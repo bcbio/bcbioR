@@ -1,0 +1,3 @@
+name: bcbio RNAseq QC
+description: Standard RNAseq QC after running bcbio
+create_dir: true

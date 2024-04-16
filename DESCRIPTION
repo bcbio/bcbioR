@@ -1,0 +1,11 @@
+Package: bcbioR
+Type: Package
+Title: Templates and functions to guide downstream analysis and data interpretation
+Version: 0.1.0
+Authors@R: person("Pantano", "Lorena", , "lorena.pantano@gmail.com",
+            role = c("aut", "cre"))
+Description: Collaborative code repository from the Harvard Chan Bioinformatics Core.
+License: MIT + file LICENSE
+LazyData: true
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
