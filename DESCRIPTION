@@ -4,8 +4,9 @@ Title: Templates and functions to guide downstream analysis and data interpretat
 Version: 0.1.0
 Authors@R: person("Pantano", "Lorena", , "lorena.pantano@gmail.com",
             role = c("aut", "cre"))
-Description: Collaborative code repository from the Harvard Chan Bioinformatics Core.
+Description: Collaborative code repository at the Harvard Chan Bioinformatics Core.
 License: MIT + file LICENSE
 LazyData: true
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.1
