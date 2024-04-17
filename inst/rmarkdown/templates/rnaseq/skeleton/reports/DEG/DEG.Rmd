@@ -21,7 +21,6 @@ params:
   denominator: bar
   subset_value: nah
   params_file: params_de.R
-
 ---
 
 ```{r echo = F}
