@@ -106,13 +106,6 @@ counts <- counts[,colnames(counts) %in% coldata$description]
 counts = counts[rownames(coldata)]
 stopifnot(all(names(counts) == rownames(coldata)))
 
-# gtf_df <- as.data.frame(rtracklayer::import(GTF))
-# gtf_df$gene_id <- sub("\\..*","\\", gtf_df$gene_id) # remove the ensembl numbering
-# 
-# rdata <- gtf_df %>% filter(type == 'gene', gene_id %in% rownames(counts)) %>%
-#   dplyr::select(gene_id, gene_name)
-# rdata$gene_name[is.na(rdata$gene_name)] <- rdata$gene_id[is.na(rdata$gene_name)]
-
 rdata = AnnotationDbi::select(org.Hs.eg.db, rownames(counts), 'SYMBOL', 'ENSEMBL') %>%
   dplyr::select(gene_id = ENSEMBL, gene_name = SYMBOL)
 
