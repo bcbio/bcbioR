@@ -32,8 +32,8 @@ library(bcbioR)
 You’ll still need to render `README.Rmd` regularly, to keep `README.md`
 up-to-date. `devtools::build_readme()` is handy for this.
 
-Use `usethis::use_import_from()` to make sure all the imports are
-correct.
+Use `usethis::use_import_from("stringr","str_replace_all")` to add a
+function you are using in the code.
 
 Don’t forget to commit and push the resulting figure files, so they
 display on GitHub and CRAN.
