@@ -14,26 +14,27 @@
 #   Test Package:              'Cmd + Shift + T'
 
 .fix <- function(x){
-  x <- tolower(x) %>% str_replace_all(x, "[[:punct:]]", " ")
-  retunr(x)
+  x <- tolower(x) %>% str_replace_all(., "[[:punct:]]", "_")
+  return(x)
 }
 
 #' @export
 bcbio_set_project <- function() {
   hbc_code <- readline("What is the hbc code:\n")
+  hbc_code <- paste0("hbc", hbc_code)
   pi <- readline("What is PI last name:\n")
   technology <- readline("What is the technology:\n")
   tissue <- readline("What is the tissue:\n")
   org <- readline("What is the organism:\n")
   project <- readline("What is the project name:\n")
-  dropbox <- readline("What is the dropbox name:\n")
-  github_org <- readline("What is the github organization:\n")
+  #dropbox <- readline("What is the dropbox name:\n")
+  #github_org <- readline("What is the github organization:\n")
   #hbc_$technology_of_$pilastname_$intervention_on_$tissue_in_$organism_$hbccode
-  project_full <- paste(project, technology, fix(pi), project, tissue, organism, hbc_code, sep="_")
-  github <- c(github_org,project_full)
-  opts <- list(code=hbc_code, project=project_full,
-               dropbox=file.path(dropbox,project_full),
-               github=github)
+  project_full <- paste(technology, .fix(pi), .fix(project), tissue, org, hbc_code, sep="_")
+  #github <- c(github_org,project_full)
+  opts <- list(code=hbc_code, project=project_full)
+               #dropbox=file.path(dropbox,project_full),
+               #github=github)
   print(opts)
   return(opts)
 }
