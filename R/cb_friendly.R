@@ -55,6 +55,7 @@ cb_friendly_pal <-function(palette = 'main', reverse = F, ...){
 #' @param palette name of the palette to be returned
 #' @param discrete boolean, whether to make palette discretely divided into colors or continuous
 #' @param reverse boolean, reverse order of colors in palette
+#' @export
 scale_color_cb_friendly <- function(palette = "main", discrete = TRUE, reverse = FALSE, ...) {
   pal <- cb_friendly_pal(palette = palette, reverse = reverse)
   
@@ -70,6 +71,7 @@ scale_color_cb_friendly <- function(palette = "main", discrete = TRUE, reverse =
 #' @param palette name of the palette to be returned
 #' @param discrete boolean, whether to make palette discretely divided into colors or continuous
 #' @param reverse boolean, reverse order of colors in palette
+#' @export
 scale_fill_cb_friendly <- function(palette = "main", discrete = TRUE, reverse = FALSE, ...) {
   pal <- cb_friendly_pal(palette = palette, reverse = reverse)
   
