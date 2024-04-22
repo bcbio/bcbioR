@@ -17,17 +17,17 @@ output:
 editor_options: 
   chunk_output_type: console
 params:
-  numerator: foo
-  denominator: bar
-  subset_value: nah
-  params_file: params_de.R
+  numerator: tumor
+  denominator: normal
+  subset_value: NA
+  params_file: ./inst/rmarkdown/templates/rnaseq/skeleton/params_de.R
 ---
 
-```{r echo = F}
+```{r load_params, echo = F}
 source(params$params_file)
 ```
 
-```{r, cache = FALSE, message = FALSE, warning=FALSE, echo=FALSE,}
+```{r load_libraries, cache = FALSE, message = FALSE, warning=FALSE, echo=FALSE,}
 library(rtracklayer)
 library(DESeq2)
 library(tidyverse)
@@ -39,6 +39,7 @@ library(msigdbr)
 library(fgsea)
 library(org.Hs.eg.db)
 library(knitr)
+library(EnhancedVolcano)
 
 ggplot2::theme_set(theme_light(base_size = 14))
 opts_chunk[["set"]](
@@ -55,7 +56,7 @@ opts_chunk[["set"]](
     fig.height = 4)
 ```
 
-```{r sanitize-datatable}
+```{r sanitize_datatable}
 sanitize_datatable = function(df, ...) {
  # remove dashes which cause wrapping
  DT::datatable(df, ..., rownames=gsub("-", "_", rownames(df)),
@@ -72,7 +73,7 @@ sanitize_datatable = function(df, ...) {
 -   Aim: `r aim`
 -   Comparison: `r paste0(params$subset_value, ': ', params$numerator, ' vs. ', params$denominator)`
 
-```{r create-filenames}
+```{r create_filenames}
 filenames = str_interp("${params$subset_value}_${params$numerator}_vs_${params$denominator}")
 contrasts = c(column,params$numerator,params$denominator)
 
@@ -88,12 +89,14 @@ name_pathways_fn=file.path(root,
 
 ```
 
-```{r read-counts-data}
-coldata=read.csv(metadata_fn, row.names = 1)
+```{r read_counts_data}
+coldata=read.csv(metadata_fn)
 stopifnot(column %in% names(coldata))
 
 # use only some samples, by default use all
-coldata <- coldata[coldata[[paste(subset_column)]] == params$subset_value, ]
+if (!is.na(subset_column)){
+  coldata <- coldata[coldata[[paste(subset_column)]] == params$subset_value, ]
+}
 coldata <- coldata[coldata[[paste(column)]] %in% c(params$numerator, params$denominator), ]
 rownames(coldata) <- coldata$description
 coldata[[column]] = relevel(as.factor(coldata[[column]]), params$denominator)
@@ -115,7 +118,7 @@ rdata = AnnotationDbi::select(org.Hs.eg.db, rownames(counts), 'SYMBOL', 'ENSEMBL
 
 When performing differential expression analysis, it is important to ensure that any detected differences are truly a result of the experimental comparison being made and not any additional variability in the data. 
 
-```{r before-RUV}
+```{r before_RUV}
 
 dds_before <- DESeqDataSetFromMatrix(counts, coldata, design = ~1)
 
@@ -126,7 +129,7 @@ degPCA(assay(vsd_before), colData(vsd_before),
 
 ```
 
-```{r do-RUV}
+```{r do_RUV}
 design <-  coldata[[column]]
 names(design) <- coldata$name
 diffs <- makeGroups(design)
@@ -144,7 +147,7 @@ formula <- as.formula(paste0("~ ",
 )
 ```
 
-```{r after-RUV}
+```{r after_RUV}
 ## Check if sample name matches
 stopifnot(all(names(counts) == rownames(new_cdata)))
 
@@ -158,11 +161,21 @@ degPCA(ruvset$normalizedCounts, new_cdata,
 
 # Differential Expression
 
-Because it is difficult to accurately detect and quantify the expression of lowly expressed genes, differences in their expression between treatment conditions can be unduly exaggerated. We correct for this so that gene LFC is not dependent overall on basal gene expression level.
+Differential gene expression analysis of count data was performed using the Bioconductor R package, DESeq2, which fits the count data to a negative binomial model. 
+
+Before fitting the model, we often look at a metric called dispersion, which is a measure for variance which also takes into consideration mean expression. A dispersion value is estimated for each individual gene, then 'shrunken' to a more accurate value based on expected variation for a typical gene exhibiting that level of expression. Finally, the shrunken dispersion value is used in the final GLM fit. 
+
+We use the below dispersion plot, which should show an inverse relationship between dispersion and mean expression, to get an idea of whether our data is a good fit for the model. 
 
 ```{r DE}
 de <- DESeq(dds_after)
 
+DESeq2::plotDispEsts(de)
+```
+
+Because it is difficult to accurately detect and quantify the expression of lowly expressed genes, differences in their expression between treatment conditions can be unduly exaggerated after the model is fit. We correct for this so that gene LFC is not dependent overall on basal gene expression level.
+
+```{r lfc_shrink}
 # resultsNames(de) # check the order is right
 resLFC = results(de, contrast=contrasts)
 resLFCS <- lfcShrink(de, coef=resultsNames(de)[ncol(vars)+2], type="apeglm")
@@ -180,14 +193,24 @@ show <- as.data.frame(res_mod[1:10, c("lfc", "padj", "gene_name")])
 degMA(as.DEGSet(resLFC)) + ggtitle('Before LFC Shrinking')
 ```
 
-```{r}
+```{r after_lfc_shrink}
 degMA(as.DEGSet(resLFCS), limit = 2) + ggtitle('After LFC Shrinking')
 
 ```
 
-This volcano plot shows the genes that are significantly up- and down-regulated as a result of the difference in treatment. 
-```{r}
-degVolcano(res_mod[,c('lfc', 'padj')], plot_text = show) 
+This volcano plot shows the genes that are significantly up- and down-regulated as a result of the analysis comparison. The points highlighted in red are genes that have padj < 0.05 and a log2-fold change > 1. Points in blue have a padj < 0.05 and a log2-fold change < 1 and points in green have a padj > 0.05 and a log2-fold change > 2. Grey points are non-significant. The dashed lines correspond to the cutoff values of log2 foldchance and padj that we have chosen.
+
+```{r volcano_plot, fig.height=6}
+# degVolcano(res_mod[,c('lfc', 'padj')], plot_text = show) 
+EnhancedVolcano(res_mod,
+                lab= res_mod$gene_name, 
+                pCutoff = 1.345719e-03, 
+                selectLab = c(res_sig$gene_name[1:15]),
+                FCcutoff = 0.5,
+                x = 'lfc',
+                y = 'padj', 
+                title="Volcano Tumor vs. Normal", 
+                subtitle = "", xlim=c(-5,5))
 
 ```
 
