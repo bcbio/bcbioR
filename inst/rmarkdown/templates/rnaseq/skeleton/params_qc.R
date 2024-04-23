@@ -6,5 +6,5 @@ aim = 'short description'
 analyst = 'person in the core'
 
 
-metadata_fn="/n/data1/cores/bcbio/platform/bcbioR-test-data/rnaseq/bcbio/coldata.csv"
-se_object="/n/data1/cores/bcbio/platform/bcbioR-test-data/rnaseq/bcbio/bcbio-se.rds"
+metadata_fn='https://raw.githubusercontent.com/bcbio/bcbioR-test-data/main/rnaseq/bcbio/coldata.csv'
+se_object=url("https://raw.githubusercontent.com/bcbio/bcbioR-test-data/main/rnaseq/bcbio/bcbio-se.rds")

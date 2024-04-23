@@ -10,6 +10,6 @@ root = "../.."
 date = "YYYYMMDD"
 column = "sample_type"
 subset_column = NA
-metadata_fn = "/n/data1/cores/bcbio/platform/bcbioR-test-data/rnaseq/bcbio/coldata.csv"
-counts_fn = '/n/data1/cores/bcbio/platform/bcbioR-test-data/rnaseq/bcbio/tximport-counts.csv'
+metadata_fn = "https://raw.githubusercontent.com/bcbio/bcbioR-test-data/main/rnaseq/bcbio/coldata.csv"
+counts_fn = 'https://raw.githubusercontent.com/bcbio/bcbioR-test-data/main/rnaseq/bcbio/tximport-counts.csv'
 basedir <- 'results'
