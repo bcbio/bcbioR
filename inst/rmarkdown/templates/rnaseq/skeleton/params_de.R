@@ -6,10 +6,10 @@ aim = 'short description'
 analyst = 'person in the core'
 
 # project params
-root = "../"
+root = "../.."
 date = "YYYYMMDD"
-column = "treatment"
-subset_column = 'cell'
-metadata_fn = "../meta/samplesheet.csv"
-counts_fn = '../data/tximport-counts.csv'
-basedir <- 'reports'
+column = "sample_type"
+subset_column = NA
+metadata_fn = "https://raw.githubusercontent.com/bcbio/bcbioR-test-data/main/rnaseq/bcbio/coldata.csv"
+counts_fn = 'https://raw.githubusercontent.com/bcbio/bcbioR-test-data/main/rnaseq/bcbio/tximport-counts.csv'
+basedir <- 'results'
