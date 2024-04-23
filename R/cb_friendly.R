@@ -1,9 +1,9 @@
 #' list of colorblind-friendly colors, developed by James and client
 cb_friendly_colors <- c(
-  `bright_purple`   = "#2759F6",
+  `blue`            = "#2759F6",
   `dark_purple`     = "#402999",
   `purple`          = "#9176C8",
-  `blue`            = "#4FAEEB",
+  `sky_blue`        = "#4FAEEB",
   `blue_grey`       = "#92A6BC",
   `forest_green`    = "#3C877B",
   `pink`            = "#E93380",
@@ -19,6 +19,7 @@ cb_friendly_colors <- c(
 )
 
 #' fetch color from list by name
+#' @export
 cb_friendly_cols <- function(...) {
   cols <- c(...)
   
@@ -30,12 +31,12 @@ cb_friendly_cols <- function(...) {
 
 #' define main colorblind-friendly palette as well as sub-palettes
 cb_friendly_palettes <- list(
-  `main`  = cb_friendly_cols("bright_purple", "dark_purple", "purple", "blue", 
+  `main`  = cb_friendly_cols("blue", "dark_purple", "purple", "sky_blue", 
                                "blue_grey", "forest_green", "pink", "olive_green", 
                                "yellow", "light_orange", "dark_orange",
                                "army_green", "black", "dark_grey", "light_blue", 
                                "brown"),
-  `cool`  = cb_friendly_cols("bright_purple", "dark_purple", "purple", "blue"),
+  `cool`  = cb_friendly_cols("blue", "dark_purple", "purple", "sky_blue"),
   `hot`   = cb_friendly_cols("yellow", "light_orange", "dark_orange"),
   `grey`  = cb_friendly_cols("black", "dark_grey", "blue_grey")
 )
@@ -44,6 +45,7 @@ cb_friendly_palettes <- list(
 #' 
 #' @param palette name of the palette to be returned
 #' @param reverse boolean, reverse order of colors in palette
+#' @export
 cb_friendly_pal <-function(palette = 'main', reverse = F, ...){
   pal <- cb_friendly_palettes[[palette]]
   if (reverse) pal <- rev(pal)
