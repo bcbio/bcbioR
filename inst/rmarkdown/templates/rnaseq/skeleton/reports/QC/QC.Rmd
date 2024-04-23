@@ -32,9 +32,10 @@ library(DESeq2)
 library(DEGreport)
 library(ggrepel)
 library(pheatmap)
-library(RColorBrewer)
+# library(RColorBrewer)
 library(DT)
 library(pheatmap)
+library(bcbioR)
 ggplot2::theme_set(theme_light(base_size = 14))
 opts_chunk[["set"]](
     cache = FALSE,
@@ -119,7 +120,7 @@ meta_df=read_csv(metadata_fn) %>% mutate(sample = tolower(description)) %>%
 
 ggplot(meta_df, aes(sample_type, fill = sample_type)) +
   geom_bar() + ylab("") + xlab("") +
-  scale_fill_brewer(palette = "Set1")
+  scale_fill_cb_friendly()
 ```
 
 
@@ -152,7 +153,7 @@ metrics %>%
     geom_point(alpha=0.5) +
     coord_flip() +
     scale_y_continuous(name = "million reads") +
-    scale_color_brewer(palette = "Set1")+
+    scale_color_cb_friendly() +
     ggtitle("Total reads") 
 
 ```
@@ -175,10 +176,10 @@ metrics %>%
                color = sample_type)) +
         geom_point() +
     coord_flip() +
-    scale_color_brewer(palette = "Set1") +
+    scale_color_cb_friendly() +
     ylim(0, 100) +
     ggtitle("Mapping rate") +
-  geom_hline(yintercept=70, color = "blue")
+  geom_hline(yintercept=70, color = cb_friendly_cols('blue'))
 ```
 
 
@@ -200,11 +201,11 @@ ggplot(metrics,aes(x = sample_type,
            y = n_genes, color = sample_type)) +
   geom_point() +
   coord_flip() +
-  scale_color_brewer(palette = "Set1") +
+  scale_color_cb_friendly() +
   ggtitle("Number of genes") +
   ylab("Number of genes") +
   xlab("") +
-  geom_hline(yintercept=20000, color = "blue")
+  geom_hline(yintercept=20000, color = cb_friendly_cols('blue'))
 ```
 
 
@@ -219,7 +220,7 @@ metrics %>%
              color = sample_type)) +
   geom_point()+
   scale_x_log10() +
-  scale_color_brewer(palette = "Set1") +
+  scale_color_cb_friendly() +
   ggtitle("Gene saturation") +
   ylab("Number of genes")
 ```
@@ -236,12 +237,12 @@ metrics %>%
   geom_point() +
   ylab("Exonic rate %") + 
   ggtitle("Exonic mapping rate") + 
-  scale_color_brewer(palette = "Set1") +
+  scale_color_cb_friendly() +
   coord_flip()  +
   xlab("") +
   ylim(c(0,100)) +
-  geom_hline(yintercept=70, color = "blue") +
-  geom_hline(yintercept=75, color = "red")
+  geom_hline(yintercept=70, color = cb_friendly_cols('blue')) +
+  geom_hline(yintercept=75, color = cb_friendly_cols('brown'))
 ```
 
 ## Intronic mapping rate
@@ -256,12 +257,12 @@ metrics %>%
   geom_point() +
   ylab("Intronic rate %") +
   ggtitle("Intronic mapping rate") + 
-  scale_color_brewer(palette = "Set1") +
+  scale_color_cb_friendly() +
   coord_flip()  +
   xlab("") +
   ylim(c(0,100)) +
-  geom_hline(yintercept=20, color = "blue") +
-  geom_hline(yintercept=15, color = "red")
+  geom_hline(yintercept=20, color = cb_friendly_cols('blue')) +
+  geom_hline(yintercept=15, color = cb_friendly_cols('brown'))
 ```
 
 ## Intergenic mapping rate
@@ -277,7 +278,7 @@ metrics %>%
     ylab("Intergenic rate %") +
     ggtitle("Intergenic mapping rate") + 
     coord_flip()  +
-    scale_color_brewer(palette = "Set1") +
+    scale_color_cb_friendly() +
     ylim(c(0, 100))
 ```
 
@@ -297,7 +298,7 @@ metrics %>%
     ylim(0, rrna_ylim) + 
     ggtitle("rRNA mapping rate") +
     coord_flip() +
-    scale_color_brewer(palette = "Set1")
+    scale_color_cb_friendly()
 ```
 
 ## 5'->3' bias
@@ -313,8 +314,8 @@ metrics %>%
   ggtitle("5'-3' bias") + 
   coord_flip() +
   ylim(c(0.5,1.5)) +
-  scale_color_brewer(palette = "Set1")+
-  geom_hline(yintercept=1, color = "blue")
+  scale_color_cb_friendly()+
+  geom_hline(yintercept=1, color = cb_friendly_cols('blue'))
 ```
 
 ## Counts per gene - all genes
@@ -337,9 +338,9 @@ ggplot(counts, aes(sample_type,
                    log2(counts+1),
                    fill = sample_type)) +
   geom_boxplot() + 
-  scale_fill_brewer(palette = "Set1") +
+  scale_fill_cb_friendly() +
   ggtitle("Counts per gene, all non-zero genes") +
-  scale_color_brewer(palette = "Set1")
+  scale_color_cb_friendly()
 ```
 
 
@@ -369,8 +370,8 @@ pca1 <- degPCA(vst, coldat_for_pca,
 pca2 <- degPCA(vst, coldat_for_pca,
               condition = "sample_type", data = T, pc1="PC3", pc2="PC4")[["plot"]]
 
-pca1 + scale_color_brewer(palette = "Set1")
-pca2 + scale_color_brewer(palette = "Set1")
+pca1 + scale_color_cb_friendly()
+pca2 + scale_color_cb_friendly()
 ```
 
 
@@ -384,9 +385,18 @@ variables=degCovariates(vst, coldat_for_pca)
 
 vst_cor <- cor(vst)
 
+annotation_cols <- cb_friendly_pal('grey')(length(unique(coldat_for_pca$sample_type)))
+names(annotation_cols) <- unique(coldat_for_pca$sample_type)
 
-p <- pheatmap(vst_cor, annotation =coldat_for_pca[,c("sample_type"), drop=F], show_rownames = T, show_colnames = T)
+p <- pheatmap(vst_cor, 
+              annotation = coldat_for_pca %>% select(sample_type) %>% mutate(sample_type = as.factor(sample_type)), 
+              show_rownames = T, 
+              show_colnames = T,
+              color = cb_friendly_pal('heatmap')(15),
+              annotation_colors = list(sample_type = annotation_cols)
+)
 p
+
 ```
 
 # R session

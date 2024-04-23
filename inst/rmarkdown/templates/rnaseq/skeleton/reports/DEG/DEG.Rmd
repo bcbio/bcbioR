@@ -75,7 +75,7 @@ sanitize_datatable = function(df, ...) {
 
 ```{r create_filenames}
 
-if (!is.na(subset_value)){
+if (!is.na(params$subset_value)){
   filenames = str_interp("${params$subset_value}_${params$numerator}_vs_${params$denominator}")
 } else {
     filenames = str_interp("${params$numerator}_vs_${params$denominator}")
@@ -130,8 +130,9 @@ dds_before <- DESeqDataSetFromMatrix(counts, coldata, design = ~1)
 
 vsd_before <- vst(dds_before)
 
-degPCA(assay(vsd_before), colData(vsd_before), 
+pca1 <- degPCA(assay(vsd_before), colData(vsd_before), 
        condition = column) + ggtitle('Before RUV')
+pca1 + scale_color_cb_friendly()
 
 ```
 
@@ -159,8 +160,9 @@ stopifnot(all(names(counts) == rownames(new_cdata)))
 
 dds_after <- DESeqDataSetFromMatrix(counts, new_cdata, design = formula)
 vsd_after<- vst(dds_after, blind=FALSE)
-degPCA(ruvset$normalizedCounts, new_cdata, 
+pca2 <- degPCA(ruvset$normalizedCounts, new_cdata, 
        condition = column) + ggtitle('After RUV')
+pca2 + scale_color_cb_friendly()
 
 ```
 
@@ -216,7 +218,7 @@ EnhancedVolcano(res_mod,
                 x = 'lfc',
                 y = 'padj', 
                 title="Volcano Tumor vs. Normal", 
-                subtitle = "", xlim=c(-5,5))
+                subtitle = "", xlim=c(-5,5)) + scale_color_cb_friendly()
 
 ```
 
