@@ -15,8 +15,15 @@ cb_friendly_colors <- c(
   `black`           = "black",
   `dark_grey`       = "darkgrey",
   `light_blue`      = "lightblue",
-  `brown`           = "#661100"   
+  `brown`           = "#661100",
+  `white`           = "white"
 )
+
+#' list cb friendly colors
+#' @export
+list_cb_friendly_cols <- function(){
+  return(cb_friendly_colors)
+}
 
 #' fetch color from list by name
 #' @export
@@ -38,7 +45,8 @@ cb_friendly_palettes <- list(
                                "brown"),
   `cool`  = cb_friendly_cols("blue", "dark_purple", "purple", "sky_blue"),
   `hot`   = cb_friendly_cols("yellow", "light_orange", "dark_orange"),
-  `grey`  = cb_friendly_cols("black", "dark_grey", "blue_grey")
+  `grey`  = cb_friendly_cols("black", "dark_grey", "blue_grey"),
+  `heatmap` = cb_friendly_cols("blue", "white", "brown")
 )
 
 #' access cb friendly palette by name, reversing if necessary

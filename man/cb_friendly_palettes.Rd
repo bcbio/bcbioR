@@ -5,7 +5,7 @@
 \alias{cb_friendly_palettes}
 \title{define main colorblind-friendly palette as well as sub-palettes}
 \format{
-An object of class \code{list} of length 4.
+An object of class \code{list} of length 5.
 }
 \usage{
 cb_friendly_palettes
