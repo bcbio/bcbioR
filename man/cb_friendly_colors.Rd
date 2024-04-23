@@ -5,7 +5,7 @@
 \alias{cb_friendly_colors}
 \title{list of colorblind-friendly colors, developed by James and client}
 \format{
-An object of class \code{character} of length 16.
+An object of class \code{character} of length 17.
 }
 \usage{
 cb_friendly_colors
