@@ -1,11 +1,10 @@
 # info params
-project = "Interon_rnaseq_hbc04916"
-PI = 'Donggi Paik, Ph.D.'
-experiment = '8 human cell lines from multiple origins. Treatment are 9 conditions including untreated.'
-aim = 'Determine treatment effect within cell line and in combination with TNF'
-analyst = 'Lorena Pantano, PhD'
+project = "name_hbcXXXXX"
+PI = 'person name'
+experiment = 'short description'
+aim = 'short description'
+analyst = 'person in the core'
 
 
-metadata_fn="../meta/hbc04916_metadata_bcbio.csv"
-se_object="../counts/bcbio-se.rds"
-cols_to_show=c("cell","treatment")
+metadata_fn="/n/data1/cores/bcbio/platform/bcbioR-test-data/rnaseq/bcbio/coldata.csv"
+se_object="/n/data1/cores/bcbio/platform/bcbioR-test-data/rnaseq/bcbio/bcbio-se.rds"

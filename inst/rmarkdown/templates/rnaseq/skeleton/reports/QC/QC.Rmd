@@ -17,7 +17,7 @@ output:
 editor_options: 
   chunk_output_type: console
 params:
-  params_file: code/params_qc.R
+  params_file: ./inst/rmarkdown/templates/rnaseq/skeleton/params_qc.R
 ---
 
 
@@ -34,6 +34,7 @@ library(ggrepel)
 library(pheatmap)
 library(RColorBrewer)
 library(DT)
+library(pheatmap)
 ggplot2::theme_set(theme_light(base_size = 14))
 opts_chunk[["set"]](
     cache = FALSE,
@@ -113,9 +114,10 @@ sanitize_datatable = function(df, ...) {
 # Samples and metadata
 
 ```{r load_metadata}
-meta_df=read_csv(metadata_fn)
+meta_df=read_csv(metadata_fn) %>% mutate(sample = tolower(description)) %>%
+  dplyr::select(-description)
 
-ggplot(meta_df, aes(cell, fill=treatment)) +
+ggplot(meta_df, aes(sample_type, fill = sample_type)) +
   geom_bar() + ylab("") + xlab("") +
   scale_fill_brewer(palette = "Set1")
 ```
@@ -126,13 +128,13 @@ se <- readRDS(se_object) #local
 
 
 metrics <- metadata(se)$metrics %>% 
-    full_join(meta_df, by = c("sample" = "sample"))
+    full_join(meta_df , by = c("sample" = "sample"))
 
 meta_sm <- meta_df %>%
   as.data.frame() %>%
   column_to_rownames("sample")
 
-meta_sm[,cols_to_show] %>% sanitize_datatable()
+meta_sm %>% sanitize_datatable()
 
 ```
 
@@ -144,9 +146,9 @@ Here, we want to see consistency and a minimum of 20 million reads.
 
 ```{r plot_total_reads}
 metrics %>%
-    ggplot(aes(x = cell,
-               y = total_reads,
-               color = treatment )) +
+    ggplot(aes(x = sample_type,
+               y = total_reads, 
+               color = sample_type)) +
     geom_point(alpha=0.5) +
     coord_flip() +
     scale_y_continuous(name = "million reads") +
@@ -168,8 +170,9 @@ The genomic mapping rate represents the percentage of reads mapping to the refer
 ```{r plot_mapping_rate}
 metrics$mapped_reads_pct <- round(metrics$mapped_reads/metrics$total_reads*100,1)
 metrics %>%
-    ggplot(aes(x = cell, 
-               y = mapped_reads_pct, color = treatment)) +
+    ggplot(aes(x = sample_type, 
+               y = mapped_reads_pct, 
+               color = sample_type)) +
         geom_point() +
     coord_flip() +
     scale_color_brewer(palette = "Set1") +
@@ -193,8 +196,8 @@ genes_detected <- summarise(genes_detected,
                       
 metrics <- metrics %>%
   left_join(genes_detected, by = c("sample" = "name"))
-ggplot(metrics,aes(x = cell,
-           y = n_genes, color = treatment)) +
+ggplot(metrics,aes(x = sample_type,
+           y = n_genes, color = sample_type)) +
   geom_point() +
   coord_flip() +
   scale_color_brewer(palette = "Set1") +
@@ -213,7 +216,7 @@ This plot shows how complex the samples are. We expect samples with more reads t
 metrics %>% 
   ggplot(aes(x = total_reads, 
              y = n_genes,
-             color = treatment)) +
+             color = sample_type)) +
   geom_point()+
   scale_x_log10() +
   scale_color_brewer(palette = "Set1") +
@@ -227,9 +230,9 @@ Here we are looking for consistency, and exonic mapping rates around 70% or 75% 
 
 ```{r plot_exonic_mapping_rate}
 metrics %>%
-  ggplot(aes(x = cell,
+  ggplot(aes(x = sample_type,
              y = exonic_rate * 100, 
-             color = treatment)) +
+             color = sample_type)) +
   geom_point() +
   ylab("Exonic rate %") + 
   ggtitle("Exonic mapping rate") + 
@@ -247,9 +250,9 @@ Here, we expect a low intronic mapping rate (≤ 15% - 20%)
 
 ```{r plot_intronic_mapping_rate}
 metrics %>%
-    ggplot(aes(x = cell,
+    ggplot(aes(x = sample_type,
                y = intronic_rate * 100, 
-               color = treatment)) +
+               color = sample_type)) +
   geom_point() +
   ylab("Intronic rate %") +
   ggtitle("Intronic mapping rate") + 
@@ -267,9 +270,9 @@ Here, we expect a low intergenic mapping rate, which is true for all samples.
 
 ```{r plot_intergenic_mapping_rate}
 metrics %>%
-    ggplot(aes(x = cell,
+    ggplot(aes(x = sample_type,
                y = intergenic_rate * 100, 
-               color = treatment)) +
+               color = sample_type)) +
         geom_point() +
     ylab("Intergenic rate %") +
     ggtitle("Intergenic mapping rate") + 
@@ -286,9 +289,9 @@ Samples should have a ribosomal RNA (rRNA) "contamination" rate below 10%
 # for some bad samples it could be > 50%
 rrna_ylim <- max(round(metrics$r_rna_rate*100, 2)) + 10
 metrics %>%
-    ggplot(aes(x = cell,
+    ggplot(aes(x = sample_type,
                y = r_rna_rate * 100, 
-               color = treatment)) +
+               color = sample_type)) +
         geom_point() +
     ylab("rRNA rate, %")+
     ylim(0, rrna_ylim) + 
@@ -303,9 +306,9 @@ There should be little bias, i.e. the values should be close to 1, or at least c
 
 ```{r plot_53_bias}
 metrics %>%
-  ggplot(aes(x = cell,
+  ggplot(aes(x = sample_type,
              y = x5_3_bias, 
-             color = treatment)) +
+             color = sample_type)) +
   geom_point() +
   ggtitle("5'-3' bias") + 
   coord_flip() +
@@ -319,7 +322,7 @@ metrics %>%
 We expect consistency in the box plots here between the samples, i.e. the distribution of counts across the genes is similar
 
 ```{r plot_counts_per_gene}
-metrics_small <- metrics %>% dplyr::select(sample, treatment)
+metrics_small <- metrics %>% dplyr::select(sample, sample_type)
 metrics_small <- left_join(sample_names, metrics_small)
 
 counts <- 
@@ -330,9 +333,9 @@ counts <-
 
 counts <- left_join(counts, metrics, by = c("name" = "sample"))
 
-ggplot(counts, aes(cell,
+ggplot(counts, aes(sample_type,
                    log2(counts+1),
-                   fill = treatment)) +
+                   fill = sample_type)) +
   geom_boxplot() + 
   scale_fill_brewer(palette = "Set1") +
   ggtitle("Counts per gene, all non-zero genes") +
@@ -355,7 +358,6 @@ raw_counts <- assays(se)[["raw"]] %>%
     filter(rowSums(.)!=0) %>%
     as.matrix()
 
-colnames(raw_counts) <- str_replace(colnames(raw_counts), "^x", "")
 vst <- vst(raw_counts)
 
 #fix samples names
@@ -363,9 +365,9 @@ coldat_for_pca <- as.data.frame(metrics)
 rownames(coldat_for_pca) <- coldat_for_pca$sample
 coldat_for_pca <- coldat_for_pca[colnames(raw_counts),]
 pca1 <- degPCA(vst, coldat_for_pca,
-              condition = "treatment", data = T)[["plot"]]
+              condition = "sample_type", data = T)[["plot"]]
 pca2 <- degPCA(vst, coldat_for_pca,
-              condition = "cell", data = T)[["plot"]]
+              condition = "sample_type", data = T, pc1="PC3", pc2="PC4")[["plot"]]
 
 pca1 + scale_color_brewer(palette = "Set1")
 pca2 + scale_color_brewer(palette = "Set1")
@@ -377,13 +379,13 @@ variables=degCovariates(vst, coldat_for_pca)
 ```
 
 
-```{r clustering fig, fig.width = 10, fig.asp = .62, eval=FALSE}
+```{r clustering fig, fig.width = 10, fig.asp = .62}
 ## Hierarchical clustering
 
 vst_cor <- cor(vst)
 
 
-p <- pheatmap(vst_cor, annotation =coldat_for_pca[,c("cell", "treatment"), drop=F], show_rownames = T, show_colnames = T)
+p <- pheatmap(vst_cor, annotation =coldat_for_pca[,c("sample_type"), drop=F], show_rownames = T, show_colnames = T)
 p
 ```
 
