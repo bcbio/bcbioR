@@ -19,6 +19,27 @@
 }
 
 #' @export
+bcbio_templates <- function(type="rnaseq", outpath){
+  switch(type,
+         rnaseq={
+
+           fpath <- system.file("rmarkdown/templates/rnaseqv2", "skeleton", package="bcbioR")
+           #file.copy(fpath, outpath, recursive = T)
+           R.utils::copyDirectory(fpath, outpath)
+         },
+         scrnaseq={
+
+           fpath <- system.file("rmarkdown/templates/singlecell", "skeleton", package="bcbioR")
+           #file.copy(fpath, outpath, recursive = T)
+           R.utils::copyDirectory(fpath, outpath)
+         },
+         {
+           stop('project type not recognize, please choose: ', 'rnaseq', 'scrnaseq')
+         }
+  )
+}
+
+#' @export
 bcbio_set_project <- function() {
   hbc_code <- readline("What is the hbc code:\n")
   hbc_code <- paste0("hbc", hbc_code)
