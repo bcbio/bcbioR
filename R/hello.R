@@ -23,7 +23,7 @@ bcbio_templates <- function(type="rnaseq", outpath){
   switch(type,
          rnaseq={
 
-           fpath <- system.file("rmarkdown/templates/rnaseqv2", "skeleton", package="bcbioR")
+           fpath <- system.file("rmarkdown/templates/rnaseq", "skeleton", package="bcbioR")
            #file.copy(fpath, outpath, recursive = T)
            R.utils::copyDirectory(fpath, outpath)
          },
