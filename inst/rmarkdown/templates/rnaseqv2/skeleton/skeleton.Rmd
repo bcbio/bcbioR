@@ -17,7 +17,7 @@ output:
 editor_options: 
   chunk_output_type: console
 params:
-  params_file: params_de.R
+  params_file: information.R
 ---
 
 ```{r echo = F}

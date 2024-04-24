@@ -1,3 +1,3 @@
 name: bcbio RNAseq
 description: Standard RNAseq down-stream analyses
-create_dir: true
+create_dir: false

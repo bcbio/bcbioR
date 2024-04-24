@@ -17,12 +17,14 @@ output:
 editor_options: 
   chunk_output_type: console
 params:
-  params_file: ./inst/rmarkdown/templates/rnaseq/skeleton/params_qc.R
+  params_file: params_qc.R
+  project_file: ../information.R
 ---
 
 
 ```{r source_params, echo = F}
 source(params$params_file)
+source(params$project_file)
 ```
 
 ```{r load_libraries, cache = FALSE, message = FALSE, warning=FALSE}

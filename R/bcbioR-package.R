@@ -2,6 +2,7 @@
 "_PACKAGE"
 
 ## usethis namespace: start
+#' @importFrom magrittr %>%
 #' @importFrom stringr str_replace_all
 ## usethis namespace: end
 #' @import ggplot2
