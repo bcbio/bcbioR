@@ -21,6 +21,7 @@ params:
   denominator: normal
   subset_value: NA
   params_file: params_de.R
+  project_file: ../information.R
 ---
 
 ```{r load_params, echo = F}
@@ -54,7 +55,7 @@ opts_chunk[["set"]](
     prompt = FALSE,
     tidy = FALSE,
     warning = FALSE,
-    echo = F, 
+    echo = T, 
     fig.height = 4)
 ```
 
@@ -332,7 +333,7 @@ res_for_writing <- res %>%
 pathways_for_writing <- pathways_long %>% 
   mutate(comparison = str_interp("${params$numerator}_vs_${params$denominator}"))
          
-if (!is.na(subset_value)){
+if (!is.na(params$subset_value)){
   counts_norm <- counts_norm %>% 
     mutate(subset = params$subset_value)  
   res_for_writing <- res_for_writing %>% 
