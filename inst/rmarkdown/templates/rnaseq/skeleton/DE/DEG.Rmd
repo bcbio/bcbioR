@@ -81,7 +81,7 @@ sanitize_datatable = function(df, ...) {
 if (!is.na(params$subset_value)){
   filenames = str_interp("${params$subset_value}_${params$numerator}_vs_${params$denominator}")
 } else {
-    filenames = str_interp("${params$numerator}_vs_${params$denominator}")
+  filenames = str_interp("${params$numerator}_vs_${params$denominator}")
 }
 
 contrasts = c(column,params$numerator,params$denominator)
@@ -128,8 +128,6 @@ rdata = AnnotationDbi::select(org.Hs.eg.db, rownames(counts), 'SYMBOL', 'ENSEMBL
 When performing differential expression analysis, it is important to ensure that any detected differences are truly a result of the experimental comparison being made and not any additional variability in the data. 
 
 
-
-
 ```{r setup_RUV}
 
 dds_before <- DESeqDataSetFromMatrix(counts, coldata, design = ~1)
@@ -159,6 +157,7 @@ pca1 + scale_color_cb_friendly()
 ```
 
 ```{r do_RUV}
+# If you want to skip the code, just set up formula to be your model in the next chunk of code
 design <-  coldata[[column]]
 names(design) <- coldata$name
 diffs <- makeGroups(design)
