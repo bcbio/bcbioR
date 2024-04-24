@@ -5,10 +5,10 @@ output: github_document
 # bcbioR
 
 <!-- badges: start -->
-  [![R-CMD-check](https://github.com/bcbio/bcbioR/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/bcbio/bcbioR/actions/workflows/R-CMD-check.yaml)
-  <!-- badges: end -->
-  
-The goal of bcbioR is to create guidelines for NGS data interpretation based on the experience of the Harvard Chan Bioinformatics Core and everybody who wants to contribute.
+
+[![R-CMD-check](https://github.com/bcbio/bcbioR/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/bcbio/bcbioR/actions/workflows/R-CMD-check.yaml) <!-- badges: end -->
+
+The goal of `bcbioR` is to create guidelines for NGS data interpretation based on the experience of the Harvard Chan Bioinformatics Core and everybody who contributes to this package.
 
 ## Installation
 
@@ -19,12 +19,31 @@ You can install the development version of bcbioR from [GitHub](https://github.c
 devtools::install_github("bcbio/bcbioR")
 ```
 
-## Example
+## Quick start
 
-
-```{r example}
+``` r
 library(bcbioR)
 ## basic example code
+# will help you to build a folder name following HCBC naming rules
+bcbio_set_project()
+```
+
+### Set base project
+
+The following code will pop up a Rmd template and then clicking 'save' will populate that folder with HCBC data structure guidelines
+
+``` r
+rmarkdown::draft("project_folder",template="common",package="bcbioR")
+```
+
+As well, You can get this by going to File -\> New File -\> R markdown: - then `From Template`, and choose `bcbio base` - choose the folder to deploy files, it could be a new folder or an existing one
+
+### Set RNAseq report folder
+
+This code will populate the folder with HCBC data structure guidelines and Rmd code:
+
+``` r
+bcbio_templates(type="rnaseq", outpath="test_folder/reports")
 ```
 
 ## How to Contribute
@@ -34,3 +53,11 @@ You'll still need to render `README.Rmd` regularly, to keep `README.md` up-to-da
 Use `usethis::use_import_from("stringr","str_replace_all")` to add a function you are using in the code.
 
 Don't forget to commit and push the resulting figure files, so they display on GitHub and CRAN.
+
+### Contributors
+
+-   Lorena Pantano
+-   Alex Bartlett
+-   Emma Berdan
+-   Heather Wick
+-   James Billingsley
