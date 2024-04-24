@@ -40,6 +40,7 @@ library(fgsea)
 library(org.Hs.eg.db)
 library(knitr)
 library(EnhancedVolcano)
+library(bcbioR)
 
 ggplot2::theme_set(theme_light(base_size = 14))
 opts_chunk[["set"]](
@@ -96,7 +97,7 @@ name_pathways_fn=file.path(root,
 ```
 
 ```{r read_counts_data}
-coldata=read.csv(metadata_fn)
+coldata=read.csv(coldata_fn)
 stopifnot(column %in% names(coldata))
 
 # use only some samples, by default use all
@@ -124,11 +125,30 @@ rdata = AnnotationDbi::select(org.Hs.eg.db, rownames(counts), 'SYMBOL', 'ENSEMBL
 
 When performing differential expression analysis, it is important to ensure that any detected differences are truly a result of the experimental comparison being made and not any additional variability in the data. 
 
-```{r before_RUV}
+
+
+
+```{r setup_RUV}
 
 dds_before <- DESeqDataSetFromMatrix(counts, coldata, design = ~1)
 
 vsd_before <- vst(dds_before)
+
+```
+
+```{r covariates, fig.height = 6, fig.width = 10}
+
+se <- readRDS(se_object) #local
+metrics <- metadata(se)$metrics %>% mutate(sample = toupper(sample)) %>% 
+  left_join(coldata %>% rownames_to_column('sample')) %>% column_to_rownames('sample')
+
+degCovariates(
+  assay(vsd_before),
+  metrics
+)
+```
+
+```{r before_RUV} 
 
 pca1 <- degPCA(assay(vsd_before), colData(vsd_before), 
        condition = column) + ggtitle('Before RUV')
@@ -193,7 +213,8 @@ res <- as.data.frame(resLFCS) %>%
   relocate(gene_name) %>% dplyr::rename(lfc = log2FoldChange) %>%
   mutate(pi = abs(lfc) * -log10(padj)) %>% arrange(-pi)
 
-res_sig <- res %>% filter(padj < 0.05) %>% arrange(padj)
+res_sig <- res %>% filter(padj < 0.05) %>% arrange(padj) %>%
+  mutate(gene_name = ifelse(is.na(gene_name), gene_id, gene_name))
 
 res_mod <- res %>% mutate(lfc = replace(lfc, lfc < -5, -5)) %>% mutate(lfc = replace(lfc, lfc > 5, 5))
 show <- as.data.frame(res_mod[1:10, c("lfc", "padj", "gene_name")])
@@ -225,6 +246,22 @@ EnhancedVolcano(res_mod,
 ## Differentially Expressed Genes
 ```{r sig_genes_table}
 res_sig %>% sanitize_datatable
+```
+
+```{r top n DEGs, fig.height = 6, fig.width = 8}
+n = 16
+top_n <- res_sig %>% slice_min(order_by = padj, n = n, with_ties = F) %>% 
+  dplyr::select(gene_name, gene_id)
+top_n_exp <- assays(vsd_after) %>% as.data.frame() %>% 
+  rownames_to_column('gene_id') %>%
+  dplyr::select(-group, -group_name) %>% 
+  pivot_longer(!gene_id, names_to = 'sample', values_to = 'log2_expression') %>%
+  right_join(top_n) %>%
+  left_join(coldata, by = c('sample' = 'description'))
+
+ggplot(top_n_exp, aes_string(x = column, y = 'log2_expression')) + geom_boxplot() + 
+  facet_wrap(~gene_name) + ggtitle(str_interp('Expression of Top ${n} DEGs'))
+
 ```
 
 # Pathway Enrichment
