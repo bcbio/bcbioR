@@ -1,23 +1,25 @@
-# Hello, world!
-#
-# This is an example function named 'hello'
-# which prints 'Hello, world!'.
-#
-# You can learn more about package authoring with RStudio at:
-#
-#   http://r-pkgs.had.co.nz/
-#
-# Some useful keyboard shortcuts for package authoring:
-#
-#   Install Package:           'Cmd + Shift + B'
-#   Check Package:             'Cmd + Shift + E'
-#   Test Package:              'Cmd + Shift + T'
-
 .fix <- function(x){
   x <- tolower(x) %>% str_replace_all(., "[[:punct:]]", "_")
   return(x)
 }
 
+#' Function to help deploy analysis folder inside a project folder
+#'
+#' This function contains Rmd, R, md, files that help to structure
+#' an analysis following HCBC best-practices.
+#' For rnaseq, it will deploy: QC and DE Rmd with additional files to help
+#'   to facilitate the analysis as needed.
+#'
+#' Normally these helper files are inside a report folder inside a
+#' project folder.
+#'
+#' @param type string indicating the type of analysis, supported: rnaseq.
+#'
+#' @param outpath string path indicating where to copy all the files to
+#' @examples
+#'  \dontrun{
+#'  bcbio_templates("rnaseq", "path_to_projects/project1/reports")
+#'  }
 #' @export
 bcbio_templates <- function(type="rnaseq", outpath){
   switch(type,
@@ -39,9 +41,23 @@ bcbio_templates <- function(type="rnaseq", outpath){
   )
 }
 
+#' Function to help with project name used for parent folder
+#'
+#' This function will ask for user input about:
+#'   * numeric code
+#'   * PI full name
+#'   * technology
+#'   * tissue
+#'   * organism
+#'   * project description
+#'
+#' It removes special character with `_`. The output is a guideline to
+#'   what the folder used can be.
+#'
+#' @returns A string list with hbc_code, and project folder name
 #' @export
 bcbio_set_project <- function() {
-  hbc_code <- readline("What is the hbc code:\n")
+  hbc_code <- readline("What is the hbc code (only numbers):\n")
   hbc_code <- paste0("hbc", hbc_code)
   pi <- readline("What is PI last name:\n")
   technology <- readline("What is the technology:\n")
@@ -67,12 +83,6 @@ bcbio_start_project <- function(options) {
 
 #' @export
 bcbio_gitignore <- function(options) {
-
-}
-
-
-hello <- function() {
-  print("Hello, world!")
 
 }
 
