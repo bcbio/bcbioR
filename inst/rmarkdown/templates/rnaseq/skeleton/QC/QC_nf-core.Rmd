@@ -17,7 +17,7 @@ output:
 editor_options: 
   chunk_output_type: console
 params:
-  params_file: ./inst/rmarkdown/templates/rnaseq/skeleton/QC/params_qc.R
+  params_file: ./inst/rmarkdown/templates/rnaseq/skeleton/QC/params_qc_nf-core.R
   project_file: ./inst/rmarkdown/templates/rnaseq/skeleton/information.R
 ---
 
@@ -117,7 +117,8 @@ sanitize_datatable = function(df, ...) {
 # Samples and metadata
 
 ```{r load_metadata}
-meta_df=read_csv(metadata_fn) %>% mutate(sample = tolower(description)) %>%
+
+meta_df=read_csv(metadata_fn) %>% mutate(sample = description) %>%
   dplyr::select(-description)
 
 ggplot(meta_df, aes(sample_type, fill = sample_type)) +
@@ -126,13 +127,40 @@ ggplot(meta_df, aes(sample_type, fill = sample_type)) +
 ```
 
 
-```{r  show-metadata}
-se <- readRDS(se_object) #local
+```{r  prepare metrics}
 
+metrics <- read_tsv(paste0(multiqc_data_dir, 'multiqc_general_stats.txt'))
+metrics_qualimap <- read_tsv(paste0(multiqc_data_dir, 'mqc_qualimap_genomic_origin_1.txt'))
 
-metrics <- metadata(se)$metrics %>% 
+metrics <- metrics %>% full_join(metrics_qualimap)
+metrics <- metrics %>%
+  clean_names() %>% 
+  dplyr::rename_with(~gsub('.*mqc_generalstats_', '', .))
+
+total_reads <- metrics %>% 
+  filter(grepl('_', sample)) %>% 
+  remove_empty(which = 'cols') %>%
+  dplyr::rename(single_sample = sample) %>%
+  mutate(sample = gsub('_[12]+$', '', single_sample)) %>%
+  group_by(sample) %>%
+  summarize(total_reads = sum(fastqc_raw_total_sequences))
+
+metrics <- metrics %>% 
+  filter(!grepl('_', sample)) %>% 
+  remove_empty(which = 'cols') %>%
+  full_join(total_reads) %>%
+  mutate(mapped_reads = samtools_reads_mapped) %>%
+  mutate(exonic_rate = exonic/(star_uniquely_mapped * 2)) %>%
+  mutate(intronic_rate = intronic/(star_uniquely_mapped * 2)) %>%
+  mutate(intergenic_rate = intergenic/(star_uniquely_mapped * 2)) %>%
+  mutate(r_rna_rate = custom_content_biotype_counts_percent_r_rna) %>%
+  mutate(x5_3_bias = qualimap_5_3_bias)
+
+metrics <- metrics %>%
     full_join(meta_df , by = c("sample" = "sample"))
+```
 
+```{r show-metadata}
 meta_sm <- meta_df %>%
   as.data.frame() %>%
   column_to_rownames("sample")
@@ -190,7 +218,8 @@ metrics %>%
 The number of genes represented in every sample is expected to be consistent and over 20K (blue line).
 
 ```{r plot_genes_detected}
-genes_detected <- colSums(assays(se)[["raw"]] > 0) %>% enframe()
+se <- readRDS(se_object)
+genes_detected <- colSums(assays(se)[["counts"]] > 0) %>% enframe()
 sample_names <- metrics[,c("sample"), drop=F]
 genes_detected <- left_join(genes_detected, sample_names, by = c("name" = "sample"))
 genes_detected <- genes_detected %>% group_by(name)
@@ -329,7 +358,7 @@ metrics_small <- metrics %>% dplyr::select(sample, sample_type)
 metrics_small <- left_join(sample_names, metrics_small)
 
 counts <- 
-  assays(se)[["raw"]] %>% 
+  assays(se)[["counts"]] %>% 
   as_tibble() %>%
   filter(rowSums(.)!=0) %>% 
   gather(name, counts) 
@@ -356,7 +385,7 @@ Principal Component Analysis (PCA) is a statistical technique used to simplify h
 
 <!-- ### PCA, PCs 1-5, (labled) -->
 ```{r PCA1:5 summary, all, unlabeled, fig.width= 7, fig.height = 5}
-raw_counts <- assays(se)[["raw"]] %>%
+raw_counts <- assays(se)[["counts"]] %>% round() %>%
     as_tibble() %>%
     filter(rowSums(.)!=0) %>%
     as.matrix()
