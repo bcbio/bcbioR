@@ -20,7 +20,7 @@ params:
   numerator: tumor
   denominator: normal
   subset_value: NA
-  ruv: false
+  ruv: true
   params_file: params_de.R
   project_file: ../information.R
 ---
@@ -45,7 +45,9 @@ library(knitr)
 library(EnhancedVolcano)
 library(bcbioR)
 library(ggprism)
-
+library(viridis)
+library(pheatmap)
+colors=cb_friendly_cols(1:15)
 ggplot2::theme_set(theme_prism(base_size = 14))
 opts_chunk[["set"]](
     cache = F,
@@ -156,13 +158,15 @@ degCovariates(
 ```{r before_RUV} 
 
 pca1 <- degPCA(norm_matrix, colData(dds_to_use), 
-       condition = column) + ggtitle('Before RUV')
+       condition = column) + ggtitle('PCA')
 pca1 + scale_color_cb_friendly()
 
 ```
 
 ```{r init_DESEQ}
 formula <- as.formula(paste0("~ ", " + ", column))
+## Check if sample name matches
+stopifnot(all(names(counts) == rownames(coldata)))
 
 dds_to_use <- DESeqDataSetFromMatrix(counts, coldata, design = formula)
 
@@ -170,17 +174,18 @@ vsd_before <- vst(dds_to_use)
 norm_matrix = assay(vsd_before)
 ```
 
-```{eval=params$ruv, results='asis'}
-# Remove Unwanted Variability
+```{r, eval=params$ruv, results='asis', echo=FALSE}
+cat("# Remove Unwanted Variability
 
-When performing differential expression analysis, it is important to ensure that any detected differences are truly a result of the experimental comparison being made and not any additional variability in the data. 
+When performing differential expression analysis, it is important to ensure that any detected differences are truly a result of the experimental comparison being made and not any additional variability in the data.")
 
 ```
 
 ```{r do_RUV, eval=params$ruv}
 # If you want to skip the code, just set up formula to be your model in the next chunk of code
+design <- coldata[[column]]
 diffs <- makeGroups(design)
-dat <- assay(vsd_before)
+dat <- norm_matrix
 ruvset <- RUVs(dat, cIdx=rownames(dat), k=1, diffs, isLog = T, round = F)
 vars <- ruvset$W
 
@@ -200,8 +205,6 @@ pca2 + scale_color_cb_friendly()
 ```
 
 ```{r after_RUV, eval=params$ruv}
-## Check if sample name matches
-stopifnot(all(names(counts) == rownames(new_cdata)))
 
 dds_to_use <- DESeqDataSetFromMatrix(counts, new_cdata, design = formula)
 vsd_to_use<- vst(dds_to_use, blind=FALSE)
@@ -244,10 +247,14 @@ show <- as.data.frame(res_mod[1:10, c("lfc", "padj", "gene_name")])
 degMA(as.DEGSet(resLFC)) + ggtitle('Before LFC Shrinking')
 ```
 
+## MA plot
+
 ```{r after_lfc_shrink}
 degMA(as.DEGSet(resLFCS), limit = 2) + ggtitle('After LFC Shrinking')
 
 ```
+
+## Volcano plot
 
 This volcano plot shows the genes that are significantly up- and down-regulated as a result of the analysis comparison. The points highlighted in red are genes that have padj < 0.05 and a log2-fold change > 1. Points in blue have a padj < 0.05 and a log2-fold change < 1 and points in green have a padj > 0.05 and a log2-fold change > 2. Grey points are non-significant. The dashed lines correspond to the cutoff values of log2 foldchance and padj that we have chosen.
 
@@ -260,12 +267,41 @@ EnhancedVolcano(res_mod,
                 FCcutoff = 0.5,
                 x = 'lfc',
                 y = 'padj', 
-                title="Volcano Tumor vs. Normal", 
-                subtitle = "", xlim=c(-5,5)) + scale_color_cb_friendly()
+                title="Volcano Tumor vs. Normal",
+                col=as.vector(colors[c("dark_grey", "light_blue",
+                                         "purple", "purple")]),
+                subtitle = "", xlim=c(-5,5)) 
 
 ```
 
+## Heatmap
+
+```{r heapmap}
+### Run pheatmap using the metadata data frame for the annotation
+ma=norm_matrix[res_sig$gene_id,]
+colma=coldata[,c("sample_type"), drop=FALSE]
+colors=lapply(colnames(colma), function(c){
+  l.col=colors[1:length(unique(colma[[c]]))]
+  names(l.col)=unique(colma[[c]])
+  l.col
+})
+names(colors)=colnames(colma)
+pheatmap(ma, 
+         color = inferno(10), 
+         cluster_rows = T, 
+         show_rownames = F,
+         annotation = colma, 
+         annotation_colors = colors,
+         border_color = NA, 
+         fontsize = 10, 
+         scale = "row", 
+         fontsize_row = 10, 
+         height = 20)
+```
+
+
 ## Differentially Expressed Genes
+
 ```{r sig_genes_table}
 res_sig %>% sanitize_datatable
 ```
