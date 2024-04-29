@@ -14,3 +14,7 @@ Imports:
     stringr,
     ggplot2,
     magrittr
+Suggests: 
+    knitr,
+    rmarkdown
+VignetteBuilder: knitr
