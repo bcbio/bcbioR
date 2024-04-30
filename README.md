@@ -51,6 +51,11 @@ and Rmd code:
 bcbio_templates(type="rnaseq", outpath="test_folder/reports")
 ```
 
+### Discover more…
+
+Go to the vignette to know more
+`vignette("bcbioR_quick_start,package="bcbioR")`
+
 ## How to Contribute
 
 You’ll still need to render `README.Rmd` regularly, to keep `README.md`

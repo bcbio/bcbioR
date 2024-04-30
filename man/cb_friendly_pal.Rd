@@ -10,6 +10,8 @@ cb_friendly_pal(palette = "main", reverse = F, ...)
 \item{palette}{name of the palette to be returned}
 
 \item{reverse}{boolean, reverse order of colors in palette}
+
+\item{...}{pass to ggplot}
 }
 \description{
 access cb friendly palette by name, reversing if necessary

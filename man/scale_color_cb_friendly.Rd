@@ -17,6 +17,8 @@ scale_color_cb_friendly(
 \item{discrete}{boolean, whether to make palette discretely divided into colors or continuous}
 
 \item{reverse}{boolean, reverse order of colors in palette}
+
+\item{...}{pass to ggplot}
 }
 \description{
 use cb friendly colors as color aesthetic with ggplot
