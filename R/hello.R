@@ -27,13 +27,13 @@ bcbio_templates <- function(type="rnaseq", outpath){
 
            fpath <- system.file("rmarkdown/templates/rnaseq", "skeleton", package="bcbioR")
            #file.copy(fpath, outpath, recursive = T)
-           R.utils::copyDirectory(fpath, outpath)
+           copyDirectory(fpath, outpath)
          },
          scrnaseq={
 
            fpath <- system.file("rmarkdown/templates/singlecell", "skeleton", package="bcbioR")
            #file.copy(fpath, outpath, recursive = T)
-           R.utils::copyDirectory(fpath, outpath)
+           copyDirectory(fpath, outpath)
          },
          {
            stop('project type not recognize, please choose: ', 'rnaseq', 'scrnaseq')
@@ -76,12 +76,11 @@ bcbio_set_project <- function() {
   return(opts)
 }
 
-#' @export
+
 bcbio_start_project <- function(options) {
 
 }
 
-#' @export
 bcbio_gitignore <- function(options) {
 
 }

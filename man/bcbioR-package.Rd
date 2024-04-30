@@ -8,6 +8,13 @@
 \description{
 Collaborative code repository at the Harvard Chan Bioinformatics Core.
 }
+\seealso{
+Useful links:
+\itemize{
+  \item \url{http://bcb.io/bcbioR/}
+}
+
+}
 \author{
 \strong{Maintainer}: Pantano Lorena \email{lorena.pantano@gmail.com}
 

@@ -8,3 +8,6 @@
 ^pkgdown$
 ^doc$
 ^Meta$
+test/*
+inst/*/*/*/*/*/*html
+inst/*/*/*/*/*/*csv

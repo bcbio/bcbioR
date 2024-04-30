@@ -6,6 +6,9 @@
 \usage{
 cb_friendly_cols(...)
 }
+\arguments{
+\item{...}{list of color names}
+}
 \description{
 fetch color from list by name
 }

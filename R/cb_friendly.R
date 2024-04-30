@@ -26,6 +26,9 @@ list_cb_friendly_cols <- function(){
 }
 
 #' fetch color from list by name
+#'
+#' @param ... list of color names
+#'
 #' @export
 cb_friendly_cols <- function(...) {
   cols <- c(...)
@@ -53,6 +56,7 @@ cb_friendly_palettes <- list(
 #'
 #' @param palette name of the palette to be returned
 #' @param reverse boolean, reverse order of colors in palette
+#' @param ... pass to ggplot
 #' @export
 cb_friendly_pal <-function(palette = 'main', reverse = F, ...){
   pal <- cb_friendly_palettes[[palette]]
@@ -65,6 +69,7 @@ cb_friendly_pal <-function(palette = 'main', reverse = F, ...){
 #' @param palette name of the palette to be returned
 #' @param discrete boolean, whether to make palette discretely divided into colors or continuous
 #' @param reverse boolean, reverse order of colors in palette
+#' @param ... pass to ggplot
 #' @export
 scale_color_cb_friendly <- function(palette = "main", discrete = TRUE, reverse = FALSE, ...) {
   pal <- cb_friendly_pal(palette = palette, reverse = reverse)
@@ -81,6 +86,7 @@ scale_color_cb_friendly <- function(palette = "main", discrete = TRUE, reverse =
 #' @param palette name of the palette to be returned
 #' @param discrete boolean, whether to make palette discretely divided into colors or continuous
 #' @param reverse boolean, reverse order of colors in palette
+#' @param ... pass to ggplot
 #' @export
 scale_fill_cb_friendly <- function(palette = "main", discrete = TRUE, reverse = FALSE, ...) {
   pal <- cb_friendly_pal(palette = palette, reverse = reverse)
