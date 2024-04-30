@@ -2,7 +2,8 @@
 title: "bcbioR quick start"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Quick_Start}
+
+  %\VignetteIndexEntry{bcbioR quick start}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
