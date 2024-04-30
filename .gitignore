@@ -7,3 +7,4 @@ test/*
 inst/*/*/*/*/*/*html
 inst/*/*/*/*/*/*csv
 inst/doc
+docs
