@@ -1,0 +1,10 @@
+pandoc: 3.1.11
+pkgdown: 2.0.9
+pkgdown_sha: ~
+articles:
+  bcbioR_quick_start: bcbioR_quick_start.html
+last_built: 2024-04-30T16:23Z
+urls:
+  reference: http://bcb.io/bcbioR/reference
+  article: http://bcb.io/bcbioR/articles
+
