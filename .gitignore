@@ -8,3 +8,5 @@ inst/*/*/*/*/*/*html
 inst/*/*/*/*/*/*csv
 inst/doc
 docs
+/doc/
+/Meta/

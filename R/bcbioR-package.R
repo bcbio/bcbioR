@@ -7,4 +7,5 @@
 ## usethis namespace: end
 #' @import ggplot2
 #' @import hues
+#' @import ggprism
 NULL
