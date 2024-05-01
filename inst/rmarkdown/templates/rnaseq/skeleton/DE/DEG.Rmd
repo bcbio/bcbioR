@@ -21,13 +21,16 @@ params:
   denominator: normal
   subset_value: NA
   ruv: true
-  params_file: params_de.R
-  project_file: ../information.R
+  params_file: ./inst/rmarkdown/templates/rnaseq/skeleton/DE/params_de.R
+  project_file: ./inst/rmarkdown/templates/rnaseq/skeleton/information.R
+  functions_file: ./inst/rmarkdown/templates/rnaseq/skeleton/load_data.R
+  
 ---
 
 ```{r load_params, echo = F}
 source(params$params_file)
 source(params$project_file)
+source(params$functions_file)
 ```
 
 ```{r load_libraries, cache = FALSE, message = FALSE, warning=FALSE, echo=FALSE,}
@@ -47,6 +50,7 @@ library(bcbioR)
 library(ggprism)
 library(viridis)
 library(pheatmap)
+library(janitor)
 colors=cb_friendly_cols(1:15)
 ggplot2::theme_set(theme_prism(base_size = 14))
 opts_chunk[["set"]](
@@ -106,21 +110,20 @@ name_pathways_fn=file.path(
 
 ```
 
-```{r read_counts_data}
-coldata=read.csv(coldata_fn)
-stopifnot(column %in% names(coldata))
+```{r load_coldata}
+coldata <- load_coldata(coldata_fn, params$numerator, params$denominator, subset_column, params$subset_value)
+```
 
-# use only some samples, by default use all
-if (!is.na(subset_column)){
-  coldata <- coldata[coldata[[paste(subset_column)]] == params$subset_value, ]
-}
-coldata <- coldata[coldata[[paste(column)]] %in% c(params$numerator, params$denominator), ]
-rownames(coldata) <- coldata$description
-coldata[[column]] = relevel(as.factor(coldata[[column]]), params$denominator)
+```{r load metrics}
+metrics <- load_metrics(se_object, multiqc_data_dir) %>% 
+  left_join(coldata, by = c('sample' = 'description'))
+rownames(metrics) <- metrics$sample
+```
 
-counts <- read_csv(counts_fn) %>% column_to_rownames('gene')
+```{r load_counts_data}
+
+counts <- load_counts(counts_fn)
 counts <- counts[,colnames(counts) %in% coldata$description]
-
 
 # if the names don't match in order or string check files names and coldata information
 counts = counts[rownames(coldata)]
@@ -142,14 +145,9 @@ norm_matrix = assay(vsd_before)
 # Covariate analysis
 
 ```{r covariates, fig.height = 6, fig.width = 10}
-
-se <- readRDS(se_object) #local
-metrics <- metadata(se)$metrics %>% mutate(sample = toupper(sample)) %>% 
-  left_join(coldata %>% rownames_to_column('sample')) %>% column_to_rownames('sample')
-
 degCovariates(
   norm_matrix,
-  metrics
+  metrics %>% as.data.frame %>% column_to_rownames('sample')
 )
 ```
 

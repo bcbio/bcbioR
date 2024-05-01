@@ -3,8 +3,8 @@ library(rmarkdown)
 render_de <- function(numerator, denominator, subset_value = NA,
                       params_file = 'params_de.R'){
 
-  rmarkdown::render(input = "DEG.Rmd",
-                    output_dir = "./",
+  rmarkdown::render(input = "./inst/rmarkdown/templates/rnaseq/skeleton/DE/DEG.Rmd",
+                    output_dir = "./inst/rmarkdown/templates/rnaseq/skeleton/DE/",
                     output_format = "html_document",
                     output_file = ifelse(!is.na(subset_value),
                                          paste0('DE_', subset_value, '_', numerator, '_vs_', denominator, '.html'),
@@ -17,7 +17,8 @@ render_de <- function(numerator, denominator, subset_value = NA,
                       numerator = numerator,
                       denominator = denominator,
                       params_file = params_file,
-                      project_file = '../information.R'
+                      project_file = '../information.R',
+                      functions_file = '../load_data.R'
                     )
   )
 }
