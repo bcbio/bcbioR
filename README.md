@@ -58,14 +58,29 @@ Go to the vignette to know more
 
 ## How to Contribute
 
-You’ll still need to render `README.Rmd` regularly, to keep `README.md`
-up-to-date. `devtools::build_readme()` is handy for this.
+### Open an issue
 
-Use `usethis::use_import_from("stringr","str_replace_all")` to add a
-function you are using in the code.
+- If you find a bug
+- If you want a new feature
+- If you want to add code to the templates
 
-Don’t forget to commit and push the resulting figure files, so they
-display on GitHub and CRAN.
+### Modify the code
+
+- Clone the repository
+- Make sure you are in the `devel` branch
+- Create a new branch `git checkout -b feature1`
+- Modify you code, add and commit
+- Push to GitHub the new branch
+- Create a PR from your branch to `devel`
+- Assignt the PR to me or Alex
+
+Some best practices when developing:
+
+- install `devtools`
+- render `README.Rmd` regularly, to keep `README.md` up-to-date.
+  `devtools::build_readme()` is handy for this.
+- Use `usethis::use_import_from("stringr","str_replace_all")` to add a
+  new function you are using in the code.
 
 ### Contributors
 
