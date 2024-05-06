@@ -54,7 +54,7 @@ bcbio_templates(type="rnaseq", outpath="test_folder/reports")
 ### Discover more…
 
 Go to the vignette to know more
-`vignette("bcbioR_quick_start,package="bcbioR")`
+`vignette("bcbioR_quick_start",package="bcbioR")`
 
 ## How to Contribute
 
