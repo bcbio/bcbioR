@@ -1,5 +1,5 @@
 library(rmarkdown)
-
+# set working directory to this file before using the function
 render_de <- function(numerator, denominator, subset_value = NA,
                       params_file = 'params_de.R'){
 

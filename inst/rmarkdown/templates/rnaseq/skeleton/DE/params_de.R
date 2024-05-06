@@ -1,14 +1,12 @@
 # project params
 date = "YYYYMMDD"
-column = "sample_type"
-subset_column = NA
 basedir <- './'
 
 # params for bcbio
 coldata_fn = "https://raw.githubusercontent.com/bcbio/bcbioR-test-data/main/rnaseq/bcbio/coldata.csv"
 counts_fn = 'https://raw.githubusercontent.com/bcbio/bcbioR-test-data/main/rnaseq/bcbio/tximport-counts.csv'
 se_object=url("https://raw.githubusercontent.com/bcbio/bcbioR-test-data/main/rnaseq/bcbio/bcbio-se.rds")
-# 
+#
 # params for nfcore
 # coldata_fn = 'https://raw.githubusercontent.com/bcbio/bcbioR-test-data/main/rnaseq/nf-core/coldata.csv'
 # counts_fn = 'https://raw.githubusercontent.com/bcbio/bcbioR-test-data/main/rnaseq/nf-core/salmon.merged.gene_counts.tsv'
