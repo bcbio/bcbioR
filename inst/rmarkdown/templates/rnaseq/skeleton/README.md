@@ -14,6 +14,9 @@ CONTROL_REP1,s3path/AEG588A1_S1_L002_R1_001.fastq.gz,s3path/AEG588A1_S1_L002_R2_
 CONTROL_REP1,s3path/AEG588A1_S1_L003_R1_001.fastq.gz,s3path/AEG588A1_S1_L003_R2_001.fastq.gz,auto
 CONTROL_REP1,s3path/AEG588A1_S1_L004_R1_001.fastq.gz,s3path/AEG588A1_S1_L004_R2_001.fastq.gz,auto
 ```
+
+You can add more columns to this file with more metadata, and use this file as the `coldata` file the templates.
+
 - Upload file to our `Datasets` in Seqera using the name of the project but starting with `nfcore-rnaseq`
 - Go to `Launchpad`, select `nf-core_rnaseq` pipeline, and select the previous created `Datasets` in the `input` parameter after clicking in `Browser`
   - Select an output directory with the same name used for the `Dataset` inside the `results` folder in S3
