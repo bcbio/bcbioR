@@ -15,10 +15,9 @@ everybody who contributes to this package.
 You can install the development version of bcbioR from
 [GitHub](https://github.com/) with:
 
-``` r
-# install.packages("devtools")
-devtools::install_github("bcbio/bcbioR")
-```
+    # install.packages("devtools")
+    devtools::install_github("bcbio/bcbioR")
+    devtools::install_github("bcbio/bcbioR",ref = "devel")
 
 ## Quick start
 

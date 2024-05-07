@@ -14,9 +14,10 @@ The goal of `bcbioR` is to create guidelines for NGS data interpretation based o
 
 You can install the development version of bcbioR from [GitHub](https://github.com/) with:
 
-``` r
+```
 # install.packages("devtools")
 devtools::install_github("bcbio/bcbioR")
+devtools::install_github("bcbio/bcbioR",ref = "devel")
 ```
 
 ## Quick start
