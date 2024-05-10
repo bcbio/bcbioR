@@ -121,7 +121,10 @@ sanitize_datatable = function(df, ...) {
 
 ```{r load_metadata}
 
-meta_df=read_csv(metadata_fn)  %>% arrange(.data[[params$factor_of_interest]]) %>% distinct(sample, .keep_all = T)
+meta_df=read_csv(metadata_fn)  %>% 
+  arrange(.data[[params$factor_of_interest]]) %>% distinct(sample, .keep_all = T) %>% 
+  select(!matches("fastq"), !matches("strandness"))
+meta_df$sample <- make.names(meta_df$sample)
 order <- meta_df$sample
 
 ggplot(meta_df, aes(.data[[params$factor_of_interest]], fill = .data[[params$factor_of_interest]])) +
@@ -132,8 +135,8 @@ ggplot(meta_df, aes(.data[[params$factor_of_interest]], fill = .data[[params$fac
 
 ```{r  prepare metrics}
 
-metrics <- read_tsv(paste0(multiqc_data_dir, 'multiqc_general_stats.txt'))
-metrics_qualimap <- read_tsv(paste0(multiqc_data_dir, 'mqc_qualimap_genomic_origin_1.txt'))
+metrics <- read_tsv(file.path(multiqc_data_dir, 'multiqc_general_stats.txt'))
+metrics_qualimap <- read_tsv(file.path(multiqc_data_dir, 'mqc_qualimap_genomic_origin_1.txt'))
 
 metrics <- metrics %>% full_join(metrics_qualimap)
 metrics <- metrics %>%
@@ -156,11 +159,19 @@ metrics <- metrics %>%
   mutate(exonic_rate = exonic/(star_uniquely_mapped * 2)) %>%
   mutate(intronic_rate = intronic/(star_uniquely_mapped * 2)) %>%
   mutate(intergenic_rate = intergenic/(star_uniquely_mapped * 2)) %>%
-  mutate(r_rna_rate = custom_content_biotype_counts_percent_r_rna) %>%
   mutate(x5_3_bias = qualimap_5_3_bias)
 
+if ("custom_content_biotype_counts_percent_r_rna" %in% colnames(metrics)){
+  metrics <- mutate(metrics, r_rna_rate = custom_content_biotype_counts_percent_r_rna)
+}else{
+ metrics[["r_rna_rate"]] <- NA
+}
+
+
+metrics$sample <- make.names(metrics$sample)
 metrics <- metrics %>%
-    full_join(meta_df , by = c("sample" = "sample"))
+  full_join(meta_df , by = c("sample" = "sample")) %>% 
+  select(where(~!all(is.na(.))))
 
 
 ```
@@ -422,14 +433,9 @@ raw_counts <- assays(se)[["counts"]] %>% round() %>%
     filter(rowSums(.)!=0) %>%
     as.matrix()
 
-### Just for this analysis, not to be permanently added#####
-colnames(raw_counts) <- gsub("X4","4", colnames(raw_counts))
-
-
 
 vst <- vst(raw_counts)
 
-#fix samples names
 coldat_for_pca <- as.data.frame(metrics)
 rownames(coldat_for_pca) <- coldat_for_pca$sample
 coldat_for_pca <- coldat_for_pca[colnames(raw_counts),]

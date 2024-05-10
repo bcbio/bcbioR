@@ -29,7 +29,7 @@ params:
   
 ---
 
-```{r load_params, echo = F}
+```{r load_params, cache = FALSE, message = FALSE, warning=FALSE}
 source(params$params_file)
 source(params$project_file)
 source(params$functions_file)
@@ -43,23 +43,7 @@ run_ruv=params$ruv
 ```
 
 
-```{r load_data}
-# this code will load from bcbio or nf-core folder
-# NOTE make sure to set numerator and denominator
-coldata <- load_coldata(coldata_fn, column,
-                        numerator, denominator,
-                        subset_column, subset_value)
-metrics <- load_metrics(se_object, multiqc_data_dir) %>% 
-  left_join(coldata, by = c('sample' = 'description'))
-rownames(metrics) <- metrics$sample
-counts <- load_counts(counts_fn)
-counts <- counts[,colnames(counts) %in% coldata$description]
-# if the names don't match in order or string check files names and coldata information
-counts = counts[rownames(coldata)]
-stopifnot(all(names(counts) == rownames(coldata)))
-```
-
-```{r load_libraries, cache = FALSE, message = FALSE, warning=FALSE, echo=FALSE,}
+```{r load_libraries, cache = FALSE, message = FALSE, warning=FALSE}
 library(rtracklayer)
 library(DESeq2)
 library(tidyverse)
@@ -94,6 +78,24 @@ opts_chunk[["set"]](
 
 # set seed for reproducibility
 set.seed(1234567890L)
+```
+
+
+```{r load_data, message=F, warning=F}
+# this code will load from bcbio or nf-core folder
+# NOTE make sure to set numerator and denominator
+coldata <- load_coldata(coldata_fn, column,
+                        numerator, denominator,
+                        subset_column, subset_value)
+metrics <- load_metrics(se_object, multiqc_data_dir) %>% 
+  left_join(coldata, by = c('sample' = 'description')) %>% 
+  as.data.frame()
+rownames(metrics) <- metrics$sample
+counts <- load_counts(counts_fn)
+counts <- counts[,colnames(counts) %in% coldata$description]
+# if the names don't match in order or string check files names and coldata information
+counts = counts[rownames(coldata)]
+stopifnot(all(names(counts) == rownames(coldata)))
 ```
 
 ```{r sanitize_datatable}
@@ -156,7 +158,7 @@ norm_matrix = assay(vsd_before)
 ```{r covariates, fig.height = 6, fig.width = 10}
 degCovariates(
   norm_matrix,
-  metrics %>% as.data.frame %>% column_to_rownames('sample')
+  metrics,
 )
 ```
 
