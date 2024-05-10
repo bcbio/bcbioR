@@ -121,11 +121,8 @@ sanitize_datatable = function(df, ...) {
 
 ```{r load_metadata}
 
-
 meta_df=read_csv(metadata_fn)  %>% arrange(.data[[params$factor_of_interest]]) %>% distinct(sample, .keep_all = T)
-
 order <- meta_df$sample
-
 
 ggplot(meta_df, aes(.data[[params$factor_of_interest]], fill = .data[[params$factor_of_interest]])) +
   geom_bar() + ylab("") + xlab("") +
@@ -242,10 +239,6 @@ genes_detected <- left_join(genes_detected, sample_names, by = c("name" = "sampl
 genes_detected <- genes_detected %>% group_by(name)
 genes_detected <- summarise(genes_detected, 
                              n_genes = max(value))
-
-#### Code to fix stupid names, only for this analysis. Remove for git###
-genes_detected$name <- gsub("X4","4", genes_detected$name)
-
                       
 metrics <- metrics %>%
   left_join(genes_detected, by = c("sample" = "name"))
