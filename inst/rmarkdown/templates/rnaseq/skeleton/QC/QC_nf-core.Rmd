@@ -195,7 +195,7 @@ metrics %>%
     ggplot(aes(x = .data[[params$factor_of_interest]],
                y = total_reads, 
                color = .data[[params$factor_of_interest]])) +
-    geom_point(alpha = 0.5) +
+    geom_point(alpha = 0.5, size=4) +
     coord_flip() +
     scale_y_continuous(name = "million reads") +
     scale_color_cb_friendly() + xlab("") + 
@@ -218,7 +218,7 @@ metrics %>%
     ggplot(aes(x = factor(sample, level = order), 
                y = mapped_reads_pct, 
                color = .data[[params$factor_of_interest]])) +
-        geom_point() +
+    geom_point(alpha = 0.5, size=4) +
     coord_flip() +
     scale_color_cb_friendly() +
     ylim(0, 100) +
@@ -261,7 +261,7 @@ metrics %>%
     ggplot(aes(x = .data[[params$factor_of_interest]],
                y = n_genes, 
                color = .data[[params$factor_of_interest]])) +
-    geom_point(alpha = 0.5) +
+    geom_point(alpha = 0.5, size=4) +
     coord_flip() +
     scale_y_continuous(name = "million reads") +
     scale_color_cb_friendly() + xlab("") + 
@@ -280,7 +280,7 @@ metrics %>%
   ggplot(aes(x = total_reads, 
              y = n_genes,
              color = .data[[params$factor_of_interest]])) +
-  geom_point()+
+  geom_point(alpha = 0.5, size=4) +
   scale_x_log10() +
   scale_color_cb_friendly() +
   ggtitle("Gene saturation") +
@@ -296,7 +296,7 @@ metrics %>%
   ggplot(aes(x = factor(sample, level = order),
              y = exonic_rate * 100, 
              color = .data[[params$factor_of_interest]])) +
-  geom_point() +
+  geom_point(alpha = 0.5, size=4) +
   ylab("Exonic rate %") + 
   ggtitle("Exonic mapping rate") + 
   scale_color_cb_friendly() +
@@ -316,7 +316,7 @@ metrics %>%
     ggplot(aes(x = factor(sample, level = order),
                y = intronic_rate * 100, 
                color = .data[[params$factor_of_interest]])) +
-  geom_point() +
+  geom_point(alpha = 0.5, size=4) +
   ylab("Intronic rate %") +
   ggtitle("Intronic mapping rate") + 
   scale_color_cb_friendly() +
@@ -336,7 +336,7 @@ metrics %>%
     ggplot(aes(x = factor(sample, level = order),
                y = intergenic_rate * 100, 
                color = .data[[params$factor_of_interest]])) +
-        geom_point() +
+    geom_point(alpha = 0.5, size=4) +
     ylab("Intergenic rate %") +
     ggtitle("Intergenic mapping rate") + 
     coord_flip()  + xlab("") +
@@ -355,7 +355,7 @@ metrics %>%
     ggplot(aes(x = factor(sample, level = order),
                y = r_rna_rate * 100, 
                color = .data[[params$factor_of_interest]])) +
-        geom_point() +
+    geom_point(alpha = 0.5, size=4) +
     ylab("rRNA rate, %")+
     ylim(0, rrna_ylim) + 
     ggtitle("rRNA mapping rate") +
@@ -372,7 +372,7 @@ metrics %>%
   ggplot(aes(x = factor(sample, level = order),
              y = x5_3_bias, 
              color = .data[[params$factor_of_interest]])) +
-  geom_point() +
+  geom_point(alpha = 0.5, size=4) +
   ggtitle("5'-3' bias") + 
   coord_flip() +
   ylim(c(0.5,1.5)) + xlab("") + ylab("5'-3' bias") +
