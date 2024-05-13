@@ -3,6 +3,31 @@
   return(x)
 }
 
+
+#' Function to check samplesheet for nf-core
+#'
+#' @param file path to CSV file for nf-core
+#' @examples
+#'
+#' bcbio_nfcore_check(system.file("extdata", "rnaseq_good.csv", package = "bcbiR") )
+#'
+#' @export
+bcbio_nfcore_check <- function(file){
+  required=c("sample","fastq_1","fastq_2","strandedness")
+  samplesheet=read_csv(file)
+
+  if (!(all(required %in% colnames(samplesheet)))){
+    print(colnames(samplesheet))
+    stop("Missing required columns ", paste(required, collapse = " "))
+  }else if (any(grepl("^[1-9]", samplesheet[["sample"]]))){
+    stop("Avoid samples starting with numbers ")
+  }else if (any(is.na(samplesheet))){
+    warning("Columns with missing values")
+  }else{
+    message("All good.")
+  }
+}
+
 #' Function to help deploy analysis folder inside a project folder
 #'
 #' This function contains Rmd, R, md, files that help to structure
