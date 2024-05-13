@@ -5,6 +5,7 @@
 * Fix when rRNA rate is missing
 * Add by sample plots in QC
 * Add function to check nfcore samplesheet
+* Add PCA with variance analysis
 
 # bcbioR 0.1.1
 

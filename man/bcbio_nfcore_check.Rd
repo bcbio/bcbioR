@@ -14,6 +14,6 @@ Function to check samplesheet for nf-core
 }
 \examples{
 
-bcbio_nfcore_check(system.file("extdata", "rnaseq_good.csv", package = "bcbiR") )
+bcbio_nfcore_check(system.file("extdata", "rnaseq_good.csv", package = "bcbioR") )
 
 }

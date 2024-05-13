@@ -9,7 +9,7 @@
 #' @param file path to CSV file for nf-core
 #' @examples
 #'
-#' bcbio_nfcore_check(system.file("extdata", "rnaseq_good.csv", package = "bcbiR") )
+#' bcbio_nfcore_check(system.file("extdata", "rnaseq_good.csv", package = "bcbioR") )
 #'
 #' @export
 bcbio_nfcore_check <- function(file){
