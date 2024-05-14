@@ -1,0 +1,3 @@
+name: bcbio TEAseq
+description: Standard TEAseq down-stream analyses
+create_dir: false
