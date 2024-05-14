@@ -16,7 +16,8 @@ module load cellranger/7.0.0
 localcores=$SLURM_CPUS_PER_TASK
 localmem=$SLURM_MEM_PER_NODE
 
-cellranger multi --id=AtheTeaSeqMulti --csv=/n/data1/cores/bcbio/PIs/athe_tsibris/10x_TEA-Seq_Tsibris_human_HIV_ex-vivoCD4_hbc04730_ZZ/meta/multiconfig_batch3.csv
+#change CSV to full path
+cellranger multi --id=AtheTeaSeqMulti --csv=meta/multiconfig_batch3.csv
 
 
 

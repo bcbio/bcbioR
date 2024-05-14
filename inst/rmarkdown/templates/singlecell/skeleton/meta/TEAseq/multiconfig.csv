@@ -1,0 +1,22 @@
+[gene-expression]
+reference, /n/shared_db/GRCh38/uk/cellranger/7.0.0/7.0.0/refdata-gex-GRCh38-2020-A
+chemistry,ARC-v1
+
+[libraries]
+fastq_id,fastqs,feature_types
+20240417_GEX,FASTQ_PATH_TO_GEX,Gene Expression
+20240417_ADT,FASTQ_PATH_TO_ADT,Antibody Capture
+20240417_HTO,FASTQ_PATH_TO_HTO,Multiplexing Capture
+
+[feature]
+reference,PATH_TO_feature_reference.csv
+
+[samples]
+sample_id,cmo_ids
+no_drug,Hashtag1
+Romidepsin,Hashtag2
+Bryostatin,Hashtag3
+AZD,Hashtag4
+RB,Hashtag5
+RA,Hashtag6
+PMAi,Hashtag7

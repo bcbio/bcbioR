@@ -16,9 +16,9 @@ module load cellranger-ARC/2.0.0
 localcores=$SLURM_CPUS_PER_TASK
 localmem=$SLURM_MEM_PER_NODE
 
+# Change libraries to full path
 cellranger-arc count --id=cellranger-arc_output \
                        --reference=/n/shared_db/GRCh38/uk/cellranger-ARC/2.0.0/2.0.0/refdata-cellranger-arc-GRCh38-2020-A-2.0.0 \
-                       --libraries=/n/data1/cores/bcbio/PIs/athe_tsibris/10x_TEA-Seq_Tsibris_human_HIV_ex-vivoCD4_hbc04730_ZZ/meta/libraries_3rdbatch.csv \
+                       --libraries=meta/libraries.csv \
                        --localcores=16 \
                        --localmem=128
-                       
