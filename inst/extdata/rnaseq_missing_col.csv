@@ -1,0 +1,7 @@
+sample,fastq_1,strandedness,tissue,sex,4_weeks,bone_tissue
+Fourwkbone1,s3://hcbc-test/input/rawdata/P496_EMoor18780_E02v1_4wkbone1_S13_L001_R2_001.fastq.gz,auto,4 week old bone tissue,Female,4_weeks,bone_tissue
+Fourwkbone1,s3://hcbc-test/input/rawdata/P496_EMoor18780_E02v1_4wkbone1_S13_L002_R2_001.fastq.gz,auto,4 week old bone tissue,Female,4_weeks,bone_tissue
+Fourwkbone2,s3://hcbc-test/input/rawdata/P496_EMoor18780_F02v1_4wkbone2_S14_L001_R2_001.fastq.gz,auto,4 week old bone tissue,Female,4_weeks,bone_tissue
+Fourwkbone2,s3://hcbc-test/input/rawdata/P496_EMoor18780_F02v1_4wkbone2_S14_L002_R2_001.fastq.gz,auto,4 week old bone tissue,Female,4_weeks,bone_tissue
+Fourwkbone3,s3://hcbc-test/input/rawdata/P496_EMoor18780_G02v1_4wkbone3_S15_L001_R2_001.fastq.gz,auto,4 week old bone tissue,Male,4_weeks,bone_tissue
+Fourwkbone3,s3://hcbc-test/input/rawdata/P496_EMoor18780_G02v1_4wkbone3_S15_L002_R2_001.fastq.gz,auto,4 week old bone tissue,Male,4_weeks,bone_tissue
