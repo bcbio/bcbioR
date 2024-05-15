@@ -34,6 +34,15 @@ The R scripts `scripts/fix_filenames.R` has some code to do that.
 
 `scripts/gex_adt_hto.sbatch` is an example of how to run this. It is assuming using HMS O2 cluster.
 
+# QC analysis
+
+The file `QC-01-load_data.R` helps loading the output of `cellranger` and creating the right object. It stores R objects in `.qs` format under a `data` folder.
+
+The file `QC-02-run_analysis.R` helps analyzing the object for the three type of data.
+
+The file `QC.Rmd` helps visualizing the analyzed data. It stores R objects in `.qs` format under a `data` folder.
+
+
 # DropBox
 
 -   In `reports/QC`
