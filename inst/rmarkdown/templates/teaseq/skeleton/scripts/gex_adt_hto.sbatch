@@ -17,7 +17,7 @@ localcores=$SLURM_CPUS_PER_TASK
 localmem=$SLURM_MEM_PER_NODE
 
 #change CSV to full path
-cellranger multi --id=AtheTeaSeqMulti --csv=meta/multiconfig_batch3.csv
+cellranger multi --id=AtheTeaSeqMulti --csv=meta/multiconfig.csv
 
 
 
