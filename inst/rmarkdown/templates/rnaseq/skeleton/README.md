@@ -15,12 +15,14 @@ CONTROL_REP1,s3path/AEG588A1_S1_L003_R1_001.fastq.gz,s3path/AEG588A1_S1_L003_R2_
 CONTROL_REP1,s3path/AEG588A1_S1_L004_R1_001.fastq.gz,s3path/AEG588A1_S1_L004_R2_001.fastq.gz,auto
 ```
 
+Use `bcbio_nfcore_check(csv_file)` to check the file is correct.
+
 You can add more columns to this file with more metadata, and use this file as the `coldata` file the templates.
 
 - Upload file to our `Datasets` in Seqera using the name of the project but starting with `nfcore-rnaseq`
 - Go to `Launchpad`, select `nf-core_rnaseq` pipeline, and select the previous created `Datasets` in the `input` parameter after clicking in `Browser`
   - Select an output directory with the same name used for the `Dataset` inside the `results` folder in S3
-- When pipeline is down, data will be copied to our on-premise HPC
+- When pipeline is down, data will be copied to our on-premise HPC in the scratch system under `bcbio` folder
 
 ## Downstream analysis
 

@@ -19,6 +19,7 @@ editor_options:
 params:
   params_file: params_qc_nf-core.R
   project_file: ../information.R
+  factor_of_interest: sample_type
 ---
 
 
@@ -38,6 +39,7 @@ library(pheatmap)
 library(DT)
 library(pheatmap)
 library(bcbioR)
+library(janitor)
 ggplot2::theme_set(theme_light(base_size = 14))
 opts_chunk[["set"]](
     cache = FALSE,
@@ -116,12 +118,16 @@ sanitize_datatable = function(df, ...) {
 
 # Samples and metadata
 
+
 ```{r load_metadata}
 
-meta_df=read_csv(metadata_fn) %>% mutate(sample = description) %>%
-  dplyr::select(-description)
+meta_df=read_csv(metadata_fn)  %>% 
+  arrange(.data[[params$factor_of_interest]]) %>% distinct(sample, .keep_all = T) %>% 
+  select(!matches("fastq"), !matches("strandness"))
+meta_df$sample <- make.names(meta_df$sample)
+order <- meta_df$sample
 
-ggplot(meta_df, aes(sample_type, fill = sample_type)) +
+ggplot(meta_df, aes(.data[[params$factor_of_interest]], fill = .data[[params$factor_of_interest]])) +
   geom_bar() + ylab("") + xlab("") +
   scale_fill_cb_friendly()
 ```
@@ -129,8 +135,8 @@ ggplot(meta_df, aes(sample_type, fill = sample_type)) +
 
 ```{r  prepare metrics}
 
-metrics <- read_tsv(paste0(multiqc_data_dir, 'multiqc_general_stats.txt'))
-metrics_qualimap <- read_tsv(paste0(multiqc_data_dir, 'mqc_qualimap_genomic_origin_1.txt'))
+metrics <- read_tsv(file.path(multiqc_data_dir, 'multiqc_general_stats.txt'))
+metrics_qualimap <- read_tsv(file.path(multiqc_data_dir, 'mqc_qualimap_genomic_origin_1.txt'))
 
 metrics <- metrics %>% full_join(metrics_qualimap)
 metrics <- metrics %>%
@@ -138,7 +144,7 @@ metrics <- metrics %>%
   dplyr::rename_with(~gsub('.*mqc_generalstats_', '', .))
 
 total_reads <- metrics %>% 
-  filter(grepl('_', sample)) %>% 
+  dplyr::filter(grepl('_', sample)) %>% 
   remove_empty(which = 'cols') %>%
   dplyr::rename(single_sample = sample) %>%
   mutate(sample = gsub('_[12]+$', '', single_sample)) %>%
@@ -146,18 +152,28 @@ total_reads <- metrics %>%
   summarize(total_reads = sum(fastqc_raw_total_sequences))
 
 metrics <- metrics %>% 
-  filter(!grepl('_', sample)) %>% 
+  dplyr::filter(!grepl('_', sample)) %>% 
   remove_empty(which = 'cols') %>%
   full_join(total_reads) %>%
   mutate(mapped_reads = samtools_reads_mapped) %>%
   mutate(exonic_rate = exonic/(star_uniquely_mapped * 2)) %>%
   mutate(intronic_rate = intronic/(star_uniquely_mapped * 2)) %>%
   mutate(intergenic_rate = intergenic/(star_uniquely_mapped * 2)) %>%
-  mutate(r_rna_rate = custom_content_biotype_counts_percent_r_rna) %>%
   mutate(x5_3_bias = qualimap_5_3_bias)
 
+if ("custom_content_biotype_counts_percent_r_rna" %in% colnames(metrics)){
+  metrics <- mutate(metrics, r_rna_rate = custom_content_biotype_counts_percent_r_rna)
+}else{
+ metrics[["r_rna_rate"]] <- NA
+}
+
+
+metrics$sample <- make.names(metrics$sample)
 metrics <- metrics %>%
-    full_join(meta_df , by = c("sample" = "sample"))
+  full_join(meta_df , by = c("sample" = "sample")) %>% 
+  select(where(~!all(is.na(.))))
+
+
 ```
 
 ```{r show-metadata}
@@ -177,15 +193,24 @@ Here, we want to see consistency and a minimum of 20 million reads.
 
 ```{r plot_total_reads}
 metrics %>%
-    ggplot(aes(x = sample_type,
+    ggplot(aes(x = factor(sample, level = order),
                y = total_reads, 
-               color = sample_type)) +
-    geom_point(alpha=0.5) +
+               fill = .data[[params$factor_of_interest]])) +
+    geom_bar(stat = "identity") +
     coord_flip() +
     scale_y_continuous(name = "million reads") +
-    scale_color_cb_friendly() +
+    scale_fill_cb_friendly() + xlab("") + 
     ggtitle("Total reads") 
 
+metrics %>%
+    ggplot(aes(x = .data[[params$factor_of_interest]],
+               y = total_reads, 
+               color = .data[[params$factor_of_interest]])) +
+    geom_point(alpha = 0.5, size=4) +
+    coord_flip() +
+    scale_y_continuous(name = "million reads") +
+    scale_color_cb_friendly() + xlab("") + 
+    ggtitle("Total reads") 
 ```
 
 ```{r calc_min_max_pct_mapped}
@@ -201,10 +226,10 @@ The genomic mapping rate represents the percentage of reads mapping to the refer
 ```{r plot_mapping_rate}
 metrics$mapped_reads_pct <- round(metrics$mapped_reads/metrics$total_reads*100,1)
 metrics %>%
-    ggplot(aes(x = sample_type, 
+    ggplot(aes(x = factor(sample, level = order), 
                y = mapped_reads_pct, 
-               color = sample_type)) +
-        geom_point() +
+               color = .data[[params$factor_of_interest]])) +
+    geom_point(alpha = 0.5, size=4) +
     coord_flip() +
     scale_color_cb_friendly() +
     ylim(0, 100) +
@@ -217,7 +242,7 @@ metrics %>%
 
 The number of genes represented in every sample is expected to be consistent and over 20K (blue line).
 
-```{r plot_genes_detected}
+```{r calc_genes_detected}
 se <- readRDS(se_object)
 genes_detected <- colSums(assays(se)[["counts"]] > 0) %>% enframe()
 sample_names <- metrics[,c("sample"), drop=F]
@@ -228,16 +253,33 @@ genes_detected <- summarise(genes_detected,
                       
 metrics <- metrics %>%
   left_join(genes_detected, by = c("sample" = "name"))
-ggplot(metrics,aes(x = sample_type,
-           y = n_genes, color = sample_type)) +
-  geom_point() +
+
+```
+
+
+```{r plot_genes_detected}
+ggplot(metrics,aes(x = factor(sample, level = order),
+           y = n_genes, fill = .data[[params$factor_of_interest]])) +
+  geom_bar(stat = "identity") +
   coord_flip() +
-  scale_color_cb_friendly() +
+  scale_fill_cb_friendly() +
   ggtitle("Number of genes") +
   ylab("Number of genes") +
   xlab("") +
   geom_hline(yintercept=20000, color = cb_friendly_cols('blue'))
+
+metrics %>%
+    ggplot(aes(x = .data[[params$factor_of_interest]],
+               y = n_genes, 
+               color = .data[[params$factor_of_interest]])) +
+    geom_point(alpha = 0.5, size=4) +
+    coord_flip() +
+    scale_y_continuous(name = "million reads") +
+    scale_color_cb_friendly() + xlab("") + 
+    ggtitle("Total reads") 
+
 ```
+
 
 
 ## Gene detection saturation
@@ -248,8 +290,8 @@ This plot shows how complex the samples are. We expect samples with more reads t
 metrics %>% 
   ggplot(aes(x = total_reads, 
              y = n_genes,
-             color = sample_type)) +
-  geom_point()+
+             color = .data[[params$factor_of_interest]])) +
+  geom_point(alpha = 0.5, size=4) +
   scale_x_log10() +
   scale_color_cb_friendly() +
   ggtitle("Gene saturation") +
@@ -262,10 +304,10 @@ Here we are looking for consistency, and exonic mapping rates around 70% or 75% 
 
 ```{r plot_exonic_mapping_rate}
 metrics %>%
-  ggplot(aes(x = sample_type,
+  ggplot(aes(x = factor(sample, level = order),
              y = exonic_rate * 100, 
-             color = sample_type)) +
-  geom_point() +
+             color = .data[[params$factor_of_interest]])) +
+  geom_point(alpha = 0.5, size=4) +
   ylab("Exonic rate %") + 
   ggtitle("Exonic mapping rate") + 
   scale_color_cb_friendly() +
@@ -282,10 +324,10 @@ Here, we expect a low intronic mapping rate (≤ 15% - 20%)
 
 ```{r plot_intronic_mapping_rate}
 metrics %>%
-    ggplot(aes(x = sample_type,
+    ggplot(aes(x = factor(sample, level = order),
                y = intronic_rate * 100, 
-               color = sample_type)) +
-  geom_point() +
+               color = .data[[params$factor_of_interest]])) +
+  geom_point(alpha = 0.5, size=4) +
   ylab("Intronic rate %") +
   ggtitle("Intronic mapping rate") + 
   scale_color_cb_friendly() +
@@ -302,13 +344,13 @@ Here, we expect a low intergenic mapping rate, which is true for all samples.
 
 ```{r plot_intergenic_mapping_rate}
 metrics %>%
-    ggplot(aes(x = sample_type,
+    ggplot(aes(x = factor(sample, level = order),
                y = intergenic_rate * 100, 
-               color = sample_type)) +
-        geom_point() +
+               color = .data[[params$factor_of_interest]])) +
+    geom_point(alpha = 0.5, size=4) +
     ylab("Intergenic rate %") +
     ggtitle("Intergenic mapping rate") + 
-    coord_flip()  +
+    coord_flip()  + xlab("") +
     scale_color_cb_friendly() +
     ylim(c(0, 100))
 ```
@@ -318,13 +360,13 @@ metrics %>%
 Samples should have a ribosomal RNA (rRNA) "contamination" rate below 10%
 
 ```{r plot_rrna_mapping_rate}
-# for some bad samples it could be > 50%
+
 rrna_ylim <- max(round(metrics$r_rna_rate*100, 2)) + 10
 metrics %>%
-    ggplot(aes(x = sample_type,
+    ggplot(aes(x = factor(sample, level = order),
                y = r_rna_rate * 100, 
-               color = sample_type)) +
-        geom_point() +
+               color = .data[[params$factor_of_interest]])) +
+    geom_point(alpha = 0.5, size=4) +
     ylab("rRNA rate, %")+
     ylim(0, rrna_ylim) + 
     ggtitle("rRNA mapping rate") +
@@ -338,13 +380,13 @@ There should be little bias, i.e. the values should be close to 1, or at least c
 
 ```{r plot_53_bias}
 metrics %>%
-  ggplot(aes(x = sample_type,
+  ggplot(aes(x = factor(sample, level = order),
              y = x5_3_bias, 
-             color = sample_type)) +
-  geom_point() +
+             color = .data[[params$factor_of_interest]])) +
+  geom_point(alpha = 0.5, size=4) +
   ggtitle("5'-3' bias") + 
   coord_flip() +
-  ylim(c(0.5,1.5)) +
+  ylim(c(0.5,1.5)) + xlab("") + ylab("5'-3' bias") +
   scale_color_cb_friendly()+
   geom_hline(yintercept=1, color = cb_friendly_cols('blue'))
 ```
@@ -354,7 +396,7 @@ metrics %>%
 We expect consistency in the box plots here between the samples, i.e. the distribution of counts across the genes is similar
 
 ```{r plot_counts_per_gene}
-metrics_small <- metrics %>% dplyr::select(sample, sample_type)
+metrics_small <- metrics %>% dplyr::select(sample, .data[[params$factor_of_interest]])
 metrics_small <- left_join(sample_names, metrics_small)
 
 counts <- 
@@ -363,13 +405,14 @@ counts <-
   filter(rowSums(.)!=0) %>% 
   gather(name, counts) 
 
-counts <- left_join(counts, metrics, by = c("name" = "sample"))
+counts <- left_join(counts, metrics_small, by = c("name" = "sample"))
 
-ggplot(counts, aes(sample_type,
+ggplot(counts, aes(factor(name, level = order),
                    log2(counts+1),
-                   fill = sample_type)) +
+                   fill = .data[[params$factor_of_interest]])) +
   geom_boxplot() + 
   scale_fill_cb_friendly() +
+  coord_flip() + xlab("") +
   ggtitle("Counts per gene, all non-zero genes") +
   scale_color_cb_friendly()
 ```
@@ -379,7 +422,7 @@ ggplot(counts, aes(sample_type,
 
 In this section, we look at how well the different groups in the dataset cluster with each other. Samples from the same group should ideally be clustering together. We use Principal Component Analysis (PCA).
 
-## Principal component analysis (PCA) {.tabset}
+## Principal component analysis (PCA) 
 
 Principal Component Analysis (PCA) is a statistical technique used to simplify high-dimensional data by identifying patterns and reducing the number of variables. In the context of gene expression, PCA helps analyze large datasets containing information about the expression levels of thousands of genes across different samples (e.g., tissues, cells).
 
@@ -390,44 +433,55 @@ raw_counts <- assays(se)[["counts"]] %>% round() %>%
     filter(rowSums(.)!=0) %>%
     as.matrix()
 
+
 vst <- vst(raw_counts)
 
-#fix samples names
 coldat_for_pca <- as.data.frame(metrics)
 rownames(coldat_for_pca) <- coldat_for_pca$sample
 coldat_for_pca <- coldat_for_pca[colnames(raw_counts),]
 pca1 <- degPCA(vst, coldat_for_pca,
-              condition = "sample_type", data = T)[["plot"]]
+              condition = params$factor_of_interest, data = T)[["plot"]]
 pca2 <- degPCA(vst, coldat_for_pca,
-              condition = "sample_type", data = T, pc1="PC3", pc2="PC4")[["plot"]]
+              condition = params$factor_of_interest, data = T, pc1="PC3", pc2="PC4")[["plot"]]
 
 pca1 + scale_color_cb_friendly()
 pca2 + scale_color_cb_friendly()
 ```
 
 
-```{r, eval=FALSE}
-variables=degCovariates(vst, coldat_for_pca)
+```{r covariate-plot,fig.height=12, fig.width=10}
+## Remove non-useful columns output by nf-core
+coldat_2 <- data.frame(coldat_for_pca[,!(colnames(coldat_for_pca) %in% c("fastq_1", "fastq_2", "salmon_library_types", "salmon_compatible_fragment_ratio", "samtools_reads_mapped_percent", "samtools_reads_properly_paired_percent", "samtools_mapped_passed_pct", "strandedness"))])
+
+# Remove missing data
+coldat_2 <- na.omit(coldat_2)
+degCovariates(vst, metadata = coldat_2)
 ```
 
-
-```{r clustering fig, fig.width = 10, fig.asp = .62}
 ## Hierarchical clustering
+```{r clustering fig, fig.width = 10, fig.asp = .62}
 
 vst_cor <- cor(vst)
 
-annotation_cols <- cb_friendly_pal('grey')(length(unique(coldat_for_pca$sample_type)))
-names(annotation_cols) <- unique(coldat_for_pca$sample_type)
+colma=meta_df %>% as.data.frame()
+rownames(colma) <- colma$sample
+colma <- colma[rownames(vst_cor), ]
+colma <- colma %>% dplyr::select(.data[[params$factor_of_interest]])
+anno_colors=lapply(colnames(colma), function(c){
+  l.col=cb_friendly_pal('grey')(length(unique(colma[[c]])))
+  names(l.col)=unique(colma[[c]])
+  l.col
+})
+names(anno_colors)=colnames(colma)
 
 p <- pheatmap(vst_cor, 
-              annotation = coldat_for_pca %>% select(sample_type) %>% mutate(sample_type = as.factor(sample_type)), 
-              show_rownames = T, 
-              show_colnames = T,
-              color = cb_friendly_pal('heatmap')(15),
-              annotation_colors = list(sample_type = annotation_cols)
-)
+         annotation = colma,
+         annotation_colors = anno_colors,
+         show_rownames = T, 
+         show_colnames = T, 
+         color = cb_friendly_pal('heatmap')(15)
+         )
 p
-
 ```
 
 # R session

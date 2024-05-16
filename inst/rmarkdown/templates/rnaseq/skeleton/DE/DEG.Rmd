@@ -29,7 +29,7 @@ params:
   
 ---
 
-```{r load_params, echo = F}
+```{r load_params, cache = FALSE, message = FALSE, warning=FALSE}
 source(params$params_file)
 source(params$project_file)
 source(params$functions_file)
@@ -43,23 +43,7 @@ run_ruv=params$ruv
 ```
 
 
-```{r load_data}
-# this code will load from bcbio or nf-core folder
-# NOTE make sure to set numerator and denominator
-coldata <- load_coldata(coldata_fn, column,
-                        numerator, denominator,
-                        subset_column, subset_value)
-metrics <- load_metrics(se_object, multiqc_data_dir) %>% 
-  left_join(coldata, by = c('sample' = 'description'))
-rownames(metrics) <- metrics$sample
-counts <- load_counts(counts_fn)
-counts <- counts[,colnames(counts) %in% coldata$description]
-# if the names don't match in order or string check files names and coldata information
-counts = counts[rownames(coldata)]
-stopifnot(all(names(counts) == rownames(coldata)))
-```
-
-```{r load_libraries, cache = FALSE, message = FALSE, warning=FALSE, echo=FALSE,}
+```{r load_libraries, cache = FALSE, message = FALSE, warning=FALSE}
 library(rtracklayer)
 library(DESeq2)
 library(tidyverse)
@@ -94,6 +78,25 @@ opts_chunk[["set"]](
 
 # set seed for reproducibility
 set.seed(1234567890L)
+```
+
+
+```{r load_data, message=F, warning=F}
+# this code will load from bcbio or nf-core folder
+# NOTE make sure to set numerator and denominator
+coldata <- load_coldata(coldata_fn, column,
+                        numerator, denominator,
+                        subset_column, subset_value)
+coldata$sample=row.names(coldata)
+metrics <- load_metrics(se_object, multiqc_data_dir) %>% 
+  left_join(coldata, by = c('sample' = 'description')) %>% 
+  as.data.frame()
+rownames(metrics) <- metrics$sample
+counts <- load_counts(counts_fn)
+counts <- counts[,colnames(counts) %in% coldata$description]
+# if the names don't match in order or string check files names and coldata information
+counts = counts[rownames(coldata)]
+stopifnot(all(names(counts) == rownames(coldata)))
 ```
 
 ```{r sanitize_datatable}
@@ -156,7 +159,7 @@ norm_matrix = assay(vsd_before)
 ```{r covariates, fig.height = 6, fig.width = 10}
 degCovariates(
   norm_matrix,
-  metrics %>% as.data.frame %>% column_to_rownames('sample')
+  metrics,
 )
 ```
 
@@ -286,7 +289,7 @@ EnhancedVolcano(res_mod,
 ```{r heapmap}
 ### Run pheatmap using the metadata data frame for the annotation
 ma=norm_matrix[res_sig$gene_id,]
-colma=coldata[,c("sample_type"), drop=FALSE]
+colma=coldata[,c(column), drop=FALSE]
 colors=lapply(colnames(colma), function(c){
   l.col=colors[1:length(unique(colma[[c]]))]
   names(l.col)=unique(colma[[c]])
@@ -324,7 +327,7 @@ top_n_exp <- norm_matrix %>% as.data.frame() %>%
   # dplyr::select(-group, -group_name) %>% 
   pivot_longer(!gene_id, names_to = 'sample', values_to = 'log2_expression') %>%
   right_join(top_n, relationship = "many-to-many") %>%
-  left_join(coldata, by = c('sample' = 'description'))
+  left_join(coldata, by = 'sample')
 
 ggplot(top_n_exp, aes_string(x = column, y = 'log2_expression')) +
   geom_boxplot(outlier.shape = NA, linewidth=0.5, color="grey") + 
