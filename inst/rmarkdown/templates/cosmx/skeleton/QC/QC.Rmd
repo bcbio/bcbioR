@@ -24,7 +24,6 @@ params:
   min_genes: 20
   min_novelty: .7
   umap_dim: approximateumap_8c6f278e.b9f4.4535.aeca.8955c1dff614_1
-  image_fn: ./reports/LVL7.png
 ---
 
 ```{r load_params, echo = F}
@@ -80,6 +79,7 @@ sanitize_datatable = function(df, ...) {
 
 ```{r read rds}
 
+# resave RDS as QS for faster reading/writing
 seurat_qs_fn <- paste0(file_path_sans_ext(params$seurat_fn), '.qs')
 
 if (!file.exists(seurat_qs_fn)){
@@ -92,9 +92,7 @@ if (!file.exists(seurat_qs_fn)){
 centroids <- data.frame(x = seurat$x_slide_mm, y = seurat$y_slide_mm, cell = seurat$cell_id)
 cents <- CreateCentroids(centroids)
 coords <- CreateFOV(coords = list(centroids = cents), type = "centroids")
-# segs <- CreateSegmentation(centroids)
-# segsFOV <- CreateFOV(segs, type = 'segmentation')
-# seurat[['segsFOV']] <- segsFOV
+
 ```
 
 ```{r plot tissue}
@@ -103,19 +101,6 @@ ggplot(seurat@meta.data, aes(y = x_slide_mm, x = y_slide_mm)) +
   geom_point(alpha = 0.05, size = 0.01) + facet_wrap(~Run_Tissue_name) + coord_equal() + 
   labs(title = "Cell coordinates in XY space")
 
-
-```
-<center>
-
-![](`r params$image_fn`){width=50%}
-
-</center>
-
-```{r check segmentation}
-
-# seg.crop <- Crop(coords, x = c(2, 2.1), y = c(3, 3.1))
-# 
-# ImageDimPlot(seurat_filtered, axes = TRUE, crop = TRUE, combine = TRUE) + xlim(c(3, 3.1)) + ylim(c(2, 2.1))
 
 ```
 
@@ -137,16 +122,7 @@ ggplot(data = seurat[[]], aes(x = nCount_RNA)) + geom_histogram(binwidth = 50) +
      xlab("nUMIs") 
 ```
 
-# Filtering Low-Quality Cells
-
-We discard cells that have less than `r params$min_genes` features and genes present in less than 3 cells. Additionally, we apply the following AtoMx QC flags to select/filter cells:
-
-qcFlagsCellComplex = Pass. Filtering for complexity (nCount_RNA / nFeature_RNA) qcFlagsCellArea = Pass. Cell areas flagged as outliers by Grubbs test
-
-We don’t use the qcFlagsFOV flag as it was discarding too many of the FOVs in a one contiguous cluster near the edge of the device.
-
-
-
+## nUMIs ranked
 ```{r plot n_umis ranked}
 nUMIs_df <- seurat[[]] %>% 
   as.data.frame() %>% 
@@ -156,13 +132,9 @@ nUMIs_df <- seurat[[]] %>%
 
 nUMIs_df$ranked_bc <- as.integer(rownames(nUMIs_df))
 
-# ggplot() + geom_line(data = nUMIs_df, aes(x = ranked_bc, y = nCount_RNA), col = "red") + 
-#   scale_y_continuous(trans = "log10") + 
-#   geom_hline(yintercept = params$min_transcripts,  linetype = "dashed") + 
-#   ylab("nUMIs") + xlab("barcode") 
-
 ```
 
+## novelty
 ```{r plot novelty}
 seurat$novelty <- log10(seurat@meta.data$nFeature_RNA) / log10(seurat@meta.data$nCount_RNA)
 
@@ -180,6 +152,12 @@ ggplot() + geom_line(data = novelty_df, aes(x = ranked_bc, y = novelty), col = "
   ylab("novelty") + xlab("barcode")
 
 ```
+
+# Filtering Low-Quality Cells
+
+We discard cells that have less than `r params$min_genes` features and genes present in less than 3 cells. Additionally, we apply the following AtoMx QC flags to select/filter cells:
+
+qcFlagsCellComplex = Pass. Filtering for complexity (nCount_RNA / nFeature_RNA) qcFlagsCellArea = Pass. Cell areas flagged as outliers by Grubbs test
 
 
 ```{r qc filtering}
@@ -208,9 +186,9 @@ There were `r n_before` cells before filtering and `r n_after` afterwards, for a
 
 ```{r plot pre/post qc}
 
-pre <- ImageDimPlot(seurat) + NoLegend() + ggtitle("Pre-QC")
+pre <- ImageDimPlot(seurat) + NoLegend() + ggtitle("Pre-Filtering")
 seurat_filtered[["FOV"]] <- subset(coords, cell = Cells(seurat_filtered))
-post <- ImageDimPlot(seurat_filtered) + NoLegend() + ggtitle("Post-QC")
+post <- ImageDimPlot(seurat_filtered) + NoLegend() + ggtitle("Post-Filtering")
 
 discarded_cells <- colnames(seurat)[!colnames(seurat) %in% colnames(seurat_filtered)]
 seurat$selected <- seurat[[]] %>%
@@ -232,8 +210,8 @@ print(pre + post + discarded)
 
 ```{r processing}
 
+# perform processing (one time). if already done previously, load from file
 processed_seurat_fn <- paste0(file_path_sans_ext(params$seurat_fn), '_processed.qs')
-
 if (!file.exists(processed_seurat_fn)) {
   seurat_filtered <- SCTransform(seurat_filtered, assay = "RNA", clip.range = c(-10,10), verbose = FALSE)
   seurat_filtered <- NormalizeData(seurat_filtered, assay = "RNA")
@@ -249,14 +227,16 @@ if (!file.exists(processed_seurat_fn)) {
 ```
 
 ```{r plot umap before}
+
+# TODO find colname of pre-filtering umap data in seurat object, use as params$umap_dim at top of file
 DimPlot(seurat, reduction = paste(params$umap_dim),
-     pt.size = 0.6) + labs(x = "umap_1", y = "umap_2", title = "Pre-QC")
+     pt.size = 0.6) + labs(x = "umap_1", y = "umap_2", title = "Pre-Filtering")
 
 ```
 
 ```{r plot umap after}
 DimPlot(seurat_filtered, reduction = "umap", pt.size = 0.6) +
-     ggtitle("Post-QC")
+     ggtitle("Post-Filtering")
 
 ```
 
@@ -270,6 +250,8 @@ ImageDimPlot(seurat_filtered, axes = TRUE, crop = TRUE, combine = TRUE)
 ## Cell Type Markers {.tabset}
 
 ```{r markers of interest, results = 'asis'}
+
+## TODO replace with markers relevant to your project
 markers_of_interest <- c('CD4', 'CD8A', 'CD8B', 'CD63', 'CD69', 'HBB')
 
 for (marker in markers_of_interest) {
@@ -279,43 +261,19 @@ for (marker in markers_of_interest) {
               reduction = "umap", pt.size = 0.6, order = T) %>%
     print()
  
-  if(marker != 'HBA1/2'){
-    p <- ImageFeaturePlot(seurat_filtered, features = marker, max.cutoff = "q95",
-                          size = 1, crop = TRUE, combine = FALSE)
-    print(p)
-    cat('\n')
-
-  }
-  
-}
-```
-
-## Apoptosis Markers {.tabset}
-
-```{r apoptosis markers, results = 'asis'}
-apoptosis_markers <- c('BCL2', 'BCL2L1', 'CASP3', 'CASP8')
-
-for (marker in apoptosis_markers) {
-  cat("### ", marker, "\n")
-  
-  FeaturePlot(seurat_filtered, features = marker, max.cutoff = "q95", min.cutoff = "q05",
-              reduction = "umap", pt.size = 0.6, order = T) %>%
-    print()
-  
   p <- ImageFeaturePlot(seurat_filtered, features = marker, max.cutoff = "q95",
                         size = 1, crop = TRUE, combine = FALSE)
   print(p)
-  
   cat('\n')
 }
 ```
-
 
 # Cell Type Identification
 
 ## Azimuth
 
 ```{r}
+# perform Azimuth cell type identification (once). if already done previously, load from file
 azimuth_seurat_fn <- paste0(file_path_sans_ext(params$seurat_fn), '_azimuth.qs')
 if (!file.exists(azimuth_seurat_fn)) {
   seurat_filtered_ann_pbmc <- RunAzimuth(seurat_filtered, assay = "RNA", reference = "pbmcref")
@@ -332,7 +290,8 @@ ImageDimPlot(seurat_filtered_ann_pbmc, axes = TRUE, crop = TRUE, combine = TRUE,
 ## Seurat and GPT4
 ```{r}
 markers <- FindAllMarkers(seurat_filtered)
-# 
+
+# TODO: uncomment this chunk to get markers for pasting into GPT4
 # markers %>%
 #   dplyr::filter(avg_log2FC > 0) %>%
 #   select(c("cluster", "gene")) %>%
@@ -341,17 +300,13 @@ markers <- FindAllMarkers(seurat_filtered)
 #   summarise(gene = paste(gene, collapse = ", "))
 
 markers %>% sanitize_datatable()
-if(grepl('LVL8', params$seurat_fn)){
-  cluster_ids <- data.frame(cluster = as.factor(c(0:7)),
-                            cell_type = as.factor(c('B-cells', 'Monocytes', 'Fibroblasts',
-                                          'Cytotoxic T-cells', 'Endothelial Cells',
-                                          'Keratinocytes', 'Plasma Cells', 'Mast Cells')))
-} else if (grepl('LVL7', params$seurat_fn)){
-  cluster_ids <- data.frame(cluster = as.factor(c(0:6)),
-                            cell_type = as.factor(c('B-cells', 'Fibroblasts', 'Monocytes',
-                                          'Cytotoxic T-cells', 'Endothelial Cells',
-                                          'T-cells', 'Keratinocytes')))
-}
+
+## TODO replace with cell types identified by GPT4 for your markers
+cluster_ids <- data.frame(cluster = as.factor(c(0:6)),
+                          cell_type = as.factor(c('B-cells', 'Fibroblasts', 'Monocytes',
+                                        'Cytotoxic T-cells', 'Endothelial Cells',
+                                        'T-cells', 'Keratinocytes')))
+
 
 seurat_filtered@meta.data <- left_join(seurat_filtered@meta.data, cluster_ids, by = c('seurat_clusters' = 'cluster'))
 rownames(seurat_filtered@meta.data) <- seurat_filtered@meta.data$cell_id
