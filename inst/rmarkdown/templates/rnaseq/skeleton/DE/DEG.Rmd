@@ -22,7 +22,7 @@ params:
   column: sample_type
   subset_column: null
   subset_value: null
-  ruv: true
+  ruv: false
   params_file: params_de.R
   project_file: ../information.R
   functions_file: load_data.R
@@ -30,10 +30,13 @@ params:
 ---
 
 ```{r load_params, cache = FALSE, message = FALSE, warning=FALSE}
+# 1. Set up input files in this R file (params_de.R)
 source(params$params_file)
+# 2. Set up project file (already done from QC probably)
 source(params$project_file)
+# 3. Load custom functions to load data from coldata/metrics/counts
 source(params$functions_file)
-# set this values if you are not using the parameters at the top
+# IMPORTANT set these values if you are not using the parameters at the top
 column=params$column
 numerator=params$numerator
 denominator=params$denominator
@@ -82,18 +85,20 @@ set.seed(1234567890L)
 
 
 ```{r load_data, message=F, warning=F}
-# this code will load from bcbio or nf-core folder
+# This code will load from bcbio or nf-core folder
 # NOTE make sure to set numerator and denominator
 coldata <- load_coldata(coldata_fn, column,
                         numerator, denominator,
                         subset_column, subset_value)
 coldata$sample=row.names(coldata)
-metrics <- load_metrics(se_object, multiqc_data_dir) %>% 
-  left_join(coldata, by = c('sample' = 'description')) %>% 
+
+counts <- load_counts(counts_fn)
+counts <- counts[,colnames(counts) %in% coldata$sample]
+
+metrics <- load_metrics(se_object, multiqc_data_dir,gtf_fn,counts) %>% 
+  left_join(coldata, by = c('sample')) %>% 
   as.data.frame()
 rownames(metrics) <- metrics$sample
-counts <- load_counts(counts_fn)
-counts <- counts[,colnames(counts) %in% coldata$description]
 # if the names don't match in order or string check files names and coldata information
 counts = counts[rownames(coldata)]
 stopifnot(all(names(counts) == rownames(coldata)))
