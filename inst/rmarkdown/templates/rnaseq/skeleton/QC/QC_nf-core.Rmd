@@ -168,7 +168,7 @@ metrics <- metrics %>%
 
 # This uses the fastqc metrics to get total reads
 total_reads <- metrics %>% 
-  dplyr::filter(grepl('_', sample)) %>% 
+  dplyr::filter(!is.na(fastqc_raw_total_sequences)) %>% 
   remove_empty(which = 'cols') %>%
   dplyr::rename(single_sample = sample) %>%
   mutate(sample = gsub('_[12]+$', '', single_sample)) %>%
@@ -177,7 +177,7 @@ total_reads <- metrics %>%
 
 # This renames to user-friendly names the metrics columns
 metrics <- metrics %>% 
-  dplyr::filter(!grepl('_', sample)) %>% 
+  dplyr::filter(is.na(fastqc_raw_total_sequences)) %>% 
   remove_empty(which = 'cols') %>%
   full_join(total_reads) %>%
   mutate(mapped_reads = samtools_reads_mapped) %>%
