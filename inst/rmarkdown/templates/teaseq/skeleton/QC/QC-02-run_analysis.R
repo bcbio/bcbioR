@@ -1,4 +1,13 @@
-
+library(Seurat)
+library(tidyverse)
+library(Matrix)
+library(data.table)
+library(magrittr)
+library(Signac)
+library(EnsDb.Hsapiens.v86)
+library(qs)
+library(bcbioR)
+# Run analysis on multi-omic sc Data
 seurat <- qread("data/tea_seurat.qs")
 
 # keep singlet only
