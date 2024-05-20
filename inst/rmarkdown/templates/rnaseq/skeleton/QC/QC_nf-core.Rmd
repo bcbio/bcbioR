@@ -403,7 +403,7 @@ metrics %>%
     geom_hline(yintercept=0.2, color = "grey", size=2)
 ```
 
-## rRNA mapping rate
+## tRNA/rRNA mapping rate
 
 Samples should have a ribosomal RNA (rRNA) "contamination" rate below 10%
 
@@ -415,9 +415,9 @@ metrics %>%
                y = r_and_t_rna_rate * 100, 
                color = .data[[factor_of_interest]])) +
     geom_point(alpha = 0.5, size=4) +
-    ylab("rRNA rate, %")+
+    ylab("tRNA/rRNA rate, %")+
     ylim(0, rrna_ylim) + 
-    ggtitle("rRNA mapping rate") +
+    ggtitle("tRNA/rRNA mapping rate") +
     coord_flip() +
     scale_color_cb_friendly() +
     geom_hline(yintercept=0.2, color = "grey", size=2)
