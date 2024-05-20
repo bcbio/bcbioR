@@ -100,8 +100,9 @@ metrics <- load_metrics(se_object, multiqc_data_dir,gtf_fn,counts) %>%
   as.data.frame()
 rownames(metrics) <- metrics$sample
 # if the names don't match in order or string check files names and coldata information
-counts = counts[rownames(coldata)]
-stopifnot(all(names(counts) == rownames(coldata)))
+counts = counts[rownames(metrics)]
+coldata = coldata[rownames(metrics),]
+stopifnot(all(names(counts) == rownames(metrics)))
 ```
 
 ```{r sanitize_datatable}
@@ -187,6 +188,7 @@ dds_to_use <- DESeqDataSetFromMatrix(counts, coldata, design = formula)
 
 vsd_before <- vst(dds_to_use)
 norm_matrix = assay(vsd_before)
+new_cdata <- coldata
 ```
 
 ```{r, eval=run_ruv, results='asis', echo=FALSE}
@@ -338,7 +340,8 @@ ggplot(top_n_exp, aes_string(x = column, y = 'log2_expression')) +
   geom_boxplot(outlier.shape = NA, linewidth=0.5, color="grey") + 
   geom_point() +
   facet_wrap(~gene_name) + 
-  ggtitle(str_interp('Expression of Top ${n} DEGs'))
+  ggtitle(str_interp('Expression of Top ${n} DEGs')) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
 
 ```
 
