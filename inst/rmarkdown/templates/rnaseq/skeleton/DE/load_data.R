@@ -43,7 +43,27 @@ load_metrics <- function(se_object, multiqc_data_dir, gtf_fn, counts){
       mutate(x5_3_bias = qualimap_5_3_bias)
 
     # Sometimes we don't have rRNA due to mismatch annotation, We skip this if is the case
-    gtf=rtracklayer::import(gtf_fn)
+    gtf <- NULL
+    if (genome =="other"){
+      gtf <- gtf_fn
+    }else{
+      if (genome == "hg38") {
+        gtf <- "hg38.rna.gtf.gz"
+      } else if (genome == "mm10") {
+        gtf <- "mm10.rna.gtf.gz"
+      } else if (genome == "mm39") {
+        gtf <- "mm39.rna.gtf.gz"
+      }
+      gtf <- system.file("extdata", "annotation",
+                         gtf,
+                         package="bcbioR")
+    }
+    if (is.null(gtf)) {
+      print("No genome provided! Please add it at the top of this Rmd")
+    }
+
+    gtf=rtracklayer::import(gtf)
+
 
     one=grep("gene_type", colnames(as.data.frame(gtf)), value = TRUE)
     another=grep("gene_biotype", colnames(as.data.frame(gtf)), value = TRUE)

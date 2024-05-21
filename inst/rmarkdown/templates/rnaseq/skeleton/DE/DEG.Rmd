@@ -22,6 +22,8 @@ params:
   column: sample_type
   subset_column: null
   subset_value: null
+  # Put hg38, mm10, mm39, or other
+  genome: hg38
   ruv: false
   params_file: params_de.R
   project_file: ../information.R
@@ -37,6 +39,7 @@ source(params$project_file)
 # 3. Load custom functions to load data from coldata/metrics/counts
 source(params$functions_file)
 # IMPORTANT set these values if you are not using the parameters at the top
+genome=params$genome
 column=params$column
 numerator=params$numerator
 denominator=params$denominator
@@ -95,7 +98,7 @@ coldata$sample=row.names(coldata)
 counts <- load_counts(counts_fn)
 counts <- counts[,colnames(counts) %in% coldata$sample]
 
-metrics <- load_metrics(se_object, multiqc_data_dir,gtf_fn,counts) %>% 
+metrics <- load_metrics(se_object, multiqc_data_dir, gtf_fn, counts) %>% 
   left_join(coldata, by = c('sample')) %>% 
   as.data.frame()
 rownames(metrics) <- metrics$sample

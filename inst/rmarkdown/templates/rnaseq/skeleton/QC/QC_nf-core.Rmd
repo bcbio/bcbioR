@@ -18,6 +18,8 @@ editor_options:
   chunk_output_type: console
 params:
   params_file: params_qc_nf-core.R
+  # Put hg38, mm10, mm39, or other
+  genome: hg38
   project_file: ../information.R
   factor_of_interest: sample_type
 ---
@@ -27,6 +29,7 @@ params:
 # 1. set up factor_of_interest parameter from parameter above or manualy
 #    this is used to color plots, it needs to be part of the metadata
 factor_of_interest=params$factor_of_interest
+genome=params$genome
 # 2. Set input files in this file
 source(params$params_file)
 # 3. If you set up this file, project information will be printed below and
@@ -140,7 +143,7 @@ meta_df <- data.frame(meta_df[,!(colnames(meta_df) %in% c("fastq_1", "fastq_2", 
 
 ggplot(meta_df, aes(.data[[factor_of_interest]],
                     fill = .data[[factor_of_interest]])) +
-  geom_bar() + ylab("") + xlab("") +
+  geom_bar() + ylab("") + xlab("") + ylab("# of samples") +
   scale_fill_cb_friendly()
 ```
 
@@ -186,19 +189,26 @@ metrics <- metrics %>%
   mutate(x5_3_bias = qualimap_5_3_bias)
 
 # Sometimes we don't have rRNA due to mismatch annotation, We skip this if is the case
-
-if (params$genome == "hg38") {
-  gtf <- "../../data/hg38.rna.gtf"
-} elseif (params$genome == "mm10") {
-  gtf <- "../../data/mm10.rna.gtf"
-} elseif (params$genome == "mm39") {
-  gtf <- "../../data/mm39.rna.gtf"
-} elseif (params$genome == "other") {
-  gtf <- gtf_fn
-} else {
-  print("No genome provided! Please add it to params_qc_nf-core.R")
+gtf <- NULL
+if (genome =="other"){
+    gtf <- gtf_fn
+}else{
+  if (genome == "hg38") {
+    gtf <- "hg38.rna.gtf.gz"
+  } else if (genome == "mm10") {
+    gtf <- "mm10.rna.gtf.gz"
+  } else if (genome == "mm39") {
+    gtf <- "mm39.rna.gtf.gz"
+  } 
+  gtf <- system.file("extdata", "annotation",
+                     gtf,
+                     package="bcbioR")
+} 
+if (is.null(gtf)) {
+  print("No genome provided! Please add it at the top of this Rmd")
 }
 
+gtf=rtracklayer::import(gtf)
 
 one=grep("gene_type", colnames(as.data.frame(gtf)), value = TRUE)
 another=grep("gene_biotype", colnames(as.data.frame(gtf)), value = TRUE)
@@ -411,7 +421,7 @@ metrics %>%
     coord_flip()  + xlab("") +
     scale_color_cb_friendly() +
     ylim(c(0, 100)) +
-    geom_hline(yintercept=0.2, color = "grey", size=2)
+    geom_hline(yintercept=20, color = "grey", size=2)
 ```
 
 ## tRNA/rRNA mapping rate
@@ -422,16 +432,17 @@ Samples should have a ribosomal RNA (rRNA) "contamination" rate below 10%
 
 rrna_ylim <- max(round(metrics$r_and_t_rna_rate*100, 2)) + 10
 metrics %>%
-    ggplot(aes(x = factor(sample, level = order),
-               y = r_and_t_rna_rate * 100, 
-               color = .data[[factor_of_interest]])) +
-    geom_point(alpha = 0.5) +
-    ylab("tRNA/rRNA rate, %")+
-    ylim(0, rrna_ylim) + 
-    ggtitle("tRNA/rRNA mapping rate") +
-    coord_flip() +
-    scale_color_cb_friendly() +
-    geom_hline(yintercept=0.2, color = "grey", size=2)
+  ggplot(aes(x = factor(sample, level = order),
+             y = r_and_t_rna_rate * 100, 
+             color = .data[[factor_of_interest]])) +
+  geom_point(alpha = 0.5) +
+  ylab("tRNA/rRNA rate, %")+
+  ylim(0, rrna_ylim) + 
+  ggtitle("tRNA/rRNA mapping rate") +
+  coord_flip() +
+  scale_color_cb_friendly() +
+  ylim(c(0, 100)) +
+  geom_hline(yintercept=20, color = "grey", size=2)
 ```
 
 ## 5'->3' bias
