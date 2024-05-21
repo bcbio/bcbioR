@@ -20,6 +20,8 @@ devtools::install_github("bcbio/bcbioR",ref = "devel")
 
 ## Quick start
 
+Use this code to generate a standard project name for all of your folders. **This code will not create any folders or files.**
+
 ``` r
 library(bcbioR)
 ## basic example code
@@ -28,6 +30,12 @@ bcbio_set_project()
 ```
 
 ### Set base project
+
+use `setwd()` to set your current directory to the place where you want to work. The bcbioR functions will automatically write to whatever directory you have set.
+
+``` r
+setwd("/path/to/analysis/folder")
+```
 
 The following code will pop up a Rmd template and then clicking ‘save’ will populate that folder with HCBC data structure guidelines
 
@@ -40,9 +48,10 @@ As well, You can get this by going to File -\> New File -\> R markdown: - then `
 ### Set RNAseq report folder
 
 This code will populate the folder with HCBC data structure guidelines and Rmd code:
+**You do not need to create a reports folder prior to running this code. This will create and populate the reports folder.**
 
 ``` r
-bcbio_templates(type="rnaseq", outpath="test_folder/reports")
+bcbio_templates(type="rnaseq", outpath="/path/to/analysis/folder/reports")
 ```
 
 ### Discover more…
