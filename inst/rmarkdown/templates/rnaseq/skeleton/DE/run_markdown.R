@@ -1,7 +1,11 @@
 library(rmarkdown)
 # set working directory to this file before using the function
-render_de <- function(column,numerator, denominator, subset_value = NA,
-                      params_file = 'params_de.R'){
+
+# set directory to this file folder
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+# example running with test data
+render_de <- function(column, numerator, denominator, subset_value = NA,
+                      params_file = 'params_de-testdata.R'){
 
   rmarkdown::render(input = "DEG.Rmd",
                     output_dir = ".",
@@ -19,9 +23,9 @@ render_de <- function(column,numerator, denominator, subset_value = NA,
                       denominator = denominator,
                       params_file = params_file,
                       project_file = '../information.R',
-                      functions_file = '../load_data.R'
+                      functions_file = 'load_data.R'
                     )
   )
 }
-
+#Example data
 render_de("sample_type","tumor", "normal")

@@ -1,5 +1,6 @@
 .fix <- function(x){
   x <- tolower(x) %>% str_replace_all(., "[[:punct:]]", "_")
+  x <- str_replace_all(x, " ", "_")
   return(x)
 }
 
