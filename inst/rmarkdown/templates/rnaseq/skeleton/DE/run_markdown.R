@@ -6,7 +6,7 @@ render_de <- function(column,numerator, denominator, subset_value = NA,
   rmarkdown::render(input = "DEG.Rmd",
                     output_dir = ".",
                     output_format = "html_document",
-                    output_file = ifelse(!is.null(subset_value),
+                    output_file = ifelse(!is.na(subset_value),
                                          paste0('DE_', subset_value, '_', numerator, '_vs_', denominator, '.html'),
                                          paste0('DE_', numerator, '_vs_', denominator, '.html')
                                          ),

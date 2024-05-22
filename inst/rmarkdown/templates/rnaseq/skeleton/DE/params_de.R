@@ -20,7 +20,7 @@ multiqc_data_dir='/path/to/nf-core/output/star_salmon/multiqc_report_data'
 # gtf_fn='/path/to/nf-core/output/genome/hg38.filtered.gtf'
 
 
-# Example data: COMMENT THESE LINE IF YOU ARE USING YOUT DATA
+# Example data: COMMENT THESE LINE IF YOU ARE USING YOUR DATA
 coldata_fn='https://raw.githubusercontent.com/bcbio/bcbioR-test-data/devel/rnaseq/nf-core/coldata.csv'
 counts_fn=url('https://raw.githubusercontent.com/bcbio/bcbioR-test-data/devel/rnaseq/nf-core/star_salmon/salmon.merged.gene_counts.tsv')
 # This folder is in the output directory inside multiqc folder
