@@ -123,7 +123,7 @@ sanitize_datatable = function(df, ...) {
 -   Analyst: `r analyst`
 -   Experiment: `r experiment`
 -   Aim: `r aim`
--   Comparison: `r ifelse(is.na(subset_value) | is.null(subset_value), paste0(numerator, ' vs. ', denominator), paste0(subset_value, ': ', numerator, ' vs. ', denominator))`
+-   Comparison: `r ifelse(is.null(subset_value), paste0(numerator, ' vs. ', denominator), paste0(subset_value, ': ', numerator, ' vs. ', denominator))`
 
 ```{r create_filenames}
 
@@ -415,7 +415,7 @@ res_for_writing <- res %>%
 pathways_for_writing <- pathways_long %>% 
   mutate(comparison = str_interp("${numerator}_vs_${denominator}"))
          
-if (!is.null(subset_value) & !is.na(subset_value)){
+if (!is.null(subset_value)){
   counts_norm <- counts_norm %>% 
     mutate(subset = subset_value)  
   res_for_writing <- res_for_writing %>% 

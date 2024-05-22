@@ -1,12 +1,12 @@
 library(rmarkdown)
 # set working directory to this file before using the function
-render_de <- function(column,numerator, denominator, subset_value = NA,
+render_de <- function(column,numerator, denominator, subset_value = NULL,
                       params_file = 'params_de.R'){
 
   rmarkdown::render(input = "DEG.Rmd",
                     output_dir = ".",
                     output_format = "html_document",
-                    output_file = ifelse(!is.na(subset_value),
+                    output_file = ifelse(!is.null(subset_value),
                                          paste0('DE_', subset_value, '_', numerator, '_vs_', denominator, '.html'),
                                          paste0('DE_', numerator, '_vs_', denominator, '.html')
                                          ),
