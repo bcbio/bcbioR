@@ -127,7 +127,7 @@ sanitize_datatable = function(df, ...) {
 
 ```{r create_filenames}
 
-if (!is.null(subset_value) & !is.na(subset_value)){
+if (!is.null(subset_value) & !is.null(subset_value)){
   filenames = str_interp("${subset_value}_${numerator}_vs_${denominator}")
 } else {
   filenames = str_interp("${numerator}_vs_${denominator}")
