@@ -6,6 +6,8 @@
 * Add by sample plots in QC
 * Add function to check nfcore samplesheet
 * Add PCA with variance analysis
+* Minor details fixed in QC RNAseq report
+* Correct metric for rRNA and tRNA
 
 # bcbioR 0.1.1
 

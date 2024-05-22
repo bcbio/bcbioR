@@ -22,7 +22,9 @@ params:
   column: sample_type
   subset_column: null
   subset_value: null
-  ruv: true
+  # Put hg38, mm10, mm39, or other
+  genome: hg38
+  ruv: false
   params_file: params_de.R
   project_file: ../information.R
   functions_file: load_data.R
@@ -30,10 +32,14 @@ params:
 ---
 
 ```{r load_params, cache = FALSE, message = FALSE, warning=FALSE}
+# 1. Set up input files in this R file (params_de.R)
 source(params$params_file)
+# 2. Set up project file (already done from QC probably)
 source(params$project_file)
+# 3. Load custom functions to load data from coldata/metrics/counts
 source(params$functions_file)
-# set this values if you are not using the parameters at the top
+# IMPORTANT set these values if you are not using the parameters at the top
+genome=params$genome
 column=params$column
 numerator=params$numerator
 denominator=params$denominator
@@ -82,21 +88,24 @@ set.seed(1234567890L)
 
 
 ```{r load_data, message=F, warning=F}
-# this code will load from bcbio or nf-core folder
+# This code will load from bcbio or nf-core folder
 # NOTE make sure to set numerator and denominator
 coldata <- load_coldata(coldata_fn, column,
                         numerator, denominator,
                         subset_column, subset_value)
 coldata$sample=row.names(coldata)
-metrics <- load_metrics(se_object, multiqc_data_dir) %>% 
-  left_join(coldata, by = c('sample' = 'description')) %>% 
+
+counts <- load_counts(counts_fn)
+counts <- counts[,colnames(counts) %in% coldata$sample]
+
+metrics <- load_metrics(se_object, multiqc_data_dir, gtf_fn, counts) %>% 
+  left_join(coldata, by = c('sample')) %>% 
   as.data.frame()
 rownames(metrics) <- metrics$sample
-counts <- load_counts(counts_fn)
-counts <- counts[,colnames(counts) %in% coldata$description]
 # if the names don't match in order or string check files names and coldata information
-counts = counts[rownames(coldata)]
-stopifnot(all(names(counts) == rownames(coldata)))
+counts = counts[rownames(metrics)]
+coldata = coldata[rownames(metrics),]
+stopifnot(all(names(counts) == rownames(metrics)))
 ```
 
 ```{r sanitize_datatable}
@@ -114,11 +123,11 @@ sanitize_datatable = function(df, ...) {
 -   Analyst: `r analyst`
 -   Experiment: `r experiment`
 -   Aim: `r aim`
--   Comparison: `r paste0(subset_value, ': ', numerator, ' vs. ', denominator)`
+-   Comparison: `r ifelse(is.null(subset_value), paste0(numerator, ' vs. ', denominator), paste0(subset_value, ': ', numerator, ' vs. ', denominator))`
 
 ```{r create_filenames}
 
-if (!is.null(subset_value)){
+if (!is.null(subset_value) & !is.null(subset_value)){
   filenames = str_interp("${subset_value}_${numerator}_vs_${denominator}")
 } else {
   filenames = str_interp("${numerator}_vs_${denominator}")
@@ -182,6 +191,7 @@ dds_to_use <- DESeqDataSetFromMatrix(counts, coldata, design = formula)
 
 vsd_before <- vst(dds_to_use)
 norm_matrix = assay(vsd_before)
+new_cdata <- coldata
 ```
 
 ```{r, eval=run_ruv, results='asis', echo=FALSE}
@@ -333,7 +343,8 @@ ggplot(top_n_exp, aes_string(x = column, y = 'log2_expression')) +
   geom_boxplot(outlier.shape = NA, linewidth=0.5, color="grey") + 
   geom_point() +
   facet_wrap(~gene_name) + 
-  ggtitle(str_interp('Expression of Top ${n} DEGs'))
+  ggtitle(str_interp('Expression of Top ${n} DEGs')) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
 
 ```
 
