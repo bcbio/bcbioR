@@ -52,7 +52,6 @@ library(rtracklayer)
 library(DESeq2)
 library(DEGreport)
 library(ggrepel)
-library(pheatmap)
 # library(RColorBrewer)
 library(DT)
 library(pheatmap)
@@ -132,8 +131,9 @@ sanitize_datatable = function(df, ...) {
 ```{r load_metadata}
 
 meta_df=read_csv(metadata_fn)  %>% 
-  arrange(.data[[factor_of_interest]]) %>% distinct(sample, .keep_all = T) %>% 
-  select(!matches("fastq"), !matches("strandness"))
+  arrange(.data[[factor_of_interest]]) %>%
+  distinct(sample, .keep_all = T) %>% 
+  dplyr::select(!matches("fastq"), !matches("strandness"))
 meta_df$sample <- make.names(meta_df$sample)
 order <- meta_df$sample
 
@@ -243,7 +243,7 @@ metrics=metrics[,c("sample","mapped_reads","exonic_rate","intronic_rate",
 metrics$sample <- make.names(metrics$sample)
 metrics <- metrics %>%
   full_join(meta_df , by = c("sample" = "sample")) %>%
-  select(where(~!all(is.na(.))))
+  dplyr::select(where(~!all(is.na(.))))
 
 ```
 
