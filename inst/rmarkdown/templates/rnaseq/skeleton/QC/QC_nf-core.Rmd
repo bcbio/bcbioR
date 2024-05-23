@@ -260,7 +260,7 @@ meta_sm %>% sanitize_datatable()
 
 ## Total reads
 
-Here, we want to see consistency and a minimum of 20 million reads.
+Here, we want to see consistency and a minimum of 20 million reads (the grey line).
 
 ```{r plot_total_reads}
 metrics %>%
@@ -271,7 +271,8 @@ metrics %>%
     coord_flip() +
     scale_y_continuous(name = "million reads") +
     scale_fill_cb_friendly() + xlab("") + 
-    ggtitle("Total reads") 
+    ggtitle("Total reads") +
+  geom_hline(yintercept=20000000, color = "grey", size=2)
 
 metrics %>%
     ggplot(aes(x = .data[[factor_of_interest]],
@@ -292,7 +293,7 @@ max_pct_mapped <- round(max(metrics$mapped_reads/metrics$total_reads)*100,1)
 
 ## Mapping rate
 
-The genomic mapping rate represents the percentage of reads mapping to the reference genome. We want to see consistent mapping rates between samples and over 70% mapping. These samples have mapping rates (`r min_pct_mapped` - `r max_pct_mapped`%).
+The genomic mapping rate represents the percentage of reads mapping to the reference genome. We want to see consistent mapping rates between samples and over 70% mapping (the grey line). These samples have mapping rates: `r min_pct_mapped` - `r max_pct_mapped`%.
 
 ```{r plot_mapping_rate}
 metrics$mapped_reads_pct <- round(metrics$mapped_reads/metrics$total_reads*100,1)
@@ -304,14 +305,14 @@ metrics %>%
     coord_flip() +
     scale_color_cb_friendly() +
     ylim(0, 100) +
-  ggtitle("Mapping rate") +
+  ggtitle("Mapping rate") + xlab("") +
   geom_hline(yintercept=70, color = "grey", size=2)
 ```
 
 
 ## Number of genes detected
 
-The number of genes represented in every sample is expected to be consistent and over 20K (blue line).
+The number of genes represented in every sample is expected to be consistent and over 20K (grey line).
 
 ```{r calc_genes_detected}
 genes_detected <- colSums(assays(se)[["counts"]] > 0) %>% enframe()
@@ -370,7 +371,7 @@ metrics %>%
 
 ## Exonic mapping rate
 
-Here we are looking for consistency, and exonic mapping rates around 70% or 75% (blue and red lines, respectively). 
+Here we are looking for consistency, and exonic mapping rates around or above 70% (grey line). 
 
 ```{r plot_exonic_mapping_rate}
 metrics %>%
@@ -389,7 +390,7 @@ metrics %>%
 
 ## Intronic mapping rate
 
-Here, we expect a low intronic mapping rate (≤ 15% - 20%)
+Here, we expect a low intronic mapping rate (≤ 15% - 20%). The grey line indicates 20%.
 
 ```{r plot_intronic_mapping_rate}
 metrics %>%
@@ -408,7 +409,7 @@ metrics %>%
 
 ## Intergenic mapping rate
 
-Here, we expect a low intergenic mapping rate, which is true for all samples.
+Here, we expect a low intergenic mapping rate, which is true for all samples. The grey line indicates 15%
 
 ```{r plot_intergenic_mapping_rate}
 metrics %>%
@@ -421,12 +422,12 @@ metrics %>%
     coord_flip()  + xlab("") +
     scale_color_cb_friendly() +
     ylim(c(0, 100)) +
-    geom_hline(yintercept=20, color = "grey", size=2)
+    geom_hline(yintercept=15, color = "grey", size=2)
 ```
 
 ## tRNA/rRNA mapping rate
 
-Samples should have a ribosomal RNA (rRNA) "contamination" rate below 10%
+Samples should have a ribosomal RNA (rRNA) "contamination" rate below 10% (the grey line).
 
 ```{r plot_rrna_mapping_rate}
 
@@ -441,8 +442,8 @@ metrics %>%
   ggtitle("tRNA/rRNA mapping rate") +
   coord_flip() +
   scale_color_cb_friendly() +
-  ylim(c(0, 100)) +
-  geom_hline(yintercept=20, color = "grey", size=2)
+  ylim(c(0, 100)) + xlab("") +
+  geom_hline(yintercept=10, color = "grey", size=2)
 ```
 
 ## 5'->3' bias
