@@ -34,12 +34,17 @@ setwd(fs::path_dir(getSourceEditorContext()$path))
 ```
 
 ```{r}
-metadata_fn={{metadata_fn}}
-se_object={{se_object}}
+# params for bcbio
+# coldata_fn = "https://raw.githubusercontent.com/bcbio/bcbioR-test-data/main/rnaseq/bcbio/coldata.csv"
+# counts_fn = 'https://raw.githubusercontent.com/bcbio/bcbioR-test-data/main/rnaseq/bcbio/tximport-counts.csv'
+# se_object=url("https://raw.githubusercontent.com/bcbio/bcbioR-test-data/main/rnaseq/bcbio/bcbio-se.rds")
+# Params for nfcore/rnaseq
+metadata_fn="{{metadata_fn}}"
+se_object="{{se_object}}"
 # This folder is in the output directory inside multiqc folder
-multiqc_data_dir={{multiqc_data_dir}}
+multiqc_data_dir="{{multiqc_data_dir}}"
 # This file is inside the genome folder in the output directory
-gtf_fn={{gtf_fn}}
+gtf_fn="{{gtf_fn}}"
 ```
 
 ```{r load_params, cache = FALSE, message = FALSE, warning=FALSE}
