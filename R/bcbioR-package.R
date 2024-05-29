@@ -9,6 +9,8 @@
 ## usethis namespace: end
 #' @import DESeq2
 #' @import ggplot2
+#' @import usethis
+#' @import fs
 #' @import hues
 #' @import ggprism
 #' @import R.utils

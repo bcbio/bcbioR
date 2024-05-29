@@ -47,8 +47,7 @@ As well, You can get this by going to File -\> New File -\> R markdown: - then `
 
 ### Set RNAseq report folder
 
-This code will populate the folder with HCBC data structure guidelines and Rmd code:
-**You do not need to create a reports folder prior to running this code. This will create and populate the reports folder.**
+This code will populate the folder with HCBC data structure guidelines and Rmd code: **You do not need to create a reports folder prior to running this code. This will create and populate the reports folder.**
 
 ``` r
 bcbio_templates(type="rnaseq", outpath="/path/to/analysis/folder/reports")

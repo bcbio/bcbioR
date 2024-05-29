@@ -19,7 +19,11 @@ Imports:
     ggprism,
     grDevices,
     R.utils,
-    readr
+    readr,
+    usethis,
+    fs,
+    jsonlite,
+    yaml
 Suggests: 
     knitr,
     rmarkdown,

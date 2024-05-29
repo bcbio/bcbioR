@@ -1,0 +1,32 @@
+---
+title: "PCA with variance analysis"
+author: "Harvard Chan Bioinformatics Core"
+---
+
+```{r }
+library(DEGreport)
+library(ggplot2)
+library(ggforce)
+
+data("bcbio_vsd_data")
+
+colors=cb_friendly_cols(1:15)
+ggplot2::theme_set(theme_prism(base_size = 14))
+
+pca <- degPCA(assay(bcbio_vsd_data), colData(bcbio_vsd_data),
+              condition = "sample_type", name = "sample", data = T)
+
+pca$plot + ggtitle(paste0("All samples", "\nPCA using ", nrow(vst), " genes")) +
+  theme(plot.title=element_text(hjust=0.5)) +
+  geom_mark_ellipse(aes(color = sample_type))
+```
+```{r}
+# NOTE:This is not confirmed to be a valid test but it could help to understand the data
+library(vegan)
+vare.disa <- vegdist(t(assay(bcbio_vsd_data)))
+
+mod = betadisper(vare.disa, colData(bcbio_vsd_data)[['sample_type']])
+anova(mod)
+```
+
+

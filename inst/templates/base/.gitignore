@@ -1,0 +1,8 @@
+.Rproj.user
+data/*
+docs/*
+**/*html
+**/*rds
+**/*rda
+**/*csv
+**/*tsv
