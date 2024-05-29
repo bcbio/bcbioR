@@ -23,7 +23,9 @@ Imports:
     usethis,
     fs,
     jsonlite,
-    yaml
+    yaml,
+    whisker,
+    rlang
 Suggests: 
     knitr,
     rmarkdown,
