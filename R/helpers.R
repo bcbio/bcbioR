@@ -103,19 +103,6 @@ bcbio_set_project <- function() {
 }
 
 
-guess_analysis <- function(path){
-  if (!fs::dir_exists(path))
-    ui_stop("{ui_val(path)} doesn't exist")
-
-  # This file is inside star_salmon/ folder
-  counts_fn <- fs::path_join(c(path, '/star_salmon/salmon.merged.gene_counts.tsv'))
-  # This folder called "multiqc_report_data" is inside the output directory star_salmon inside multiqc folder
-  multiqc_data_dir <- fs::path_join(c(path, 'star_salmon/multiqc_report_data'))
-  # This file is inside star_salmon/ folder
-  se_object <- fs::path_join(c(path, 'star_salmon/salmon.merged.gene_counts.rds'))
-
-}
-
 read_pipeline_info <- function(nfcore){
   # pipeline_info/params_2024-05-28_12-28-51.json
   config <- fs::path_join(c(nfcore, "pipeline_info"))
@@ -135,7 +122,6 @@ read_pipeline_info <- function(nfcore){
   }
   list(metadata=metadata, pipeline=pipeline)
 }
-
 
 render_rmd <- function(infile, outfile, ls_data){
   whisker.render(read_file(infile),
@@ -193,7 +179,7 @@ use_bcbio_analysis <- function(path, nfcore=NULL, copy=FALSE, metadata=NULL){
     if (!fs::dir_exists(nfcore))
       ui_stop("{ui_value(nfcore)} doesn't exist. point to nfcore path or turn on copy mode.")
 
-    #guess analysis from pipeline file
+    # guess analysis from pipeline file
     information <- read_pipeline_info(nfcore)
     fs::dir_create(fs::path_join(c(path, "meta")))
     meta_path <- fs::path_join(c(path, "meta", fs::path_file(information$metadata)))
@@ -206,12 +192,15 @@ use_bcbio_analysis <- function(path, nfcore=NULL, copy=FALSE, metadata=NULL){
       if (!fs::file_exists(information$metadata)){
         ui_warn("{ui_value(metadata)} not found. We can only work with local filesytems. For now.")
         ui_todo("Please, copy {ui_value(metadata)} to {ui_value(meta_path)}.")
-        ui_warn("If this file is manually set up, the Rmd code will fail.")
+        ui_warn("If this file isn't manually set up, the Rmd code will fail.")
       }else{
+        ui_info("Copy metadata to {ui_value(meta_path)}")
         fs::file_copy(information$metadata, meta_path)
       }
       metadata <- meta_path
     }
+    path_final <- fs::path_join(c(path, "final"))
+    ui_todo("Please, copy nf-core output directory to {ui_value(path_final)}")
   }
   # set all files from analysis
   data <- bcbio_params(nfcore, pipeline, metadata, copy=copy)
