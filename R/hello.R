@@ -39,7 +39,11 @@ bcbio_nfcore_check <- function(file){
 #' Normally these helper files are inside a report folder inside a
 #' project folder.
 #'
-#' @param type string indicating the type of analysis, supported: rnaseq.
+#' @param type string indicating the type of analysis, supported:
+#'   - base
+#'   - rnaseq, scrnaseq,
+#'   - teaseq
+#'   - cosmx
 #'
 #' @param outpath string path indicating where to copy all the files to
 #' @examples
@@ -49,20 +53,30 @@ bcbio_nfcore_check <- function(file){
 #' @export
 bcbio_templates <- function(type="rnaseq", outpath){
   switch(type,
+         base={
+           fpath <- system.file("rmarkdown/templates/common", "skeleton", package="bcbioR")
+           copyDirectory(fpath, outpath)
+         },
          rnaseq={
-
            fpath <- system.file("rmarkdown/templates/rnaseq", "skeleton", package="bcbioR")
-           #file.copy(fpath, outpath, recursive = T)
            copyDirectory(fpath, outpath)
          },
          scrnaseq={
-
            fpath <- system.file("rmarkdown/templates/singlecell", "skeleton", package="bcbioR")
-           #file.copy(fpath, outpath, recursive = T)
+           copyDirectory(fpath, outpath)
+         },
+         teaseq={
+           fpath <- system.file("rmarkdown/templates/teaseq", "skeleton", package="bcbioR")
+           copyDirectory(fpath, outpath)
+         },
+         cosmx={
+           fpath <- system.file("rmarkdown/templates/cosmx", "skeleton", package="bcbioR")
            copyDirectory(fpath, outpath)
          },
          {
-           stop('project type not recognize, please choose: ', 'rnaseq', 'scrnaseq')
+           stop('project type not recognize, please choose: ', 'base',
+                'rnaseq', 'scrnaseq',
+                'teaseq', 'cosmx')
          }
   )
 }
