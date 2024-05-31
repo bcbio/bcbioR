@@ -22,7 +22,7 @@ devtools::install_github("bcbio/bcbioR",ref = "devel")
 
 Use this code to generate a standard project name for all of your folders. **This code will not create any folders or files.**
 
-``` r
+```
 library(bcbioR)
 ## basic example code
 # will help you to build a folder name following HCBC naming rules
@@ -33,24 +33,21 @@ bcbio_set_project()
 
 use `setwd()` to set your current directory to the place where you want to work. The bcbioR functions will automatically write to whatever directory you have set.
 
-``` r
+```
 setwd("/path/to/analysis/folder")
 ```
 
-The following code will pop up a Rmd template and then clicking ‘save’ will populate that folder with HCBC data structure guidelines
+The following code will pop up a Rmd template will populate that folder with HCBC data structure guidelines
 
-``` r
-rmarkdown::draft("project_folder",template="common",package="bcbioR")
 ```
-
-As well, You can get this by going to File -\> New File -\> R markdown: - then `From Template`, and choose `bcbio base` - choose the folder to deploy files, it could be a new folder or an existing one
+bcbio_templates(type="base", outpath="/path/to/analysis/folder")
+```
 
 ### Set RNAseq report folder
 
-This code will populate the folder with HCBC data structure guidelines and Rmd code:
-**You do not need to create a reports folder prior to running this code. This will create and populate the reports folder.**
+This code will populate the folder with HCBC data structure guidelines and Rmd code: **You do not need to create a reports folder prior to running this code. This will create and populate the reports folder.**
 
-``` r
+``` 
 bcbio_templates(type="rnaseq", outpath="/path/to/analysis/folder/reports")
 ```
 
@@ -79,7 +76,6 @@ Go to the vignette to know more `vignette("bcbioR_quick_start",package="bcbioR")
 Some best practices when developing:
 
 -   install `devtools`
--   render `README.Rmd` regularly, to keep `README.md` up-to-date. `devtools::build_readme()` is handy for this.
 -   Use `usethis::use_import_from("stringr","str_replace_all")` to add a new function you are using in the code.
 
 ### Contributors
