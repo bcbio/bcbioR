@@ -144,7 +144,7 @@ meta_df <- data.frame(meta_df[,!(colnames(meta_df) %in% c("fastq_1", "fastq_2", 
 ggplot(meta_df, aes(.data[[factor_of_interest]],
                     fill = .data[[factor_of_interest]])) +
   geom_bar() + ylab("") + xlab("") + ylab("# of samples") +
-  scale_fill_cb_friendly()
+  scale_fill_cb_friendly() + theme(axis.text.x=element_text(angle = 90, vjust = 0.5), legend.position = "none")
 ```
 
 
