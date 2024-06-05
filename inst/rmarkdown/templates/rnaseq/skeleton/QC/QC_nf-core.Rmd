@@ -26,7 +26,7 @@ params:
 
 
 ```{r source_params, echo = F}
-# 1. set up factor_of_interest parameter from parameter above or manualy
+# 1. set up factor_of_interest parameter from parameter above or manually
 #    this is used to color plots, it needs to be part of the metadata
 factor_of_interest=params$factor_of_interest
 genome=params$genome
@@ -137,10 +137,6 @@ meta_df=read_csv(metadata_fn)  %>%
 meta_df$sample <- make.names(meta_df$sample)
 order <- meta_df$sample
 
-# remove some columns
-meta_df <- data.frame(meta_df[,!(colnames(meta_df) %in% c("fastq_1", "fastq_2",  "strandedness"))])
-
-
 ggplot(meta_df, aes(.data[[factor_of_interest]],
                     fill = .data[[factor_of_interest]])) +
   geom_bar() + ylab("") + xlab("") + ylab("# of samples") +
@@ -148,7 +144,7 @@ ggplot(meta_df, aes(.data[[factor_of_interest]],
 ```
 
 
-```{r}
+```{r load_data}
 # read counts from SE object
 se <- readRDS(se_object)
 raw_counts <- assays(se)[["counts"]] %>% round() %>%
@@ -156,9 +152,9 @@ raw_counts <- assays(se)[["counts"]] %>% round() %>%
 raw_counts=raw_counts[rowSums(raw_counts)!=0,]
 ```
 
-```{r  prepare metrics}
+```{r  prepare_metrics}
 # Get metrics from nf-core into bcbio like table
-# many metrics are already in the Genereal Table of MultiQC, this reads the file
+# many metrics are already in the General Table of MultiQC, this reads the file
 metrics <- read_tsv(file.path(multiqc_data_dir, 'multiqc_general_stats.txt'))
 
 # we get some more metrics from Qualimap and rename columns
@@ -247,7 +243,7 @@ metrics <- metrics %>%
 
 ```
 
-```{r show-metadata}
+```{r show_metadata}
 meta_sm <- meta_df %>%
   as.data.frame() %>%
   column_to_rownames("sample")
@@ -347,7 +343,7 @@ metrics %>%
     coord_flip() +
     scale_y_continuous(name = "million reads") +
     scale_color_cb_friendly() + xlab("") + 
-    ggtitle("Total reads") 
+    ggtitle("Number of Genes") 
 
 ```
 
@@ -436,7 +432,7 @@ metrics %>%
   ggplot(aes(x = factor(sample, level = order),
              y = r_and_t_rna_rate * 100, 
              color = .data[[factor_of_interest]])) +
-  geom_point(alpha = 0.5) +
+  geom_point(alpha = 0.5, size=4) +
   ylab("tRNA/rRNA rate, %")+
   ylim(0, rrna_ylim) + 
   ggtitle("tRNA/rRNA mapping rate") +
@@ -498,7 +494,7 @@ In this section, we look at how well the different groups in the dataset cluster
 
 Principal Component Analysis (PCA) is a statistical technique used to simplify high-dimensional data by identifying patterns and reducing the number of variables. In the context of gene expression, PCA helps analyze large datasets containing information about the expression levels of thousands of genes across different samples (e.g., tissues, cells).
 
-<!-- ### PCA, PCs 1-5, (labled) -->
+<!-- ### PCA, PCs 1-4, (labled) -->
 ```{r PCA1:5 summary, all, unlabeled, fig.width= 7, fig.height = 5}
 
 vst <- vst(raw_counts)
