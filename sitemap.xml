@@ -28,10 +28,16 @@
     <loc>http://bcb.io/bcbioR/reference/bcbioR-package.html</loc>
   </url>
   <url>
+    <loc>http://bcb.io/bcbioR/reference/bcbio_nfcore_check.html</loc>
+  </url>
+  <url>
     <loc>http://bcb.io/bcbioR/reference/bcbio_set_project.html</loc>
   </url>
   <url>
     <loc>http://bcb.io/bcbioR/reference/bcbio_templates.html</loc>
+  </url>
+  <url>
+    <loc>http://bcb.io/bcbioR/reference/bcbio_vsd_data.html</loc>
   </url>
   <url>
     <loc>http://bcb.io/bcbioR/reference/cb_friendly_colors.html</loc>

@@ -26,7 +26,7 @@
     
     <a class="navbar-brand me-2" href="index.html">bcbioR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.2</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -64,50 +64,77 @@
 </h1></div>
 <!-- badges: start -->
 
+<!-- badges: end -->
 <p>The goal of <code>bcbioR</code> is to create guidelines for NGS data interpretation based on the experience of the Harvard Chan Bioinformatics Core and everybody who contributes to this package.</p>
 <div class="section level2">
 <h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
 </h2>
 <p>You can install the development version of bcbioR from <a href="https://github.com/" class="external-link">GitHub</a> with:</p>
-<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># install.packages("devtools")</span></span>
-<span><span class="fu">devtools</span><span class="fu">::</span><span class="fu">install_github</span><span class="op">(</span><span class="st">"bcbio/bcbioR"</span><span class="op">)</span></span></code></pre></div>
+<pre><code><span><span class="co"># install.packages("devtools")</span></span>
+<span><span class="fu">devtools</span><span class="fu">::</span><span class="fu">install_github</span><span class="op">(</span><span class="st">"bcbio/bcbioR"</span><span class="op">)</span></span>
+<span><span class="fu">devtools</span><span class="fu">::</span><span class="fu">install_github</span><span class="op">(</span><span class="st">"bcbio/bcbioR"</span>,ref <span class="op">=</span> <span class="st">"devel"</span><span class="op">)</span></span></code></pre>
 </div>
 <div class="section level2">
 <h2 id="quick-start">Quick start<a class="anchor" aria-label="anchor" href="#quick-start"></a>
 </h2>
-<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="http://bcb.io/bcbioR/">bcbioR</a></span><span class="op">)</span></span>
+<p>Use this code to generate a standard project name for all of your folders. <strong>This code will not create any folders or files.</strong></p>
+<pre><code><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="http://bcb.io/bcbioR/">bcbioR</a></span><span class="op">)</span></span>
 <span><span class="co">## basic example code</span></span>
 <span><span class="co"># will help you to build a folder name following HCBC naming rules</span></span>
-<span><span class="fu"><a href="reference/bcbio_set_project.html">bcbio_set_project</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu"><a href="reference/bcbio_set_project.html">bcbio_set_project</a></span><span class="op">(</span><span class="op">)</span></span></code></pre>
 <div class="section level3">
 <h3 id="set-base-project">Set base project<a class="anchor" aria-label="anchor" href="#set-base-project"></a>
 </h3>
-<p>The following code will pop up a Rmd template and then clicking ‘save’ will populate that folder with HCBC data structure guidelines</p>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu">rmarkdown</span><span class="fu">::</span><span class="fu"><a href="https://pkgs.rstudio.com/rmarkdown/reference/draft.html" class="external-link">draft</a></span><span class="op">(</span><span class="st">"project_folder"</span>,template<span class="op">=</span><span class="st">"common"</span>,package<span class="op">=</span><span class="st">"bcbioR"</span><span class="op">)</span></span></code></pre></div>
-<p>As well, You can get this by going to File -&gt; New File -&gt; R markdown: - then <code>From Template</code>, and choose <code>bcbio base</code> - choose the folder to deploy files, it could be a new folder or an existing one</p>
+<p>use <code><a href="https://rdrr.io/r/base/getwd.html" class="external-link">setwd()</a></code> to set your current directory to the place where you want to work. The bcbioR functions will automatically write to whatever directory you have set.</p>
+<pre><code><span><span class="fu"><a href="https://rdrr.io/r/base/getwd.html" class="external-link">setwd</a></span><span class="op">(</span><span class="st">"/path/to/analysis/folder"</span><span class="op">)</span></span></code></pre>
+<p>The following code will pop up a Rmd template will populate that folder with HCBC data structure guidelines</p>
+<pre><code><span><span class="fu"><a href="reference/bcbio_templates.html">bcbio_templates</a></span><span class="op">(</span>type<span class="op">=</span><span class="st">"base"</span>, outpath<span class="op">=</span><span class="st">"/path/to/analysis/folder"</span><span class="op">)</span></span></code></pre>
 </div>
 <div class="section level3">
 <h3 id="set-rnaseq-report-folder">Set RNAseq report folder<a class="anchor" aria-label="anchor" href="#set-rnaseq-report-folder"></a>
 </h3>
-<p>This code will populate the folder with HCBC data structure guidelines and Rmd code:</p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="reference/bcbio_templates.html">bcbio_templates</a></span><span class="op">(</span>type<span class="op">=</span><span class="st">"rnaseq"</span>, outpath<span class="op">=</span><span class="st">"test_folder/reports"</span><span class="op">)</span></span></code></pre></div>
+<p>This code will populate the folder with HCBC data structure guidelines and Rmd code: <strong>You do not need to create a reports folder prior to running this code. This will create and populate the reports folder.</strong></p>
+<pre><code><span><span class="fu"><a href="reference/bcbio_templates.html">bcbio_templates</a></span><span class="op">(</span>type<span class="op">=</span><span class="st">"rnaseq"</span>, outpath<span class="op">=</span><span class="st">"/path/to/analysis/folder/reports"</span><span class="op">)</span></span></code></pre>
 </div>
 <div class="section level3">
 <h3 id="discover-more">Discover more…<a class="anchor" aria-label="anchor" href="#discover-more"></a>
 </h3>
-<p>Go to the vignette to know more <code>vignette("bcbioR_quick_start,package="bcbioR")</code></p>
+<p>Go to the vignette to know more <code><a href="articles/bcbioR_quick_start.html">vignette("bcbioR_quick_start",package="bcbioR")</a></code></p>
 </div>
 </div>
 <div class="section level2">
 <h2 id="how-to-contribute">How to Contribute<a class="anchor" aria-label="anchor" href="#how-to-contribute"></a>
 </h2>
-<p>You’ll still need to render <code>README.Rmd</code> regularly, to keep <code>README.md</code> up-to-date. <code>devtools::build_readme()</code> is handy for this.</p>
-<p>Use <code>usethis::use_import_from("stringr","str_replace_all")</code> to add a function you are using in the code.</p>
-<p>Don’t forget to commit and push the resulting figure files, so they display on GitHub and CRAN.</p>
+<div class="section level3">
+<h3 id="open-an-issue">Open an issue<a class="anchor" aria-label="anchor" href="#open-an-issue"></a>
+</h3>
+<ul>
+<li>If you find a bug</li>
+<li>If you want a new feature</li>
+<li>If you want to add code to the templates</li>
+</ul>
+</div>
+<div class="section level3">
+<h3 id="modify-the-code">Modify the code<a class="anchor" aria-label="anchor" href="#modify-the-code"></a>
+</h3>
+<ul>
+<li>Clone the repository</li>
+<li>Make sure you are in the <code>devel</code> branch</li>
+<li>Create a new branch <code>git checkout -b feature1</code>
+</li>
+<li>Modify you code, add and commit</li>
+<li>Push to GitHub the new branch</li>
+<li>Create a PR from your branch to <code>devel</code>
+</li>
+<li>Assignt the PR to me or Alex</li>
+</ul>
+<p>Some best practices when developing:</p>
+<ul>
+<li>install <code>devtools</code>
+</li>
+<li>Use <code>usethis::use_import_from("stringr","str_replace_all")</code> to add a new function you are using in the code.</li>
+</ul>
+</div>
 <div class="section level3">
 <h3 id="contributors">Contributors<a class="anchor" aria-label="anchor" href="#contributors"></a>
 </h3>
@@ -117,6 +144,8 @@
 <li>Emma Berdan</li>
 <li>Heather Wick</li>
 <li>James Billingsley</li>
+<li>Zhu Zhuo</li>
+<li>Elizabeth Partan</li>
 </ul>
 </div>
 </div>
