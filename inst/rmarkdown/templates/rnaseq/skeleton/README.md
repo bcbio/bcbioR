@@ -17,9 +17,9 @@ CONTROL_REP1,s3path/AEG588A1_S1_L004_R1_001.fastq.gz,s3path/AEG588A1_S1_L004_R2_
 
 Use `bcbio_nfcore_check(csv_file)` to check the file is correct.
 
-You can add more columns to this file with more metadata, and use this file as the `coldata` file the templates.
+You can add more columns to this file with more metadata, and use this file as the `coldata` file in the templates.
 
-- Upload file to our `Datasets` in Seqera using the name of the project but starting with `nfcore-rnaseq`
+- Upload file to our `Datasets` in Seqera using the name of the project but starting with `rnaseq-pi_lastname-hbc_code`
 - Go to `Launchpad`, select `nf-core_rnaseq` pipeline, and select the previous created `Datasets` in the `input` parameter after clicking in `Browser`
   - Select an output directory with the same name used for the `Dataset` inside the `results` folder in S3
 - When pipeline is down, data will be copied to our on-premise HPC in the scratch system under `scratch/groups/hsph/hbc/bcbio/` folder
@@ -47,10 +47,6 @@ On the `YAML` header file of the `Rmd` you can specify some parameters or just s
 - MA plot
 - Pathway analysis
 - Tables
-
-There are some code related to alternative analysis:
-
-- `DE/Multiplicative_DE_docs.md` that shows some cases when there is multiple variables in the model with multiple levels: sex (2 levels) and genotype (4 levels)
 
 ## DropBox
 

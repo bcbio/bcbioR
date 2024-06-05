@@ -19,7 +19,9 @@ Imports:
     ggprism,
     grDevices,
     R.utils,
-    readr
+    readr,
+    fs,
+    withr
 Suggests: 
     knitr,
     rmarkdown,

@@ -42,8 +42,37 @@ And get the colors directly:
 ```{r}
 cb_friendly_cols(1:16)
 ```
-```{r}
+This is the full palette:
+
+```{r fig.width=9, fig.height=6}
 library(hues)
 swatch(cb_friendly_cols(1:16))
 ```
 
+# Set projects
+
+HCBC uses a structured based directory to organize projects. You can set up this by using:
+
+```{r}
+tmp_dir=withr::local_tempdir()
+bcbio_templates(type="base", outpath=tmp_dir)
+fs::dir_ls(tmp_dir, recurse=TRUE)
+```
+
+
+We support multiple analyses type:
+
+- RNAseq
+- scRNAseq
+- TEAseq
+- COSMX
+
+To get the example code for any of them you can use a similar command:
+
+```{r}
+analysis_tmp=fs::path_join(c(tmp_dir, "reports"))
+bcbio_templates(type="rnaseq", outpath=analysis_tmp)
+fs::dir_ls(analysis_tmp, recurse=TRUE)
+```
+
+Use `scrnaseq`, `teaseq` or `cosmx` to get those other templates.
