@@ -1,28 +1,28 @@
-
 # bcbioR
 
 <!-- badges: start -->
 
 [![R-CMD-check](https://github.com/bcbio/bcbioR/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/bcbio/bcbioR/actions/workflows/R-CMD-check.yaml)
+
 <!-- badges: end -->
 
-The goal of `bcbioR` is to create guidelines for NGS data interpretation
-based on the experience of the Harvard Chan Bioinformatics Core and
-everybody who contributes to this package.
+The goal of `bcbioR` is to create guidelines for NGS data interpretation based on the experience of the Harvard Chan Bioinformatics Core and everybody who contributes to this package.
 
 ## Installation
 
-You can install the development version of bcbioR from
-[GitHub](https://github.com/) with:
+You can install the development version of bcbioR from [GitHub](https://github.com/) with:
 
-``` r
+```         
 # install.packages("devtools")
 devtools::install_github("bcbio/bcbioR")
+devtools::install_github("bcbio/bcbioR",ref = "devel")
 ```
 
 ## Quick start
 
-``` r
+Use this code to generate a standard project name for all of your folders. **This code will not create any folders or files.**
+
+```
 library(bcbioR)
 ## basic example code
 # will help you to build a folder name following HCBC naming rules
@@ -31,46 +31,59 @@ bcbio_set_project()
 
 ### Set base project
 
-The following code will pop up a Rmd template and then clicking ‘save’
-will populate that folder with HCBC data structure guidelines
+use `setwd()` to set your current directory to the place where you want to work. The bcbioR functions will automatically write to whatever directory you have set.
 
-``` r
-rmarkdown::draft("project_folder",template="common",package="bcbioR")
+```
+setwd("/path/to/analysis/folder")
 ```
 
-As well, You can get this by going to File -\> New File -\> R
-markdown: - then `From Template`, and choose `bcbio base` - choose the
-folder to deploy files, it could be a new folder or an existing one
+The following code will pop up a Rmd template will populate that folder with HCBC data structure guidelines
+
+```
+bcbio_templates(type="base", outpath="/path/to/analysis/folder")
+```
 
 ### Set RNAseq report folder
 
-This code will populate the folder with HCBC data structure guidelines
-and Rmd code:
+This code will populate the folder with HCBC data structure guidelines and Rmd code: **You do not need to create a reports folder prior to running this code. This will create and populate the reports folder.**
 
-``` r
-bcbio_templates(type="rnaseq", outpath="test_folder/reports")
+``` 
+bcbio_templates(type="rnaseq", outpath="/path/to/analysis/folder/reports")
 ```
 
 ### Discover more…
 
-Go to the vignette to know more
-`vignette("bcbioR_quick_start,package="bcbioR")`
+Go to the vignette to know more `vignette("bcbioR_quick_start",package="bcbioR")`
 
 ## How to Contribute
 
-You’ll still need to render `README.Rmd` regularly, to keep `README.md`
-up-to-date. `devtools::build_readme()` is handy for this.
+### Open an issue
 
-Use `usethis::use_import_from("stringr","str_replace_all")` to add a
-function you are using in the code.
+-   If you find a bug
+-   If you want a new feature
+-   If you want to add code to the templates
 
-Don’t forget to commit and push the resulting figure files, so they
-display on GitHub and CRAN.
+### Modify the code
+
+-   Clone the repository
+-   Make sure you are in the `devel` branch
+-   Create a new branch `git checkout -b feature1`
+-   Modify you code, add and commit
+-   Push to GitHub the new branch
+-   Create a PR from your branch to `devel`
+-   Assignt the PR to me or Alex
+
+Some best practices when developing:
+
+-   install `devtools`
+-   Use `usethis::use_import_from("stringr","str_replace_all")` to add a new function you are using in the code.
 
 ### Contributors
 
-- Lorena Pantano
-- Alex Bartlett
-- Emma Berdan
-- Heather Wick
-- James Billingsley
+-   Lorena Pantano
+-   Alex Bartlett
+-   Emma Berdan
+-   Heather Wick
+-   James Billingsley
+-   Zhu Zhuo
+-   Elizabeth Partan

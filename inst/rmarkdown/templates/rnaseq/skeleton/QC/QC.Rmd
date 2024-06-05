@@ -17,8 +17,8 @@ output:
 editor_options: 
   chunk_output_type: console
 params:
-  params_file: ./inst/rmarkdown/templates/rnaseq/skeleton/QC/params_qc.R
-  project_file: ./inst/rmarkdown/templates/rnaseq/skeleton/information.R
+  params_file: params_qc.R
+  project_file: ../information.R
 ---
 
 

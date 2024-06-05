@@ -1,0 +1,54 @@
+---
+title: "PCA with variance analysis"
+author: "Harvard Chan Bioinformatics Core"
+---
+
+Dispersion estimates are a key part of the DESEQ2 analysis. DESEQ2 uses data from all samples and all genes to generate a relationship between level expression and variance and then shrinks per gene dispersions to match this distribution. If one group has higher variance than all others this will affect the dispersion estimates. Here we visually check that the variance per group is similar using a PCA. The ellipses are minimal volume enclosing ellipses using the Khachiyan algorithm.
+
+
+**Manually add in your covariate of interest to define the groups. One can be created by combining multiple metadata columns using the paste0 function.**
+
+```{r }
+## Example of creating a group covariate
+
+# meta$group <- paste0(meta$sex,"_", meta$age,"_",meta$treatment)
+
+factor_of_interest <- "insert column name for covariate of interest"
+```
+
+
+```{r }
+library(DEGreport)
+library(ggplot2)
+library(ggforce)
+
+data("bcbio_vsd_data")
+
+colors=cb_friendly_cols(1:15)
+ggplot2::theme_set(theme_prism(base_size = 14))
+
+pca <- degPCA(assay(bcbio_vsd_data), colData(bcbio_vsd_data),
+              condition = factor_of_interest, name = "sample", data = T)
+
+pca$plot + ggtitle(paste0("All samples", "\nPCA using ", nrow(vst), " genes")) +
+  theme(plot.title=element_text(hjust=0.5)) +
+  geom_mark_ellipse(aes(color = sample_type))
+```
+
+## PERMDISP
+
+Groups in a univariate analysis can also differ with regard to their mean values, variation around those means, or both. In univariate analyses, dispersion can be examined using Levene’s test.  PERMDISP is a multivariate extension of Levene’s test to examine whether groups differ in variability. In essence, PERMDISP involves calculating the distance from each data point to its group centroid and then testing whether those distances differ among the groups. [Source](https://uw.pressbooks.pub/appliedmultivariatestatistics/chapter/permdisp/)
+
+Here we apply this test to our variance stabilized data. We calculate distances betwen samples and then use the betadisper() function from the popular vegan package. We get two overall p-values where significant means that the dispersions are different between groups. The first p-value comes from the anova() function and the second from the permutest() function. We also get pairwise p-values for every group-group comparison.
+
+```{r}
+library(vegan)
+vare.disa <- vegdist(t(assay(bcbio_vsd_data)))
+
+mod = betadisper(vare.disa, colData(bcbio_vsd_data)[['sample_type']])
+anova(mod)
+permutest(mod, pairwise = TRUE)
+
+```
+
+
