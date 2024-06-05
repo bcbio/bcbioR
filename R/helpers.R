@@ -145,13 +145,47 @@ bcbio_params <-function(nfcore_path, pipeline, metadata, copy){
 
 }
 
-bcbio_render <- function(path, pipeline, data){
-  if (pipeline=="nf-core/rnaseq"){
-    analysis_template <- fs::path_package("bcbioR", "templates", "rnaseq", "qc")
-    fs::dir_copy(analysis_template, fs::path_join(c(path, "reports", "qc")), overwrite=TRUE)
-    analysis_template <- fs::path_package("bcbioR", "templates", "rnaseq", "de")
-    fs::dir_copy(analysis_template, fs::path_join(c(path, "reports", "de")), overwrite=TRUE)
+copy_files_in_folder<- function(origin, remote){
+  to_copy <- fs::dir_ls(origin)
+  for (element in to_copy){
+    full_new_path <- fs::path_join(c(remote, fs::path_file(element)))
 
+    if (fs::is_dir(element)){
+      if (!(fs::dir_exists(full_new_path)))
+        fs::dir_copy(element, full_new_path)
+    }
+    if (fs::is_file(element)){
+      if (!(fs::file_exists(full_new_path)))
+        fs::file_copy(element, full_new_path)
+    }
+  }
+}
+
+copy_templates <- function(path, pipeline){
+  base = c("bcbioR", "templates")
+  if (pipeline=="nf-core/rnaseq"){
+    parts = c(base, "rnaseq")
+  }else if(pipeline=="scrnaseq"){
+    parts = c(base, "scrnaseq")
+  }else if(pipeline=="teaseq"){
+    parts = c(base, "teaseq")
+  }else if(pipeline=="cosmx"){
+    parts = c(base, "cosmx")
+  }
+  analysis_template <- fs::path_package(parts)
+  ls_files <- grep("org", list.files(analysis_template, full.names = TRUE),
+                   value = TRUE, invert = TRUE)
+  copy_files_in_folder(path, ls_files)
+}
+
+bcbio_render <- function(path, pipeline, data){
+  copy_templates(fs::path_join(c(path, "reports"), pipeline))
+
+  if (pipeline=="nf-core/rnaseq"){
+    # analysis_template <- fs::path_package("bcbioR", "templates", "rnaseq", "qc")
+    # fs::dir_copy(analysis_template, fs::path_join(c(path, "reports", "qc")), overwrite=TRUE)
+    # analysis_template <- fs::path_package("bcbioR", "templates", "rnaseq", "de")
+    # fs::dir_copy(analysis_template, fs::path_join(c(path, "reports", "de")), overwrite=TRUE)
     render_rmd(
       fs::path_join(c(path, "reports", "qc", "QC_nf-core.Rmd")),
       fs::path_join(c(path, "reports", "qc", "QC_nf-core.Rmd")),
@@ -165,6 +199,9 @@ bcbio_render <- function(path, pipeline, data){
     ui_info("Please, to start the analysis, modify these parameter in QC/QC.rmd")
     ui_todo("set genome to hg38, mm10, mm39, or other")
     ui_todo("set factor_of_interest to a column in your metadata")
+  }else{
+    ui_warn("These are draft templates, are meant to show examples of specific analysis")
+    ui_todo("Please, read carefully and adapt to your data and question.")
   }
 }
 
@@ -207,22 +244,6 @@ use_bcbio_analysis <- function(path, nfcore=NULL, copy=FALSE, metadata=NULL){
   if (!copy)
     bcbio_render(path, pipeline, data)
 
-}
-
-copy_files_in_folder<- function(origin, remote){
-  to_copy <- fs::dir_ls(origin)
-  for (element in to_copy){
-    full_new_path <- fs::path_join(c(remote, fs::path_file(element)))
-
-    if (fs::is_dir(element)){
-      if (!(fs::dir_exists(full_new_path)))
-        fs::dir_copy(element, full_new_path)
-    }
-    if (fs::is_file(element)){
-      if (!(fs::file_exists(full_new_path)))
-        fs::file_copy(element, full_new_path)
-    }
-  }
 }
 
 #' @export

@@ -108,7 +108,7 @@ metrics <- load_metrics(se_object, multiqc_data_dir, gtf_fn, counts) %>%
   as.data.frame()
 rownames(metrics) <- metrics$sample
 # if the names don't match in order or string check files names and coldata information
-counts = counts[rownames(metrics)]
+counts = counts[,rownames(metrics)]
 coldata = coldata[rownames(metrics),]
 stopifnot(all(names(counts) == rownames(metrics)))
 ```

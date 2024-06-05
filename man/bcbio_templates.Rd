@@ -7,7 +7,13 @@
 bcbio_templates(type = "rnaseq", outpath)
 }
 \arguments{
-\item{type}{string indicating the type of analysis, supported: rnaseq.}
+\item{type}{string indicating the type of analysis, supported:
+\itemize{
+\item base
+\item rnaseq, scrnaseq,
+\item teaseq
+\item cosmx
+}}
 
 \item{outpath}{string path indicating where to copy all the files to}
 }
