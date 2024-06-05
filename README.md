@@ -86,3 +86,4 @@ Some best practices when developing:
 -   Heather Wick
 -   James Billingsley
 -   Zhu Zhuo
+-   Elizabeth Partan
