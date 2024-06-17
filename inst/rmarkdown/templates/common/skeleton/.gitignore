@@ -1,0 +1,9 @@
+*.Rproj*
+.Rhistory
+.Rproj.user
+.Rhistory
+.DS*
+*._*
+*placeholder*
+data/*
+final/*

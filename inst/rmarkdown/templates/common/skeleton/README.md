@@ -14,10 +14,11 @@
 
 -   `meta` should contain the CSV/YAML files used by *bcbio* or *nextflow*
 -   `scripts` should contain `sbatch` scripts or any custom scripts used in this project
--   `data` contains raw data
+-   `data` contains raw data, it can contains big data objects
 -   `reports` contains `Rmd` and `html` together with their files that will be added to *DropBox*. Each type of project have different guidelines.
 -   `final` contains the output of *nextflow/bcbio*
--   For any relevant files or papers use the `docs` folder on *DropBox*
+-   `code` contains any other files that support custom analysis and don't generate a report
+-   For any relevant client files or papers use the `docs` folder on *DropBox*
 
 ## Download
 

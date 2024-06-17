@@ -1,6 +1,32 @@
 .fix <- function(x){
   x <- tolower(x) %>% str_replace_all(., "[[:punct:]]", "_")
+  x <- str_replace_all(x, " ", "_")
   return(x)
+}
+
+
+#' Function to check samplesheet for nf-core
+#'
+#' @param file path to CSV file for nf-core
+#' @examples
+#'
+#' bcbio_nfcore_check(system.file("extdata", "rnaseq_good.csv", package = "bcbioR") )
+#'
+#' @export
+bcbio_nfcore_check <- function(file){
+  required=c("sample","fastq_1","fastq_2","strandedness")
+  samplesheet=read_csv(file)
+
+  if (!(all(required %in% colnames(samplesheet)))){
+    print(colnames(samplesheet))
+    stop("Missing required columns ", paste(required, collapse = " "))
+  }else if (any(grepl("^[1-9]", samplesheet[["sample"]]))){
+    stop("Avoid samples starting with numbers ")
+  }else if (any(is.na(samplesheet))){
+    warning("Columns with missing values")
+  }else{
+    message("All good.")
+  }
 }
 
 #' Function to help deploy analysis folder inside a project folder
@@ -13,7 +39,11 @@
 #' Normally these helper files are inside a report folder inside a
 #' project folder.
 #'
-#' @param type string indicating the type of analysis, supported: rnaseq.
+#' @param type string indicating the type of analysis, supported:
+#'   - base
+#'   - rnaseq, scrnaseq,
+#'   - teaseq
+#'   - cosmx
 #'
 #' @param outpath string path indicating where to copy all the files to
 #' @examples
@@ -23,20 +53,30 @@
 #' @export
 bcbio_templates <- function(type="rnaseq", outpath){
   switch(type,
+         base={
+           fpath <- system.file("rmarkdown/templates/common", "skeleton", package="bcbioR")
+           copyDirectory(fpath, outpath)
+         },
          rnaseq={
-
            fpath <- system.file("rmarkdown/templates/rnaseq", "skeleton", package="bcbioR")
-           #file.copy(fpath, outpath, recursive = T)
            copyDirectory(fpath, outpath)
          },
          scrnaseq={
-
            fpath <- system.file("rmarkdown/templates/singlecell", "skeleton", package="bcbioR")
-           #file.copy(fpath, outpath, recursive = T)
+           copyDirectory(fpath, outpath)
+         },
+         teaseq={
+           fpath <- system.file("rmarkdown/templates/teaseq", "skeleton", package="bcbioR")
+           copyDirectory(fpath, outpath)
+         },
+         cosmx={
+           fpath <- system.file("rmarkdown/templates/cosmx", "skeleton", package="bcbioR")
            copyDirectory(fpath, outpath)
          },
          {
-           stop('project type not recognize, please choose: ', 'rnaseq', 'scrnaseq')
+           stop('project type not recognize, please choose: ', 'base',
+                'rnaseq', 'scrnaseq',
+                'teaseq', 'cosmx')
          }
   )
 }
