@@ -21,7 +21,7 @@ test_that("rnaseq testing", {
                       subset_value = subset_value,
                       numerator = numerator,
                       denominator = denominator,
-                      params_file = file.path(path,'DE/params_de.R'),
+                      params_file = file.path(path,'DE/params_de-example.R'),
                       project_file = file.path(path,'information.R'),
                       functions_file = file.path(path,'DE/load_data.R')
                     )
