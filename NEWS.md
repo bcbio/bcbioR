@@ -1,4 +1,4 @@
-# bcbioR 0.1.2
+# bcbioR 0.1.3
 
 * Add combatseq
 * Add draft templates for TEAseq, COSMX
