@@ -4,6 +4,8 @@
 .Ruserdata
 *.Rproj
 test/*
+testthat/*/*/*/*/*/*html
+testthat/*/*/*/*/*/*csv
 inst/*/*/*/*/*/*html
 inst/*/*/*/*/*/*csv
 inst/doc

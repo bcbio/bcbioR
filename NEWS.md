@@ -1,5 +1,6 @@
-# bcbioR 0.1.2
+# bcbioR 0.1.3
 
+* Add combatseq
 * Add draft templates for TEAseq, COSMX
 * Adapt templates to nf-core rnaseq
 * Fix when sample start by number
