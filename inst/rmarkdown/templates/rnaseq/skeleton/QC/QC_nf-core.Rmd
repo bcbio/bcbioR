@@ -17,6 +17,8 @@ output:
 editor_options: 
   chunk_output_type: console
 params:
+  # params_file: params_qc_nf-core-example.R # example data
+  # Fill this file with the right paths to nfcore output
   params_file: params_qc_nf-core.R
   # Put hg38, mm10, mm39, or other
   genome: hg38
@@ -266,9 +268,10 @@ metrics %>%
     geom_bar(stat = "identity") +
     coord_flip() +
     scale_y_continuous(name = "million reads") +
+    scale_x_discrete(limits = rev) +
     scale_fill_cb_friendly() + xlab("") + 
     ggtitle("Total reads") +
-  geom_hline(yintercept=20000000, color = "grey", size=2)
+  geom_hline(yintercept=20000000, color = "grey", linewidth=2)
 
 metrics %>%
     ggplot(aes(x = .data[[factor_of_interest]],
@@ -299,10 +302,11 @@ metrics %>%
                color = .data[[factor_of_interest]])) +
     geom_point(alpha = 0.5, size=4) +
     coord_flip() +
+    scale_x_discrete(limits = rev) +
     scale_color_cb_friendly() +
     ylim(0, 100) +
   ggtitle("Mapping rate") + xlab("") +
-  geom_hline(yintercept=70, color = "grey", size=2)
+  geom_hline(yintercept=70, color = "grey", linewidth=2)
 ```
 
 
@@ -330,10 +334,11 @@ ggplot(metrics,aes(x = factor(sample, level = order),
   geom_bar(stat = "identity") +
   coord_flip() +
   scale_fill_cb_friendly() +
+  scale_x_discrete(limits = rev) +
   ggtitle("Number of genes") +
   ylab("Number of genes") +
   xlab("") +
-  geom_hline(yintercept=20000, color = "grey", size=2)
+  geom_hline(yintercept=20000, color = "grey", linewidth=2)
 
 metrics %>%
     ggplot(aes(x = .data[[factor_of_interest]],
@@ -341,6 +346,7 @@ metrics %>%
                color = .data[[factor_of_interest]])) +
     geom_point(alpha = 0.5, size=4) +
     coord_flip() +
+    scale_x_discrete(limits = rev) +
     scale_y_continuous(name = "million reads") +
     scale_color_cb_friendly() + xlab("") + 
     ggtitle("Number of Genes") 
@@ -377,11 +383,12 @@ metrics %>%
   geom_point(alpha = 0.5, size=4) +
   ylab("Exonic rate %") + 
   ggtitle("Exonic mapping rate") + 
+  scale_x_discrete(limits = rev) +
   scale_color_cb_friendly() +
   coord_flip()  +
   xlab("") +
   ylim(c(0,100)) +
-  geom_hline(yintercept=70, color = "grey", size=2) 
+  geom_hline(yintercept=70, color = "grey", linewidth=2) 
 ```
 
 ## Intronic mapping rate
@@ -396,11 +403,12 @@ metrics %>%
   geom_point(alpha = 0.5, size=4) +
   ylab("Intronic rate %") +
   ggtitle("Intronic mapping rate") + 
+  scale_x_discrete(limits = rev) +
   scale_color_cb_friendly() +
   coord_flip()  +
   xlab("") +
   ylim(c(0,100)) +
-  geom_hline(yintercept=20, color = "grey", size=2) 
+  geom_hline(yintercept=20, color = "grey", linewidth=2) 
 ```
 
 ## Intergenic mapping rate
@@ -416,9 +424,10 @@ metrics %>%
     ylab("Intergenic rate %") +
     ggtitle("Intergenic mapping rate") + 
     coord_flip()  + xlab("") +
+    scale_x_discrete(limits = rev) +
     scale_color_cb_friendly() +
     ylim(c(0, 100)) +
-    geom_hline(yintercept=15, color = "grey", size=2)
+    geom_hline(yintercept=15, color = "grey", linewidth=2)
 ```
 
 ## tRNA/rRNA mapping rate
@@ -437,9 +446,10 @@ metrics %>%
   ylim(0, rrna_ylim) + 
   ggtitle("tRNA/rRNA mapping rate") +
   coord_flip() +
+  scale_x_discrete(limits = rev) +
   scale_color_cb_friendly() +
   ylim(c(0, 100)) + xlab("") +
-  geom_hline(yintercept=10, color = "grey", size=2)
+  geom_hline(yintercept=10, color = "grey", linewidth=2)
 ```
 
 ## 5'->3' bias
@@ -454,9 +464,10 @@ metrics %>%
   geom_point(alpha = 0.5, size=4) +
   ggtitle("5'-3' bias") + 
   coord_flip() +
+  scale_x_discrete(limits = rev) +
   ylim(c(0.5,1.5)) + xlab("") + ylab("5'-3' bias") +
   scale_color_cb_friendly()+
-  geom_hline(yintercept=1, color = "grey", size=2)
+  geom_hline(yintercept=1, color = "grey", linewidth=2)
 ```
 
 ## Counts per gene - all genes
@@ -479,6 +490,7 @@ ggplot(counts, aes(factor(name, level = order),
                    log2(counts+1),
                    fill = .data[[factor_of_interest]])) +
   geom_boxplot() + 
+  scale_x_discrete(limits = rev) +
   scale_fill_cb_friendly() +
   coord_flip() + xlab("") +
   ggtitle("Counts per gene, all non-zero genes") +
