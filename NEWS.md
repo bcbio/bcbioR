@@ -1,5 +1,6 @@
 # bcbioR 0.1.3
 
+* fix duplicated gene names
 * Add combatseq
 * Add draft templates for TEAseq, COSMX
 * Adapt templates to nf-core rnaseq
