@@ -161,7 +161,8 @@ name_pathways_fn=file.path(
 ```{r load_counts_data}
 
 rdata = AnnotationDbi::select(org.Hs.eg.db, rownames(counts), 'SYMBOL', 'ENSEMBL') %>%
-  dplyr::select(gene_id = ENSEMBL, gene_name = SYMBOL)
+  dplyr::select(gene_id = ENSEMBL, gene_name = SYMBOL) %>% 
+  distinct(gene_id, .keep_all = TRUE)
 
 ```
 
