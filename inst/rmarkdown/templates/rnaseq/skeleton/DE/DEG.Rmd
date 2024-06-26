@@ -36,6 +36,7 @@ params:
 
 
 ```{r}
+# This set up the working directory to this file so all files can be found
 library(rstudioapi)
 setwd(fs::path_dir(getSourceEditorContext()$path))
 ```
