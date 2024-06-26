@@ -34,6 +34,14 @@ params:
   functions_file: load_data.R
 ---
 
+
+```{r}
+# This set up the working directory to this file so all files can be found
+library(rstudioapi)
+setwd(fs::path_dir(getSourceEditorContext()$path))
+```
+
+
 ```{r load_params, cache = FALSE, message = FALSE, warning=FALSE}
 # 1. Set up input files in this R file (params_de.R)
 source(params$params_file)
@@ -161,7 +169,8 @@ name_pathways_fn=file.path(
 ```{r load_counts_data}
 
 rdata = AnnotationDbi::select(org.Hs.eg.db, rownames(counts), 'SYMBOL', 'ENSEMBL') %>%
-  dplyr::select(gene_id = ENSEMBL, gene_name = SYMBOL)
+  dplyr::select(gene_id = ENSEMBL, gene_name = SYMBOL) %>% 
+  distinct(gene_id, .keep_all = TRUE)
 
 ```
 
