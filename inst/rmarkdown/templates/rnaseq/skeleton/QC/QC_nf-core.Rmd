@@ -26,6 +26,11 @@ params:
   factor_of_interest: sample_type
 ---
 
+```{r}
+library(rstudioapi)
+setwd(fs::path_dir(getSourceEditorContext()$path))
+```
+
 
 ```{r source_params, echo = F}
 # 1. set up factor_of_interest parameter from parameter above or manually

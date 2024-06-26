@@ -34,6 +34,13 @@ params:
   functions_file: load_data.R
 ---
 
+
+```{r}
+library(rstudioapi)
+setwd(fs::path_dir(getSourceEditorContext()$path))
+```
+
+
 ```{r load_params, cache = FALSE, message = FALSE, warning=FALSE}
 # 1. Set up input files in this R file (params_de.R)
 source(params$params_file)
