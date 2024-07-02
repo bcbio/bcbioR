@@ -400,6 +400,9 @@ res <- as.data.frame(resLFCS) %>%
   relocate(gene_name) %>% dplyr::rename(lfc = log2FoldChange) %>%
   mutate(pi = abs(lfc) * -log10(padj)) %>% arrange(-pi)
 
+## Filter out genes that have no expression or were filtered out by DESEQ2
+res <- res[res$baseMean>0,] %>% drop_na(padj) %>% drop_na(pvalue)
+
 res_sig <- res %>% filter(padj < 0.05) %>% arrange(padj) %>%
   mutate(gene_name = ifelse(is.na(gene_name), gene_id, gene_name))
 
