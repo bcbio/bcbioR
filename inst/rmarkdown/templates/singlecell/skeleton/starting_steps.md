@@ -269,7 +269,7 @@ if(all(metafull$barcode == rownames(seurat_merge@meta.data))) {
 seurat_merge[["RNA"]] <- JoinLayers(seurat_merge[["RNA"]])
 
 ### Save Seurat object for future processing
-save(seurat_merge, file = "seurat_pre-filtered.rds")
+saveRDS(seurat_merge, file = "seurat_pre-filtered.rds")
 write.csv(seurat_merge@meta.data, file = "metadata_pre-filtered.csv")
 ```
 
@@ -349,6 +349,6 @@ if(all(metafull$barcode == rownames(seurat_merge@meta.data))) {
 seurat_merge[["RNA"]] <- JoinLayers(seurat_merge[["RNA"]])
 
 ### Save Seurat object for future processing
-save(seurat_merge, file = "seurat_pre-filtered.rds")
+saveRDS(seurat_merge, file = "seurat_pre-filtered.rds")
 write.csv(seurat_merge@meta.data, file = "metadata_pre-filtered.csv")
 ```
