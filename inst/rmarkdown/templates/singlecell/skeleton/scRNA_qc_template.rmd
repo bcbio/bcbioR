@@ -93,7 +93,7 @@ In this section, we review quality control (QC) metrics for the **raw feature ma
 
 ## Cells per sample
 
-```{r load_data}
+```{r cells raw}
 table(metadata0$orig.ident)
 
 ```
@@ -247,25 +247,11 @@ Based on the above QC metrics, we filtered the dataset to isolate cells passing 
 
 In this section, we review QC metrics for our filtered dataset.
 
-```{r filtering1,  echo=F}
-# Filter out low quality reads using selected thresholds 
-seurat_qc <- subset(x = seurat_merge, 
-                    subset = (nCount_RNA >= 250)
-                    #& (nCount_RNA < 50000)
-                    & (nFeature_RNA >= 250) 
-                    & (mitoRatio < 0.2)
-                    & (Log10GenesPerUMI > 0.80)
-                    )
-#saveRDS(seurat_qc, file = "seurat_olfactory_mice_qc_full.rds")
-#write.csv(seurat_qc@meta.data, file = "metadata_olfactory_mice_qc_1_full.csv")
-nCells <- nrow(seurat_qc@meta.data)
-metadata1 <- seurat_qc@meta.data
+## Cells per sample
 
-
-metadata1 = metadata1 %>%  dplyr::rename(nUMI = nCount_RNA,
-                nGene = nFeature_RNA)
-
+```{r cells filtered}
 table(metadata1$orig.ident)
+
 ```
 
 
