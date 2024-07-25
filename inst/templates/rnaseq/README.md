@@ -64,8 +64,3 @@ On the `YAML` header file of the `Rmd` you can specify some parameters or just s
   -	[ ] Significant genes results file as described above, but additionally append columns containing normalized count values for each sample.
   -	Make sure to append the gene symbols to these tables so the researcher can interpret the results.
 
-## GitHub
-
-- [ ] Push all `*Rmd` `*R` files used for the *QC* and *DE* analysis respecting folder structure.
-
-Please, ignore `*html/figures/csv` and any output of the code.
