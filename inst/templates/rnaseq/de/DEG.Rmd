@@ -175,7 +175,6 @@ rdata = AnnotationDbi::select(org.Hs.eg.db, rownames(counts), 'SYMBOL', 'ENSEMBL
 ```
 
 ```{r setup_RUV}
-
 dds_to_use <- DESeqDataSetFromMatrix(counts, coldata, design = ~1)
 
 vsd_before <- vst(dds_to_use)
