@@ -17,7 +17,7 @@ output:
 editor_options: 
   chunk_output_type: console
 params:
-  project_file: information_snrna.R
+  project_file: information.R
   seurat_fn: ../data/fDat_sn_RC.rds
   cellchat_fn: ../data/snrna_cellchat.qs
   cellchat_grade2_fn: ../data/snrna_cellchat_grade2.qs
