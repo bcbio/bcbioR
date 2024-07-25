@@ -17,45 +17,41 @@ output:
 editor_options: 
   chunk_output_type: console
 params:
+  # params_file: params_qc_nf-core-example.R # example data
+  # Fill this file with the right paths to nfcore output
+  params_file: params_qc_nf-core.R
   # Put hg38, mm10, mm39, or other
   genome: hg38
+  project_file: ../information.R
   factor_of_interest: sample_type
 ---
 
-```{r, echo = F}
+```{r}
+# This set up the working directory to this file so all files can be found
 library(rstudioapi)
 setwd(fs::path_dir(getSourceEditorContext()$path))
 ```
 
-```{r}
-metadata_fn="{{metadata_fn}}"
-se_object="{{se_object}}"
-# This folder is in the output directory inside multiqc folder
-multiqc_data_dir="{{multiqc_data_dir}}"
-# This file is inside the genome folder in the output directory
-gtf_fn="{{gtf_fn}}"
-```
 
 ```{r source_params, echo = F}
-#knitr::opts_knit$set(root.dir = getSourceEditorContext()$path)
-# 1. set up factor_of_interest parameter from parameter above or manualy
+# 1. set up factor_of_interest parameter from parameter above or manually
 #    this is used to color plots, it needs to be part of the metadata
 factor_of_interest=params$factor_of_interest
 genome=params$genome
 # 2. Set input files in this file
-# This is the file used to run nf-core or compatible to that
-metadata_fn='/Path/to/metadata/meta.csv'
-# This file is inside star_salmon/ folder
-se_object='/path/to/nf-core/output/star_salmon/salmon.merged.gene_counts.rds'
-# This folder called "multiqc_report_data" is inside the output directory star_salmon inside multiqc folder
-multiqc_data_dir='/path/to/nf-core/output/star_salmon/multiqc_report_data'
-# This file is inside the genome folder in the output directory, use this only for non-model organism
-# gtf_fn='/path/to/nf-core/output/genome/hg38.filtered.gtf'
+source(params$params_file)
+# 3. If you set up this file, project information will be printed below and
+#.   it can be reused for other Rmd files.
+source(params$project_file)
 ```
 
 # Overview
 
-{{ project }}
+-   Project: `r project`
+-   PI: `r PI`
+-   Analyst: `r analyst`
+-   Experiment: `r experiment`
+
 
 ```{r load_libraries, cache = FALSE, message = FALSE, warning=FALSE}
 library(tidyverse)
@@ -80,7 +76,7 @@ opts_chunk[["set"]](
     prompt = FALSE,
     tidy = FALSE,
     warning = FALSE,
-    fig.height = 6)
+    fig.height = 4)
 ```
 
 
@@ -149,18 +145,14 @@ meta_df=read_csv(metadata_fn)  %>%
 meta_df$sample <- make.names(meta_df$sample)
 order <- meta_df$sample
 
-# remove some columns
-meta_df <- data.frame(meta_df[,!(colnames(meta_df) %in% c("fastq_1", "fastq_2",  "strandedness"))])
-
-
 ggplot(meta_df, aes(.data[[factor_of_interest]],
                     fill = .data[[factor_of_interest]])) +
   geom_bar() + ylab("") + xlab("") + ylab("# of samples") +
-  scale_fill_cb_friendly()
+  scale_fill_cb_friendly() + theme(axis.text.x=element_text(angle = 90, vjust = 0.5), legend.position = "none")
 ```
 
 
-```{r}
+```{r load_data}
 # read counts from SE object
 se <- readRDS(se_object)
 raw_counts <- assays(se)[["counts"]] %>% round() %>%
@@ -168,9 +160,9 @@ raw_counts <- assays(se)[["counts"]] %>% round() %>%
 raw_counts=raw_counts[rowSums(raw_counts)!=0,]
 ```
 
-```{r  prepare metrics}
+```{r  prepare_metrics}
 # Get metrics from nf-core into bcbio like table
-# many metrics are already in the Genereal Table of MultiQC, this reads the file
+# many metrics are already in the General Table of MultiQC, this reads the file
 metrics <- read_tsv(file.path(multiqc_data_dir, 'multiqc_general_stats.txt'))
 
 # we get some more metrics from Qualimap and rename columns
@@ -259,7 +251,7 @@ metrics <- metrics %>%
 
 ```
 
-```{r show-metadata}
+```{r show_metadata}
 meta_sm <- meta_df %>%
   as.data.frame() %>%
   column_to_rownames("sample")
@@ -282,9 +274,10 @@ metrics %>%
     geom_bar(stat = "identity") +
     coord_flip() +
     scale_y_continuous(name = "million reads") +
+    scale_x_discrete(limits = rev) +
     scale_fill_cb_friendly() + xlab("") + 
     ggtitle("Total reads") +
-  geom_hline(yintercept=20000000, color = "grey", size=2)
+  geom_hline(yintercept=20000000, color = "grey", linewidth=2)
 
 metrics %>%
     ggplot(aes(x = .data[[factor_of_interest]],
@@ -315,10 +308,11 @@ metrics %>%
                color = .data[[factor_of_interest]])) +
     geom_point(alpha = 0.5, size=4) +
     coord_flip() +
+    scale_x_discrete(limits = rev) +
     scale_color_cb_friendly() +
     ylim(0, 100) +
   ggtitle("Mapping rate") + xlab("") +
-  geom_hline(yintercept=70, color = "grey", size=2)
+  geom_hline(yintercept=70, color = "grey", linewidth=2)
 ```
 
 
@@ -346,10 +340,11 @@ ggplot(metrics,aes(x = factor(sample, level = order),
   geom_bar(stat = "identity") +
   coord_flip() +
   scale_fill_cb_friendly() +
+  scale_x_discrete(limits = rev) +
   ggtitle("Number of genes") +
   ylab("Number of genes") +
   xlab("") +
-  geom_hline(yintercept=20000, color = "grey", size=2)
+  geom_hline(yintercept=20000, color = "grey", linewidth=2)
 
 metrics %>%
     ggplot(aes(x = .data[[factor_of_interest]],
@@ -357,9 +352,10 @@ metrics %>%
                color = .data[[factor_of_interest]])) +
     geom_point(alpha = 0.5, size=4) +
     coord_flip() +
+    scale_x_discrete(limits = rev) +
     scale_y_continuous(name = "million reads") +
     scale_color_cb_friendly() + xlab("") + 
-    ggtitle("Total reads") 
+    ggtitle("Number of Genes") 
 
 ```
 
@@ -393,11 +389,12 @@ metrics %>%
   geom_point(alpha = 0.5, size=4) +
   ylab("Exonic rate %") + 
   ggtitle("Exonic mapping rate") + 
+  scale_x_discrete(limits = rev) +
   scale_color_cb_friendly() +
   coord_flip()  +
   xlab("") +
   ylim(c(0,100)) +
-  geom_hline(yintercept=70, color = "grey", size=2) 
+  geom_hline(yintercept=70, color = "grey", linewidth=2) 
 ```
 
 ## Intronic mapping rate
@@ -412,11 +409,12 @@ metrics %>%
   geom_point(alpha = 0.5, size=4) +
   ylab("Intronic rate %") +
   ggtitle("Intronic mapping rate") + 
+  scale_x_discrete(limits = rev) +
   scale_color_cb_friendly() +
   coord_flip()  +
   xlab("") +
   ylim(c(0,100)) +
-  geom_hline(yintercept=20, color = "grey", size=2) 
+  geom_hline(yintercept=20, color = "grey", linewidth=2) 
 ```
 
 ## Intergenic mapping rate
@@ -432,9 +430,10 @@ metrics %>%
     ylab("Intergenic rate %") +
     ggtitle("Intergenic mapping rate") + 
     coord_flip()  + xlab("") +
+    scale_x_discrete(limits = rev) +
     scale_color_cb_friendly() +
     ylim(c(0, 100)) +
-    geom_hline(yintercept=15, color = "grey", size=2)
+    geom_hline(yintercept=15, color = "grey", linewidth=2)
 ```
 
 ## tRNA/rRNA mapping rate
@@ -448,14 +447,15 @@ metrics %>%
   ggplot(aes(x = factor(sample, level = order),
              y = r_and_t_rna_rate * 100, 
              color = .data[[factor_of_interest]])) +
-  geom_point(alpha = 0.5) +
+  geom_point(alpha = 0.5, size=4) +
   ylab("tRNA/rRNA rate, %")+
   ylim(0, rrna_ylim) + 
   ggtitle("tRNA/rRNA mapping rate") +
   coord_flip() +
+  scale_x_discrete(limits = rev) +
   scale_color_cb_friendly() +
   ylim(c(0, 100)) + xlab("") +
-  geom_hline(yintercept=10, color = "grey", size=2)
+  geom_hline(yintercept=10, color = "grey", linewidth=2)
 ```
 
 ## 5'->3' bias
@@ -470,9 +470,10 @@ metrics %>%
   geom_point(alpha = 0.5, size=4) +
   ggtitle("5'-3' bias") + 
   coord_flip() +
+  scale_x_discrete(limits = rev) +
   ylim(c(0.5,1.5)) + xlab("") + ylab("5'-3' bias") +
   scale_color_cb_friendly()+
-  geom_hline(yintercept=1, color = "grey", size=2)
+  geom_hline(yintercept=1, color = "grey", linewidth=2)
 ```
 
 ## Counts per gene - all genes
@@ -495,6 +496,7 @@ ggplot(counts, aes(factor(name, level = order),
                    log2(counts+1),
                    fill = .data[[factor_of_interest]])) +
   geom_boxplot() + 
+  scale_x_discrete(limits = rev) +
   scale_fill_cb_friendly() +
   coord_flip() + xlab("") +
   ggtitle("Counts per gene, all non-zero genes") +
@@ -510,7 +512,7 @@ In this section, we look at how well the different groups in the dataset cluster
 
 Principal Component Analysis (PCA) is a statistical technique used to simplify high-dimensional data by identifying patterns and reducing the number of variables. In the context of gene expression, PCA helps analyze large datasets containing information about the expression levels of thousands of genes across different samples (e.g., tissues, cells).
 
-<!-- ### PCA, PCs 1-5, (labled) -->
+<!-- ### PCA, PCs 1-4, (labled) -->
 ```{r PCA1:5 summary, all, unlabeled, fig.width= 7, fig.height = 5}
 
 vst <- vst(raw_counts)
