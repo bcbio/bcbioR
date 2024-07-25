@@ -1,13 +1,24 @@
 # Guidelines
 
+## Set Repository
+
+- Start a git repository: `usethis::use_git()`
+- Push this project to GitHub, follow these steps:
+
+* Only once every 30 days, set up your github credentials: `usethis::gh_token_help()`
+  * **NOTE** You may want to run this first (one time) to keep this token working in future sessions: `git config --global credential.helper store`
+  
+- Push repository to HBC github as private: `usethis::use_github(org="hbc",private=TRUE)`
+
 ## Set up work-space
 
 -   [ ] Replace the title in this file to match the project's title
 -   [ ] Modify `information.R` with the right text for this project, it can be used to source in other `Rmd` files. The main `Rmd` file in this directory can be used to show general information of the project if needed.
 -   [ ] Use the same project name to create a folder in *Dropbox* and a repo in *GitHub*
--   [ ] Use the function `bcbio_templates` to create templates inside `reports` for each type of analysis. For instance, for *RNAseq*:
-    -   `bcbio_templates(type="rnaseq", outpath="reports")` or
-    -   `bcbio_templates(type="rnaseq", outpath="reports/experiment1")`
+-   [ ] If you didn't provide the pipeline when creating this project:
+        Use the function `bcbio_templates` to create templates inside `reports` for each type of analysis. For instance, for *RNAseq*:
+    -   `use_bcbio_analysis(".", 'nf-core/rnaseq', copy = TRUE)` or
+    -   `use_bcbio_analysis(".", 'singlecell', copy = TRUE)`
     -   Then go to that folder and read the `README.md`
 
 ## Folders

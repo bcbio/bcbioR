@@ -106,7 +106,7 @@ bcbio_params <-function(nfcore_path, pipeline, metadata, copy){
 
 }
 
-copy_files_in_folder<- function(remote, origin){
+copy_files_in_folder<- function(origin, remote){
   to_copy <- fs::dir_ls(origin)
   to_copy <- grep("org", to_copy,
                   value = TRUE, invert = TRUE)
@@ -140,7 +140,7 @@ copy_templates <- function(path, pipeline){
   # ls_files <- grep("org", list.files(analysis_template, full.names = TRUE),
   #                  value = TRUE, invert = TRUE)
   # ui_info("{ui_value(length(ls_files))} amount of files to copy")
-  copy_files_in_folder(path, analysis_template)
+  copy_files_in_folder(analysis_template, path)
 }
 
 bcbio_render <- function(path, pipeline, data){
@@ -170,7 +170,7 @@ bcbio_render <- function(path, pipeline, data){
 }
 
 #' @export
-use_bcbio_analysis <- function(path, pipeline, copy=FALSE, metadata=NULL){
+use_bcbio_analysis <- function(path, pipeline, copy=TRUE, metadata=NULL){
 
   if (copy){
     # deploy files
@@ -181,10 +181,10 @@ use_bcbio_analysis <- function(path, pipeline, copy=FALSE, metadata=NULL){
         ui_stop("{ui_value(metadata)} doesn't exist.")
       fs::file_copy(metadata, meta_path)
     }
-  }else{
-    if (!fs::dir_exists(pipeline))
-      ui_stop("{ui_value(nfcore)} doesn't exist. point to nfcore path or turn on copy mode.")
-
+  }
+  if (!is.null(pipeline) & fs::dir_exists(pipeline)){
+      # ui_stop("{ui_value(nfcore)} doesn't exist. point to nfcore path or turn on copy mode.")
+    ui_info("Trying to guess nf-core pipeline at {ui_value(pipeline)}")
     # guess analysis from pipeline file
     information <- read_pipeline_info(pipeline)
     fs::dir_create(fs::path_join(c(path, "meta")))
@@ -210,8 +210,8 @@ use_bcbio_analysis <- function(path, pipeline, copy=FALSE, metadata=NULL){
   }
   # set all files from analysis
   copy_templates(fs::path_join(c(path, "reports")), pipeline)
-  if (!copy){
-    data <- bcbio_params(nfcore, pipeline, metadata, copy=copy)
+  if (fs::dir_exists(pipeline)){
+    data <- bcbio_params(nfcore, pipeline, metadata)
     bcbio_render(path, pipeline, data)
   }
 
@@ -236,7 +236,7 @@ use_bcbio_projects <- function(path, pipeline=NULL, metadata=NULL,
 
   if (!is.null(pipeline)){
     ui_info("Using this pipeline templates {ui_value(pipeline)}")
-    use_bcbio_analysis(path, pipeline, copy = TRUE, metadata=metadata)
+    use_bcbio_analysis(path, pipeline, copy = copy, metadata=metadata)
   }
   # is_nfcore_ready <- FALSE
   # if (is.null(pipeline) && rlang::is_interactive()){
@@ -263,25 +263,27 @@ use_bcbio_projects <- function(path, pipeline=NULL, metadata=NULL,
   #   }
   # }
 
-  if (git){
-    ui_info("Create Git local repo at {ui_value(path)}")
-    use_git()
-  }
-  if (gh){
-    ui_info("Create GitHub repo at {ui_value(path)}")
-    whoami <- suppressMessages(gh::gh_whoami())
-    if (is.null(whoami)) {
-      ui_stop(c(
-        "x" = "Unable to discover a GitHub personal access token.",
-        "i" = "A token is required in order to create and push to a new repo.",
-        "_" = "Call {.run usethis::gh_token_help()} for help configuring a token."
-      ))
-    }
-    use_github(organisation=org, private = TRUE)
-  }else{
-    ui_info("You decided not to create a repo, please use this to push when ready")
-    ui_info("use_github(organisation=org), private = TRUE")
-  }
+  # if (git){
+  #   ui_info("Create Git local repo at {ui_value(path)}")
+  #   use_git()
+  # }
+  # if (gh){
+  #   ui_info("Create GitHub repo at {ui_value(path)}")
+  #   whoami <- suppressMessages(gh::gh_whoami())
+  #   if (is.null(whoami)) {
+  #     ui_warn(c(
+  #       "x" = "Unable to discover a GitHub personal access token.",
+  #       "i" = "A token is required in order to create and push to a new repo.",
+  #       "_" = "Call {.run usethis::gh_token_help()} for help configuring a token."
+  #     ))
+  #     ui_todo("Try this later: use_github(organisation=org), private = TRUE")
+  #
+  #   }
+  #   use_github(organisation=org, private = TRUE)
+  # }else{
+  #   ui_info("You decided not to create a repo, please use this to push when ready")
+  #   ui_todo("Try this later: use_github(organisation=org), private = TRUE")
+  # }
 
   answer <- FALSE
   if (rlang::is_interactive())
