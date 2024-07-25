@@ -20,7 +20,7 @@ Imports:
     grDevices,
     R.utils,
     readr,
-    withr
+    withr,
     usethis,
     fs,
     jsonlite,
@@ -35,4 +35,4 @@ VignetteBuilder: knitr
 URL: http://bcb.io/bcbioR/
 Config/testthat/edition: 3
 Depends: 
-    R (>= 2.10)
+    R (>= 4.3.1)

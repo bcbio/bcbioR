@@ -48,60 +48,21 @@ bcbio_nfcore_check <- function(file){
 #'  }
 #' @export
 bcbio_templates <- function(type="rnaseq", outpath){
+  fs::dir_create(outpath)
   switch(type,
          rnaseq={
-
-           fpath <- system.file("rmarkdown/templates/rnaseq", "skeleton", package="bcbioR")
            #file.copy(fpath, outpath, recursive = T)
-           copyDirectory(fpath, outpath)
+           copy_templates(outpath, "nf-core/rnaseq")
          },
          scrnaseq={
-
-           fpath <- system.file("rmarkdown/templates/singlecell", "skeleton", package="bcbioR")
            #file.copy(fpath, outpath, recursive = T)
-           copyDirectory(fpath, outpath)
+           copy_templates(outpath, "singlecell")
          },
          {
-           stop('project type not recognize, please choose: ', 'rnaseq', 'scrnaseq')
+           stop('project type not recognize, please choose: ', 'rnaseq', 'singlecell')
          }
   )
 }
-
-#' Function to help with project name used for parent folder
-#'
-#' This function will ask for user input about:
-#'   * numeric code
-#'   * PI full name
-#'   * technology
-#'   * tissue
-#'   * organism
-#'   * project description
-#'
-#' It removes special character with `_`. The output is a guideline to
-#'   what the folder used can be.
-#'
-#' @returns A string list with hbc_code, and project folder name
-#' @export
-bcbio_set_project <- function() {
-  hbc_code <- readline("What is the hbc code (only numbers):\n")
-  hbc_code <- paste0("hbc", hbc_code)
-  pi <- readline("What is PI last name:\n")
-  technology <- readline("What is the technology:\n")
-  tissue <- readline("What is the tissue:\n")
-  org <- readline("What is the organism:\n")
-  project <- readline("What is the project name:\n")
-  #dropbox <- readline("What is the dropbox name:\n")
-  #github_org <- readline("What is the github organization:\n")
-  #hbc_$technology_of_$pilastname_$intervention_on_$tissue_in_$organism_$hbccode
-  project_full <- paste(technology, .fix(pi), .fix(project), tissue, org, hbc_code, sep="_")
-  #github <- c(github_org,project_full)
-  opts <- list(code=hbc_code, project=project_full)
-               #dropbox=file.path(dropbox,project_full),
-               #github=github)
-  print(opts)
-  return(opts)
-}
-
 
 read_pipeline_info <- function(nfcore){
   # pipeline_info/params_2024-05-28_12-28-51.json
@@ -145,8 +106,10 @@ bcbio_params <-function(nfcore_path, pipeline, metadata, copy){
 
 }
 
-copy_files_in_folder<- function(origin, remote){
+copy_files_in_folder<- function(remote, origin){
   to_copy <- fs::dir_ls(origin)
+  to_copy <- grep("org", to_copy,
+                  value = TRUE, invert = TRUE)
   for (element in to_copy){
     full_new_path <- fs::path_join(c(remote, fs::path_file(element)))
 
@@ -162,24 +125,25 @@ copy_files_in_folder<- function(origin, remote){
 }
 
 copy_templates <- function(path, pipeline){
-  base = c("bcbioR", "templates")
+  base = c("bcbioR")
   if (pipeline=="nf-core/rnaseq"){
-    parts = c(base, "rnaseq")
-  }else if(pipeline=="scrnaseq"){
-    parts = c(base, "scrnaseq")
+    parts = c("templates/rnaseq")
+  }else if(pipeline=="singlecell"){
+    parts = c("templates/singlecell")
   }else if(pipeline=="teaseq"){
-    parts = c(base, "teaseq")
+    parts = c("templates/teaseq")
   }else if(pipeline=="cosmx"){
-    parts = c(base, "cosmx")
+    parts = c("templates/cosmx")
   }
-  analysis_template <- fs::path_package(parts)
-  ls_files <- grep("org", list.files(analysis_template, full.names = TRUE),
-                   value = TRUE, invert = TRUE)
-  copy_files_in_folder(path, ls_files)
+  analysis_template <- fs::path_package(base, parts)
+  ui_info("Getting templates from {ui_value(analysis_template)}")
+  # ls_files <- grep("org", list.files(analysis_template, full.names = TRUE),
+  #                  value = TRUE, invert = TRUE)
+  # ui_info("{ui_value(length(ls_files))} amount of files to copy")
+  copy_files_in_folder(path, analysis_template)
 }
 
 bcbio_render <- function(path, pipeline, data){
-  copy_templates(fs::path_join(c(path, "reports"), pipeline))
 
   if (pipeline=="nf-core/rnaseq"){
     # analysis_template <- fs::path_package("bcbioR", "templates", "rnaseq", "qc")
@@ -206,18 +170,23 @@ bcbio_render <- function(path, pipeline, data){
 }
 
 #' @export
-use_bcbio_analysis <- function(path, nfcore=NULL, copy=FALSE, metadata=NULL){
+use_bcbio_analysis <- function(path, pipeline, copy=FALSE, metadata=NULL){
 
   if (copy){
     # deploy files
     ui_info("Rmd templates will be copied but variables path won't be filled automatically.")
-    pipeline <- nfcore
+    if (!is.null(metadata)){
+      meta_path <- fs::path_join(c(path, "meta", fs::path_file(metadata)))
+      if (!(fs::file_exists(metadata)))
+        ui_stop("{ui_value(metadata)} doesn't exist.")
+      fs::file_copy(metadata, meta_path)
+    }
   }else{
-    if (!fs::dir_exists(nfcore))
+    if (!fs::dir_exists(pipeline))
       ui_stop("{ui_value(nfcore)} doesn't exist. point to nfcore path or turn on copy mode.")
 
     # guess analysis from pipeline file
-    information <- read_pipeline_info(nfcore)
+    information <- read_pipeline_info(pipeline)
     fs::dir_create(fs::path_join(c(path, "meta")))
     meta_path <- fs::path_join(c(path, "meta", fs::path_file(information$metadata)))
     pipeline <- information$pipeline
@@ -227,7 +196,7 @@ use_bcbio_analysis <- function(path, nfcore=NULL, copy=FALSE, metadata=NULL){
       fs::file_copy(metadata, meta_path)
     }else{
       if (!fs::file_exists(information$metadata)){
-        ui_warn("{ui_value(metadata)} not found. We can only work with local filesytems. For now.")
+        ui_warn("{ui_value(metadata)} not found. We can only work with local filesytems right now.")
         ui_todo("Please, copy {ui_value(metadata)} to {ui_value(meta_path)}.")
         ui_warn("If this file isn't manually set up, the Rmd code will fail.")
       }else{
@@ -240,17 +209,22 @@ use_bcbio_analysis <- function(path, nfcore=NULL, copy=FALSE, metadata=NULL){
     ui_todo("Please, copy nf-core output directory to {ui_value(path_final)}")
   }
   # set all files from analysis
-  data <- bcbio_params(nfcore, pipeline, metadata, copy=copy)
-  if (!copy)
+  copy_templates(fs::path_join(c(path, "reports")), pipeline)
+  if (!copy){
+    data <- bcbio_params(nfcore, pipeline, metadata, copy=copy)
     bcbio_render(path, pipeline, data)
+  }
+
 
 }
 
 #' @export
 #' @examples
 #' path <- withr::local_tempdir()
-#' # use_bcbio_projects(path,nfcore="nf-core/rnaseq",copy=TRUE)
-use_bcbio_projects <- function(path, nfcore=NULL, metadata=NULL, git=TRUE, gh=FALSE, org=NULL, copy=FALSE) {
+#' use_bcbio_projects(path,pipeline="nf-core/rnaseq",copy=TRUE)
+#' fs::dir_ls(path)
+use_bcbio_projects <- function(path, pipeline=NULL, metadata=NULL,
+                               git=TRUE, gh=FALSE, org=NULL, copy=TRUE) {
 
   ui_info("Creating project at {ui_value(path)}")
   if (!fs::dir_exists(path))
@@ -260,30 +234,34 @@ use_bcbio_projects <- function(path, nfcore=NULL, metadata=NULL, git=TRUE, gh=FA
   base_template <- fs::path_package("bcbioR", "templates", "base")
   copy_files_in_folder(base_template, path)
 
-  is_nfcore_ready <- FALSE
-  if (is.null(nfcore) && rlang::is_interactive()){
-    is_nfcore_ready <- ui_yeah("Have you already run nf-core pipeline?",
-                               n_yes=1, n_no =1)
-    if (is_nfcore_ready && rlang::is_interactive()){
-      nfcore <- readline("? Enter path to nf-core output: ")
-    }else{
-      ui_warn("Please, turn copy = TRUE to only deploy files or,")
-      ui_stop("Please use {ui_code('use_bcbio_projects')} again when you have the nf-core output.")
-    }
-    use_bcbio_analysis(path, nfcore, copy, metadata)
-  }else{
-    if (fs::dir_exists(nfcore)){
-      ui_info("Checking {ui_value(nfcore)} as nf-core output directory")
-      use_bcbio_analysis(path, nfcore, copy, metadata)
-    }else if (copy){
-      # deploy only files
-      ui_info("Deploying only templates without pipeline information.")
-      use_bcbio_analysis(path, nfcore, copy = TRUE, metadata=metadata)
-    }else{
-      ui_warn("Please, provide nfcore working directory or")
-      ui_warn("turn copy = TRUE to only deploy files.")
-    }
+  if (!is.null(pipeline)){
+    ui_info("Using this pipeline templates {ui_value(pipeline)}")
+    use_bcbio_analysis(path, pipeline, copy = TRUE, metadata=metadata)
   }
+  # is_nfcore_ready <- FALSE
+  # if (is.null(pipeline) && rlang::is_interactive()){
+  #   is_nfcore_ready <- ui_yeah("Have you already run nf-core pipeline?",
+  #                              n_yes=1, n_no =1)
+  #   if (is_nfcore_ready && rlang::is_interactive()){
+  #     nfcore <- readline("? Enter path to nf-core output: ")
+  #   }else{
+  #     ui_warn("Please, turn copy = TRUE to only deploy files or,")
+  #     ui_stop("Please use {ui_code('use_bcbio_projects')} again when you have the nf-core output.")
+  #   }
+  #   use_bcbio_analysis(path, nfcore, copy, metadata)
+  # }else{
+  #   if (fs::dir_exists(nfcore)){
+  #     ui_info("Checking {ui_value(nfcore)} as nf-core output directory")
+  #     use_bcbio_analysis(path, nfcore, copy, metadata)
+  #   }else if (copy){
+  #     # deploy only files
+  #     ui_info("Deploying only templates without pipeline information.")
+  #     use_bcbio_analysis(path, nfcore, copy = TRUE, metadata=metadata)
+  #   }else{
+  #     ui_warn("Please, provide nfcore working directory or")
+  #     ui_warn("turn copy = TRUE to only deploy files.")
+  #   }
+  # }
 
   if (git){
     ui_info("Create Git local repo at {ui_value(path)}")
@@ -299,7 +277,10 @@ use_bcbio_projects <- function(path, nfcore=NULL, metadata=NULL, git=TRUE, gh=FA
         "_" = "Call {.run usethis::gh_token_help()} for help configuring a token."
       ))
     }
-    use_github(organisation=org)
+    use_github(organisation=org, private = TRUE)
+  }else{
+    ui_info("You decided not to create a repo, please use this to push when ready")
+    ui_info("use_github(organisation=org), private = TRUE")
   }
 
   answer <- FALSE
