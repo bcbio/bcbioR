@@ -54,12 +54,24 @@ bcbio_templates <- function(type="rnaseq", outpath){
            #file.copy(fpath, outpath, recursive = T)
            copy_templates(outpath, "nf-core/rnaseq")
          },
-         scrnaseq={
+         singlecell={
            #file.copy(fpath, outpath, recursive = T)
            copy_templates(outpath, "singlecell")
          },
+         singlecell_delux={
+           #file.copy(fpath, outpath, recursive = T)
+           copy_templates(outpath, "singlecell_delux")
+         },
+         spatial={
+           #file.copy(fpath, outpath, recursive = T)
+           copy_templates(outpath, "spatial")
+         },
+         multiomics={
+           #file.copy(fpath, outpath, recursive = T)
+           copy_templates(outpath, "multiomics")
+         },
          {
-           stop('project type not recognize, please choose: ', 'rnaseq', 'singlecell')
+           stop('project type not recognize, please choose: ', 'rnaseq', 'singlecell','singlecell_delux','spatial')
          }
   )
 }
@@ -130,10 +142,12 @@ copy_templates <- function(path, pipeline){
     parts = c("templates/rnaseq")
   }else if(pipeline=="singlecell"){
     parts = c("templates/singlecell")
-  }else if(pipeline=="teaseq"){
-    parts = c("templates/teaseq")
-  }else if(pipeline=="cosmx"){
-    parts = c("templates/cosmx")
+  }else if(pipeline=="singlecell_delux"){
+    parts = c("templates/singlecell_delux")
+  }else if(pipeline=="multiomics"){
+    parts = c("templates/multiomics")
+  }else if(pipeline=="spatial"){
+    parts = c("templates/spatial")
   }
   analysis_template <- fs::path_package(base, parts)
   ui_info("Getting templates from {ui_value(analysis_template)}")
