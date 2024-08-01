@@ -7,7 +7,6 @@
 #' @importFrom readr read_csv
 #' @importFrom stringr str_replace_all
 ## usethis namespace: end
-#' @import DESeq2
 #' @import ggplot2
 #' @import usethis
 #' @import fs

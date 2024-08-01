@@ -27,7 +27,6 @@ Suggests:
     ggprism,
     stringr,
     ggplot2,
-    DESeq2,
     knitr,
     rmarkdown,
     testthat (>= 3.0.0)
