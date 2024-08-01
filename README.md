@@ -33,7 +33,6 @@ The following code will pop up a Rmd template will populate that folder with HCB
 ```
 use_bcbio_projects(path,pipeline="nf-core/rnaseq")
 use_bcbio_projects(path,pipeline="singlecell")
-
 ```
 
 ### Set RNAseq report folder

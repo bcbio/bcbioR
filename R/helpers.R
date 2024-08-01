@@ -50,6 +50,10 @@ bcbio_nfcore_check <- function(file){
 bcbio_templates <- function(type="rnaseq", outpath){
   fs::dir_create(outpath)
   switch(type,
+         base={
+           #file.copy(fpath, outpath, recursive = T)
+           copy_templates(outpath, "base")
+         },
          rnaseq={
            #file.copy(fpath, outpath, recursive = T)
            copy_templates(outpath, "nf-core/rnaseq")
@@ -138,7 +142,9 @@ copy_files_in_folder<- function(origin, remote){
 
 copy_templates <- function(path, pipeline){
   base = c("bcbioR")
-  if (pipeline=="nf-core/rnaseq"){
+  if (pipeline=="base"){
+    parts = c("templates/base")
+  }else if(pipeline=="nf-core/rnaseq"){
     parts = c("templates/rnaseq")
   }else if(pipeline=="singlecell"){
     parts = c("templates/singlecell")
