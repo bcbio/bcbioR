@@ -23,6 +23,8 @@ project folder.
 }
 \examples{
  \dontrun{
- bcbio_templates("rnaseq", "path_to_projects/project1/reports")
+  path <- withr::local_tempdir()
+  bcbio_templates(type="base",outpath=path)
+  fs::dir_ls(path,all=T)
  }
 }

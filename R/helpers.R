@@ -44,7 +44,9 @@ bcbio_nfcore_check <- function(file){
 #' @param outpath string path indicating where to copy all the files to
 #' @examples
 #'  \dontrun{
-#'  bcbio_templates("rnaseq", "path_to_projects/project1/reports")
+#'   path <- withr::local_tempdir()
+#'   bcbio_templates(type="base",outpath=path)
+#'   fs::dir_ls(path,all=T)
 #'  }
 #' @export
 bcbio_templates <- function(type="rnaseq", outpath){
@@ -123,7 +125,7 @@ bcbio_params <-function(nfcore_path, pipeline, metadata, copy){
 }
 
 copy_files_in_folder<- function(origin, remote){
-  to_copy <- fs::dir_ls(origin)
+  to_copy <- fs::dir_ls(origin,all = TRUE)
   to_copy <- grep("org", to_copy,
                   value = TRUE, invert = TRUE)
   for (element in to_copy){
@@ -189,7 +191,7 @@ bcbio_render <- function(path, pipeline, data){
   }
 }
 
-#' @export
+#' help with bcbio analysis setup
 use_bcbio_analysis <- function(path, pipeline, copy=TRUE, metadata=NULL){
 
   if (copy){
@@ -238,8 +240,7 @@ use_bcbio_analysis <- function(path, pipeline, copy=TRUE, metadata=NULL){
 
 }
 
-#' @export
-#' @examples
+#' Pilot to deploy full projects at once
 #' path <- withr::local_tempdir()
 #' use_bcbio_projects(path,pipeline="nf-core/rnaseq",copy=TRUE)
 #' fs::dir_ls(path)

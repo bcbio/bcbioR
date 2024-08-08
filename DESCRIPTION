@@ -21,11 +21,11 @@ Imports:
     jsonlite,
     yaml,
     whisker,
-    rlang
+    rlang,
+    stringr
 Suggests: 
     hues,
     ggprism,
-    stringr,
     ggplot2,
     knitr,
     rmarkdown,
@@ -34,4 +34,4 @@ VignetteBuilder: knitr
 URL: http://bcb.io/bcbioR/
 Config/testthat/edition: 3
 Depends: 
-    R (>= 4.3.1)
+    R (>= 4.2.0)
