@@ -142,7 +142,19 @@ copy_files_in_folder<- function(origin, remote){
   }
 }
 
+deploy_apps <- function(apps, path){
+  fs::dir_create(file.path(path, "apps"))
+  sapply(names(apps), function(app){
+    dest_file=file.path(path, "apps", paste0(app, ".zip"))
+    download.file(url = apps[[app]],
+                  destfile = dest_file)
+    unzip(zipfile = dest_file, exdir = dirname(dest_file))
+    fs::file_delete(dest_file)
+  })
+}
+
 copy_templates <- function(path, pipeline){
+  apps=list()
   base = c("bcbioR")
   if (pipeline=="base"){
     parts = c("templates/base")
@@ -150,6 +162,7 @@ copy_templates <- function(path, pipeline){
     parts = c("templates/rnaseq")
   }else if(pipeline=="singlecell"){
     parts = c("templates/singlecell")
+    apps=c(apps, scRNAseq_qc="https://github.com/hbc/scRNAseq_qc_app/archive/refs/heads/main.zip")
   }else if(pipeline=="singlecell_delux"){
     parts = c("templates/singlecell_delux")
   }else if(pipeline=="multiomics"){
@@ -163,6 +176,7 @@ copy_templates <- function(path, pipeline){
   #                  value = TRUE, invert = TRUE)
   # ui_info("{ui_value(length(ls_files))} amount of files to copy")
   copy_files_in_folder(analysis_template, path)
+  deploy_apps(apps, path)
 }
 
 bcbio_render <- function(path, pipeline, data){
