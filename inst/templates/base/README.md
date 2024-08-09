@@ -43,7 +43,7 @@
 
 -   [ ] Track in *Git* this `README` file
 -   [ ] Track in *Git* files in `scripts`, `meta`, and `reports` that belongs to these type:
-    -   **Note** Git add `*.Rmd *.R *ipynb *.sh *.yaml`. (feel free use `.gitignore` if you use a GUI for non-tracked files). *DO NOT* use `git add *`. *DO NOT* track `html/csv/figures`
+    -   **Note** Git add `*.Rmd *.R *ipynb *.sh *.yaml`. (feel free use `.gitignore` if you use a GUI for non-tracked files). *DO NOT* use `git add *`. *DO NOT* track `html/csv/figures`. *DO NOT* track files that you did not use for this project (i.e. irrelevant templates, placeholders)
 -   [ ] Commit files and push to *Github* as necessary throughout the project, but especially when work is complete
 
 ## Dropbox
