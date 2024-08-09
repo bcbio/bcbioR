@@ -205,7 +205,7 @@ bcbio_render <- function(path, pipeline, data){
   }
 }
 
-#' help with bcbio analysis setup
+# help with bcbio analysis setup
 use_bcbio_analysis <- function(path, pipeline, copy=TRUE, metadata=NULL){
 
   if (copy){
@@ -254,10 +254,10 @@ use_bcbio_analysis <- function(path, pipeline, copy=TRUE, metadata=NULL){
 
 }
 
-#' Pilot to deploy full projects at once
-#' path <- withr::local_tempdir()
-#' use_bcbio_projects(path,pipeline="nf-core/rnaseq",copy=TRUE)
-#' fs::dir_ls(path)
+# Pilot to deploy full projects at once
+# path <- withr::local_tempdir()
+# use_bcbio_projects(path,pipeline="nf-core/rnaseq",copy=TRUE)
+# fs::dir_ls(path)
 use_bcbio_projects <- function(path, pipeline=NULL, metadata=NULL,
                                git=TRUE, gh=FALSE, org=NULL, copy=TRUE) {
 
