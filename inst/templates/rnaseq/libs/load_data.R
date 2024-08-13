@@ -101,15 +101,17 @@ load_metrics <- function(se_object, multiqc_data_dir, gtf_fn, counts){
   return(metrics)
 }
 
-load_coldata <- function(coldata_fn, column, numerator, denominator, subset_column = NULL, subset_value = NULL){
+load_coldata <- function(coldata_fn, column=NULL, numerator=NULL, denominator=NULL, subset_column = NULL, subset_value = NULL){
   coldata=read.csv(coldata_fn) %>%
-    dplyr::select(!matches("fastq") & !matches("strandness")) %>%
+    dplyr::distinct(sample, .keep_all = T) %>%
+    dplyr::select(!matches("fastq"), !matches("strandness")) %>%
     distinct()
   if('description' %in% names(coldata)){
     coldata$sample <- tolower(coldata$description)
   }
   coldata <- coldata %>% distinct(sample, .keep_all = T)
-  stopifnot(column %in% names(coldata))
+  if (!is.null(column))
+    stopifnot(column %in% names(coldata))
 
   # use only some samples, by default use all
   if (!is.null(subset_column)){
@@ -121,7 +123,8 @@ load_coldata <- function(coldata_fn, column, numerator, denominator, subset_colu
   rownames(coldata) <- coldata$sample
   coldata$description <- coldata$sample
 
-  coldata[[column]] = relevel(as.factor(coldata[[column]]), denominator)
+  if (!is.null(denominator))
+    coldata[[column]] = relevel(as.factor(coldata[[column]]), denominator)
 
   return(coldata)
 }
@@ -138,8 +141,8 @@ load_counts <- function(counts_fn){
   } else { # nf-core input
     counts <- read_tsv(counts_fn) %>% dplyr::select(-gene_name) %>%
       mutate(gene_id = str_replace(gene_id, pattern = "\\.[0-9]+$", "")) %>%
-      column_to_rownames('gene_id') %>% round
-
+      column_to_rownames('gene_id') %>% round %>% as.matrix()
+    counts=counts[rowSums(counts)!=0,]
     return(counts)
   }
 

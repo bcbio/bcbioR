@@ -17,23 +17,24 @@ output:
 editor_options: 
   chunk_output_type: console
 params:
-  # params_file: params_qc_nf-core-example.R # example data
   # Fill this file with the right paths to nfcore output
-  params_file: params_qc_nf-core.R
   # Put hg38, mm10, mm39, or other
+  # params_file: params_qc_nf-core-example.R # example data
+  params_file: params_qc_nf-core-example.R
   genome: hg38
   project_file: ../information.R
+  functions_file: ../libs/load_data.R
   factor_of_interest: sample_type
 ---
 
-```{r}
+```{r, cache = FALSE, message = FALSE, warning=FALSE}
 # This set up the working directory to this file so all files can be found
 library(rstudioapi)
 setwd(fs::path_dir(getSourceEditorContext()$path))
 ```
 
 
-```{r source_params, echo = F}
+```{r source_params, cache = FALSE, message = FALSE, warning=FALSE}
 # 1. set up factor_of_interest parameter from parameter above or manually
 #    this is used to color plots, it needs to be part of the metadata
 factor_of_interest=params$factor_of_interest
@@ -43,6 +44,8 @@ source(params$params_file)
 # 3. If you set up this file, project information will be printed below and
 #.   it can be reused for other Rmd files.
 source(params$project_file)
+# 4. Load custom functions to load data from coldata/metrics/counts
+source(params$functions_file)
 ```
 
 # Overview
@@ -80,50 +83,6 @@ opts_chunk[["set"]](
 ```
 
 
-```{r subchunkify, echo=FALSE, eval=FALSE}
-#' Create sub-chunks for plots
-#'
-#' taken from: https://stackoverflow.com/questions/15365829/dynamic-height-and-width-for-knitr-plots
-#'
-#' @param pl a plot object
-#' @param fig.height figure height
-#' @param fig.width figure width
-#' @param chunk_name name of the chunk
-#'
-#' @author Andreas Scharmueller \email{andschar@@protonmail.com}
-#'
-subchunkify = function(pl,
-                       fig.height = 7,
-                       fig.width = 5,
-                       chunk_name = 'plot') {
-  pl_deparsed = paste0(deparse(function() {
-    pl
-  }), collapse = '')
-  
-  sub_chunk = paste0(
-    "```{r ",
-    chunk_name,
-    ", fig.height=",
-    fig.height,
-    ", fig.width=",
-    fig.width,
-    ", dpi=72",
-    ", echo=FALSE, message=FALSE, warning=FALSE, fig.align='center'}",
-    "\n(",
-    pl_deparsed,
-    ")()",
-    "\n```"
-  )
-  
-  cat(knitr::knit(
-    text = knitr::knit_expand(text = sub_chunk),
-    quiet = TRUE
-  ))
-}
-
-```
-
-
 ```{r sanitize-datatable}
 sanitize_datatable = function(df, ...) {
  # remove dashes which cause wrapping
@@ -135,16 +94,29 @@ sanitize_datatable = function(df, ...) {
 
 # Samples and metadata
 
+```{r load_data, message=F, warning=F}
+# This code will load from bcbio or nf-core folder
+# NOTE make sure to set numerator and denominator
+coldata <- load_coldata(coldata_fn)
+coldata$sample=row.names(coldata)
+ 
+counts <- load_counts(counts_fn)
+counts <- counts[,colnames(counts) %in% coldata$sample]
+
+metrics <- load_metrics(se_object, multiqc_data_dir, gtf_fn, counts) %>% 
+  left_join(coldata, by = c('sample')) %>% 
+  as.data.frame()
+# TODO: change order as needed
+order <- unique(metrics[["sample"]])
+rownames(metrics) <- metrics$sample
+# if the names don't match in order or string check files names and coldata information
+counts = counts[,rownames(metrics)]
+coldata = coldata[rownames(metrics),]
+stopifnot(all(names(counts) == rownames(metrics)))
+```
 
 ```{r load_metadata}
-
-meta_df=read_csv(metadata_fn)  %>% 
-  arrange(.data[[factor_of_interest]]) %>%
-  distinct(sample, .keep_all = T) %>% 
-  dplyr::select(!matches("fastq"), !matches("strandness"))
-meta_df$sample <- make.names(meta_df$sample)
-order <- meta_df$sample
-
+meta_df=coldata
 ggplot(meta_df, aes(.data[[factor_of_interest]],
                     fill = .data[[factor_of_interest]])) +
   geom_bar() + ylab("") + xlab("") + ylab("# of samples") +
@@ -152,112 +124,11 @@ ggplot(meta_df, aes(.data[[factor_of_interest]],
 ```
 
 
-```{r load_data}
-# read counts from SE object
-se <- readRDS(se_object)
-raw_counts <- assays(se)[["counts"]] %>% round() %>%
-   as.matrix()
-raw_counts=raw_counts[rowSums(raw_counts)!=0,]
-```
-
-```{r  prepare_metrics}
-# Get metrics from nf-core into bcbio like table
-# many metrics are already in the General Table of MultiQC, this reads the file
-metrics <- read_tsv(file.path(multiqc_data_dir, 'multiqc_general_stats.txt'))
-
-# we get some more metrics from Qualimap and rename columns
-metrics_qualimap <- read_tsv(file.path(multiqc_data_dir, 'mqc_qualimap_genomic_origin_1.txt'))
-metrics <- metrics %>% full_join(metrics_qualimap)
-metrics <- metrics %>%
-  clean_names() %>% 
-  dplyr::rename_with(~gsub('.*mqc_generalstats_', '', .))
-
-# This uses the fastqc metrics to get total reads
-total_reads <- metrics %>% 
-  dplyr::filter(!is.na(fastqc_raw_total_sequences)) %>% 
-  remove_empty(which = 'cols') %>%
-  dplyr::rename(single_sample = sample) %>%
-  mutate(sample = gsub('_[12]+$', '', single_sample)) %>%
-  group_by(sample) %>%
-  summarize(total_reads = sum(fastqc_raw_total_sequences))
-
-# This renames to user-friendly names the metrics columns
-metrics <- metrics %>% 
-  dplyr::filter(is.na(fastqc_raw_total_sequences)) %>% 
-  remove_empty(which = 'cols') %>%
-  full_join(total_reads) %>%
-  mutate(mapped_reads = samtools_reads_mapped) %>%
-  mutate(exonic_rate = exonic/(star_uniquely_mapped * 2)) %>%
-  mutate(intronic_rate = intronic/(star_uniquely_mapped * 2)) %>%
-  mutate(intergenic_rate = intergenic/(star_uniquely_mapped * 2)) %>%
-  mutate(x5_3_bias = qualimap_5_3_bias)
-
-# Sometimes we don't have rRNA due to mismatch annotation, We skip this if is the case
-gtf <- NULL
-if (genome =="other"){
-    gtf <- gtf_fn
-}else{
-  if (genome == "hg38") {
-    gtf <- "hg38.rna.gtf.gz"
-  } else if (genome == "mm10") {
-    gtf <- "mm10.rna.gtf.gz"
-  } else if (genome == "mm39") {
-    gtf <- "mm39.rna.gtf.gz"
-  } 
-  gtf <- system.file("extdata", "annotation",
-                     gtf,
-                     package="bcbioR")
-} 
-if (is.null(gtf)) {
-  print("No genome provided! Please add it at the top of this Rmd")
-}
-
-gtf=rtracklayer::import(gtf)
-
-one=grep("gene_type", colnames(as.data.frame(gtf)), value = TRUE)
-another=grep("gene_biotype", colnames(as.data.frame(gtf)), value = TRUE)
-biotype=NULL
-if(length(one)==1){
-  biotype=one
-}else if(length(another)==1){
-  biotype=another
-}else{
-  warning("No gene biotype founded")
-}
-
-if (!is.null(biotype)){
-  annotation=as.data.frame(gtf) %>% .[,c("gene_id", biotype)]
-  rRNA=grepl("rRNA|tRNA",annotation[[biotype]])
-  genes=intersect(annotation[rRNA,"gene_id"],row.names(raw_counts))
-  ratio=data.frame(sample=colnames(raw_counts),
-                   r_and_t_rna_rate=colSums(raw_counts[genes,])/colSums(raw_counts))
-  metrics = left_join(metrics, ratio, by="sample")
-}else{
-   metrics[["r_and_t_rna_rate"]] <- NA
-}
-
-# if ("custom_content_biotype_counts_percent_r_rna" %in% colnames(metrics)){
-#   metrics <- mutate(metrics, r_rna_rate = custom_content_biotype_counts_percent_r_rna)
-# }else{
-#  metrics[["r_rna_rate"]] <- NA
-# }
-metrics=metrics[,c("sample","mapped_reads","exonic_rate","intronic_rate",
-                   "total_reads",
-                   "x5_3_bias", "r_and_t_rna_rate","intergenic_rate")]
-metrics$sample <- make.names(metrics$sample)
-metrics <- metrics %>%
-  full_join(meta_df , by = c("sample" = "sample")) %>%
-  dplyr::select(where(~!all(is.na(.))))
-
-```
-
 ```{r show_metadata}
 meta_sm <- meta_df %>%
-  as.data.frame() %>%
-  column_to_rownames("sample")
+  as.data.frame() 
 
 meta_sm %>% sanitize_datatable()
-
 ```
 
 # Read metrics {.tabset}
@@ -321,7 +192,7 @@ metrics %>%
 The number of genes represented in every sample is expected to be consistent and over 20K (grey line).
 
 ```{r calc_genes_detected}
-genes_detected <- colSums(assays(se)[["counts"]] > 0) %>% enframe()
+genes_detected <- colSums(counts > 0) %>% enframe()
 sample_names <- metrics[,c("sample"), drop=F]
 genes_detected <- left_join(genes_detected, sample_names, by = c("name" = "sample"))
 genes_detected <- genes_detected %>% group_by(name)
@@ -484,15 +355,15 @@ We expect consistency in the box plots here between the samples, i.e. the distri
 metrics_small <- metrics %>% dplyr::select(sample, .data[[factor_of_interest]])
 metrics_small <- left_join(sample_names, metrics_small)
 
-counts <- 
-  assays(se)[["counts"]] %>% 
+counts_lng <- 
+  counts %>% 
   as_tibble() %>%
   filter(rowSums(.)!=0) %>% 
   gather(name, counts) 
 
-counts <- left_join(counts, metrics_small, by = c("name" = "sample"))
+counts_lng <- left_join(counts_lng, metrics_small, by = c("name" = "sample"))
 
-ggplot(counts, aes(factor(name, level = order),
+ggplot(counts_lng, aes(factor(name, level = order),
                    log2(counts+1),
                    fill = .data[[factor_of_interest]])) +
   geom_boxplot() + 
@@ -515,11 +386,11 @@ Principal Component Analysis (PCA) is a statistical technique used to simplify h
 <!-- ### PCA, PCs 1-4, (labled) -->
 ```{r PCA1:5 summary, all, unlabeled, fig.width= 7, fig.height = 5}
 
-vst <- vst(raw_counts)
+vst <- vst(counts)
 
 coldat_for_pca <- as.data.frame(metrics)
 rownames(coldat_for_pca) <- coldat_for_pca$sample
-coldat_for_pca <- coldat_for_pca[colnames(raw_counts),]
+coldat_for_pca <- coldat_for_pca[colnames(counts),]
 pca1 <- degPCA(vst, coldat_for_pca,
               condition = factor_of_interest, data = T)[["plot"]]
 pca2 <- degPCA(vst, coldat_for_pca,
@@ -552,10 +423,9 @@ cluster by plotting the correlation between the expression profiles of the
 samples.
 
 ```{r clustering fig, fig.width = 10, fig.asp = .62}
-
 vst_cor <- cor(vst)
 
-colma=meta_df %>% as.data.frame()
+colma=coldata %>% as.data.frame()
 rownames(colma) <- colma$sample
 colma <- colma[rownames(vst_cor), ]
 colma <- colma %>% dplyr::select(.data[[factor_of_interest]])

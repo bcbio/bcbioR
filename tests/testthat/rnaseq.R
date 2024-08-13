@@ -1,74 +1,51 @@
 library(bcbioR)
 
 
-test_that("scrnaseq",{
-  path <- withr::local_tempdir()
-  print(path)
-  copy_templates(path, "singlecell")
-  expect_length(fs::dir_ls(path,all=T),8)
-  expect_true(grepl("scRNAseq_qc_app",
-                    fs::dir_ls(file.path(path, "apps"), recurse=T, all=T)[2]))
-})
-
-test_that("base copy",{
-  path <- withr::local_tempdir()
-  print(path)
-  bcbio_templates(type="base", outpath=path)
-  expect_length(fs::dir_ls(path,all=T),9)
-})
-
-test_that("rnaseq copy",{
+test_that("rnaseq deg",{
   path <- withr::local_tempdir()
   print(path)
   bcbio_templates(type="rnaseq", outpath=path)
-  expect_length(fs::dir_ls(path,all=T),4)
-  # numerator="tumor"
-  # denominator="normal"
-  # subset_value=NA
-  # rmarkdown::render(input = file.path(path,"DE/DEG.Rmd"),
-  #                   output_dir = file.path(path,"DE"),
-  #                   output_format = "html_document",
-  #                   output_file = ifelse(!is.na(subset_value),
-  #                                        paste0('DE_', subset_value, '_', numerator, '_vs_', denominator, '.html'),
-  #                                        paste0('DE_', numerator, '_vs_', denominator, '.html')
-  #                   ),
-  #                   clean = TRUE,
-  #                   envir = new.env(),
-  #                   params = list(
-  #                     subset_value = subset_value,
-  #                     numerator = numerator,
-  #                     denominator = denominator,
-  #                     params_file = file.path(path,'DE/params_de-example.R'),
-  #                     project_file = file.path(path,'information.R'),
-  #                     functions_file = file.path(path,'DE/load_data.R')
-  #                   )
-  # )
-  # use_bcbio_projects(path, nfcore="nf-core/rnaseq", copy=TRUE, git=FALSE)
+  fs::dir_ls(path,all=T)
+  numerator="tumor"
+  denominator="normal"
+  subset_value=NA
+  rmarkdown::render(input = file.path(path,"DE/DEG.Rmd"),
+                    output_dir = file.path(path,"DE"),
+                    output_format = "html_document",
+                    output_file = ifelse(!is.na(subset_value),
+                                         paste0('DE_', subset_value, '_', numerator, '_vs_', denominator, '.html'),
+                                         paste0('DE_', numerator, '_vs_', denominator, '.html')
+                    ),
+                    clean = TRUE,
+                    # envir = new.env(),
+                    params = list(
+                      subset_value = subset_value,
+                      numerator = numerator,
+                      denominator = denominator,
+                      params_file = file.path(path,'DE/params_de-example.R'),
+                      project_file = file.path(path,'information.R'),
+                      functions_file = file.path(path,'libs/load_data.R')
+                    )
+  )
+  # browseURL(file.path(path, "DE/DE_tumor_vs_normal.html"))
+  # usethis::proj_activate(path)
 })
 
-# test_that("rnaseq testing", {
-#   path <- withr::local_tempdir()
-#   print(path)
-#   bcbio_templates(type="rnaseq", outpath=path)
-#   numerator="tumor"
-#   denominator="normal"
-#   subset_value=NA
-#   rmarkdown::render(input = file.path(path,"DE/DEG.Rmd"),
-#                     output_dir = file.path(path,"DE"),
-#                     output_format = "html_document",
-#                     output_file = ifelse(!is.na(subset_value),
-#                                          paste0('DE_', subset_value, '_', numerator, '_vs_', denominator, '.html'),
-#                                          paste0('DE_', numerator, '_vs_', denominator, '.html')
-#                     ),
-#                     clean = TRUE,
-#                     envir = new.env(),
-#                     params = list(
-#                       subset_value = subset_value,
-#                       numerator = numerator,
-#                       denominator = denominator,
-#                       params_file = file.path(path,'DE/params_de.R'),
-#                       project_file = file.path(path,'information.R'),
-#                       functions_file = file.path(path,'DE/load_data.R')
-#                     )
-#   )
-# })
+test_that("rnaseq qc",{
+  path <- withr::local_tempdir()
+  print(path)
+  bcbio_templates(type="rnaseq", outpath=path)
+  fs::dir_ls(path,all=T)
+  rmarkdown::render(input = file.path(path,"QC/QC_nf-core.Rmd"),
+                    output_dir = file.path(path,"QC"),
+                    output_format = "html_document",
+                    clean = TRUE,
+                    params = list(
+                      params_file = file.path(path,'QC/params_qc_nf-core-example.R'),
+                      project_file = file.path(path,'information.R'),
+                      functions_file = file.path(path,'libs/load_data.R')
+                    )
+  )
+  # browseURL(file.path(path, "QC/QC_nf-core.html"))
+  # usethis::proj_activate(path)
+})
