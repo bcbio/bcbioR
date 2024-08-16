@@ -22,6 +22,8 @@ bcbio_nfcore_check <- function(file){
     stop("Missing required columns ", paste(required, collapse = " "))
   }else if (any(grepl("^[1-9]", samplesheet[["sample"]]))){
     stop("Avoid samples starting with numbers ")
+  }else if (any(grep("[^a-zA-Z0-9_]", samplesheet[["sample"]]))){
+    stop("Sample names should contain only letters, numbers, and underscores")
   }else if (any(is.na(samplesheet))){
     warning("Columns with missing values")
   }else{
