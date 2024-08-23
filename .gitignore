@@ -19,3 +19,4 @@ tests/*
 .httr-oauth
 .DS_Store
 .quarto
+inst/templates/chipseq/QC/QC.html

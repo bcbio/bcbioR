@@ -1,0 +1,358 @@
+---
+title: "Quality Control"
+author: "Harvard Chan Bioinformatics Core"
+date: "`r Sys.Date()`"
+output:
+   html_document:
+      code_folding: hide
+      df_print: paged
+      highlights: pygments
+      number_sections: true
+      self_contained: true
+      theme: default
+      toc: true
+      toc_float:
+         collapsed: true
+         smooth_scroll: true
+editor_options: 
+  chunk_output_type: console
+params:
+  # Fill this file with the right paths to nfcore output
+  # params_file: params_qc_nf-core-example.R # example data
+  params_file: params_qc-example.R
+  project_file: ../information.R
+  functions_file: ../libs/load_data.R
+  factor_of_interest: genotype
+
+---
+
+```{r, cache = FALSE, message = FALSE, warning=FALSE}
+# This set up the working directory to this file so all files can be found
+# library(rstudioapi)
+# setwd(fs::path_dir(getSourceEditorContext()$path))
+```
+
+
+```{r source_params, cache = FALSE, message = FALSE, warning=FALSE}
+# 1. set up factor_of_interest parameter from parameter above or manually
+#    this is used to color plots, it needs to be part of the metadata
+# 2. Set input files in this file
+source(params$params_file)
+# 3. If you set up this file, project information will be printed below and
+#.   it can be reused for other Rmd files.
+source(params$project_file)
+# 4. Load custom functions to load data from coldata/metrics/counts
+source(params$functions_file)
+```
+
+# Overview
+
+-   Project: `r project`
+-   PI: `r PI`
+-   Analyst: `r analyst`
+-   Experiment: `r experiment`
+
+
+```{r load_libraries, cache = FALSE, message = FALSE, warning=FALSE}
+library(tidyverse)
+library(knitr)
+library(rtracklayer)
+library(DESeq2)
+library(DEGreport)
+library(ggrepel)
+# library(RColorBrewer)
+library(DT)
+library(pheatmap)
+library(bcbioR)
+library(janitor)
+ggplot2::theme_set(theme_light(base_size = 14))
+opts_chunk[["set"]](
+    cache = FALSE,
+    cache.lazy = FALSE,
+    dev = c("png", "pdf"),
+    error = TRUE,
+    highlight = TRUE,
+    message = FALSE,
+    prompt = FALSE,
+    tidy = FALSE,
+    warning = FALSE,
+    fig.height = 4)
+```
+
+
+```{r sanitize-datatable}
+sanitize_datatable = function(df, ...) {
+ # remove dashes which cause wrapping
+ DT::datatable(df, ..., rownames=gsub("-", "_", rownames(df)),
+                   colnames=gsub("-", "_", colnames(df)))
+}
+```
+
+# Samples and metadata
+
+```{r load_data, message=F, warning=F}
+# This code will load from bcbio or nf-core folder
+# NOTE make sure to set numerator and denominator
+coldata <- load_coldata(coldata_fn)
+coldata$sample=row.names(coldata)
+
+metrics <- load_metrics(multiqc_data_dir)
+
+metrics <- full_join(coldata, metrics)
+rownames(metrics) <- metrics$sample
+dds <- load_counts(counts_fn)
+
+coldata_for_dds = metrics[colnames(dds),]
+stopifnot(all(colnames(dds) == rownames(coldata_for_dds)))
+
+peaks <- load_peaks(peaks_dir) %>% left_join(coldata)
+```
+
+```{r show_metadata}
+metrics_lite <- metrics %>% dplyr::select(sample, total_reads, mapped_reads_pct, frip, peak_count)
+full_join(coldata, metrics_lite) %>% sanitize_datatable()
+```
+
+# Read metrics {.tabset}
+
+## Total reads
+
+Here, we want to see consistency and a minimum of 20 million reads (the grey line).
+
+```{r plot_total_reads}
+metrics %>%
+    ggplot(aes(x = sample,
+               y = total_reads, 
+               fill = antibody)) +
+    geom_bar(stat = "identity") +
+    coord_flip() +
+    scale_y_continuous(name = "million reads") +
+    scale_x_discrete(limits = rev) +
+    scale_fill_cb_friendly() + xlab("") + 
+    ggtitle("Total reads")+
+  geom_hline(yintercept=20000000, color = "grey", linewidth=2)
+
+```
+
+## Mapping rate
+
+```{r calc_min_max_pct_mapped}
+#get min percent mapped reads for reference
+min_pct_mapped <- round(min(metrics$mapped_reads/metrics$total_reads)*100,1)
+max_pct_mapped <- round(max(metrics$mapped_reads/metrics$total_reads)*100,1)
+```
+
+The genomic mapping rate represents the percentage of reads mapping to the reference genome. We want to see consistent mapping rates between samples and over 70% mapping (the grey line). These samples have mapping rates: `r min_pct_mapped` - `r max_pct_mapped`%.
+
+```{r plot_mapping_rate}
+metrics %>%
+    ggplot(aes(x = sample,
+               y = mapped_reads_pct, 
+               fill = antibody)) +
+    geom_bar(stat = "identity") +
+    coord_flip() +
+    scale_y_continuous(name = "% reads mapped") +
+    scale_x_discrete(limits = rev) +
+    scale_fill_cb_friendly() + xlab("") + 
+  ggtitle("Mapping rate") + xlab("") +
+  geom_hline(yintercept=70, color = "grey", linewidth=2)
+
+```
+
+## Mapped Reads
+
+```{r plot_mapped_reads}
+metrics %>%
+    ggplot(aes(x = sample,
+               y = mapped_reads, 
+               fill = antibody)) +
+    geom_bar(stat = "identity") +
+    coord_flip() +
+    scale_y_continuous(name = "million reads") +
+    scale_x_discrete(limits = rev) +
+    scale_fill_cb_friendly() + xlab("") + 
+    ggtitle("Mapped reads")
+
+```
+
+## NSC 
+
+```{r plot_nsc}
+metrics %>%
+    ggplot(aes(x = sample,
+               y = nsc, 
+               fill = antibody)) +
+    geom_bar(stat = "identity") +
+    coord_flip() +
+    scale_y_continuous(name = "NSC coefficient") +
+    scale_x_discrete(limits = rev) +
+    scale_fill_cb_friendly() + xlab("") + 
+    ggtitle("Normalized Strand Cross-Correlation")
+
+```
+
+
+## RSC
+
+```{r plot_rsc}
+metrics %>%
+    ggplot(aes(x = sample,
+               y = rsc, 
+               fill = antibody)) +
+    geom_bar(stat = "identity") +
+    coord_flip() +
+    scale_y_continuous(name = "NSC coefficient") +
+    scale_x_discrete(limits = rev) +
+    scale_fill_cb_friendly() + xlab("") + 
+    ggtitle("Relative Strand Cross-Correlation")
+
+```
+
+
+## Fraction of reads in peaks
+
+This figure shows what percentage of reads are mapping to regions within peaks called by macs2. The expected fraction of reads in peaks will vary by protein.
+
+```{r plot_frip}
+metrics %>% filter(!is.na(frip)) %>%
+    ggplot(aes(x = sample,
+               y = frip, 
+               fill = antibody)) +
+    geom_bar(stat = "identity") +
+    coord_flip() +
+    scale_y_continuous(name = "FRiP") +
+    scale_x_discrete(limits = rev) +
+    scale_fill_cb_friendly() + xlab("") + 
+    ggtitle("Fraction of reads in peaks")
+
+```
+
+## Number of peaks
+
+Ideally, we will see a similar number of peaks between replicates. 
+
+```{r plot_peak_count}
+metrics %>% filter(!is.na(peak_count)) %>%
+    ggplot(aes(x = sample,
+               y = peak_count, 
+               fill = antibody)) +
+    geom_bar(stat = "identity") +
+    coord_flip() +
+    scale_y_continuous(name = "Number of Peaks") +
+    scale_x_discrete(limits = rev) +
+    scale_fill_cb_friendly() + xlab("") + 
+    ggtitle("Number of Peaks")
+
+```
+
+## Non-Redundant Fraction
+
+The NRF is the number of uniquely mapping reads divided by the total number of reads. The ENCODE website also sets out standardized thresholds for this as well and those are summarized in the table below.
+
+```{r nrf table}
+NRF <- c("NRF < 0.5", "0.5 < NRF < 0.8", "0.8 < NRF < 0.9", "NRF > 0.9")
+NRF_level <- c("Concerning", "Acceptable", "Compliant", "Ideal")
+
+NRF_df <- data.frame(NRF, NRF_level)
+
+colnames(NRF_df) <- c("NRF", "NRF Level")
+NRF_df %>% sanitize_datatable()
+
+```
+
+```{r plot_nrf}
+metrics %>% 
+    ggplot(aes(x = sample,
+               y = nrf, 
+               fill = antibody)) +
+    geom_bar(stat = "identity") +
+    coord_flip() +
+    scale_y_continuous(name = "Non-Redundant Fraction") +
+    scale_x_discrete(limits = rev) +
+    scale_fill_cb_friendly() + xlab("") + 
+    ggtitle("Non-Redundant Fraction")+
+    geom_hline(yintercept = 0.9, linetype = "dashed", color="green") +
+    geom_hline(yintercept = 0.8, linetype = "dashed", color="orange") +
+    geom_hline(yintercept = 0.5, linetype = "dashed", color="red")
+
+```
+
+# Correlation Heatmap
+
+Inter-correlation analysis (ICA) is another way to look at how well samples
+cluster by plotting the correlation between the peak regions of the
+samples.
+
+```{r clustering fig, fig.width = 10, fig.asp = .62}
+vst_cor <- cor(assays(dds)$vst)
+
+colma=coldata_for_dds %>% as.data.frame()
+rownames(colma) <- colma$sample
+colma <- colma[rownames(vst_cor), ]
+colma <- colma %>% dplyr::select(.data[[params$factor_of_interest]])
+anno_colors=lapply(colnames(colma), function(c){
+  l.col=cb_friendly_pal('grey')(length(unique(colma[[c]])))
+  names(l.col)=unique(colma[[c]])
+  l.col
+})
+names(anno_colors)=colnames(colma)
+
+p <- pheatmap(vst_cor, 
+         annotation = colma,
+         annotation_colors = anno_colors,
+         show_rownames = T, 
+         show_colnames = T, 
+         color = cb_friendly_pal('heatmap')(15)
+         )
+p
+```
+
+# PCA
+
+We can run PCA to evaluate the variation amongst our samples and whether or not the greatest sources of variation in the data (PC1 and PC2) can be attributed to the factors of interest in this experiment.
+
+```{r PCA1:5 summary, all, unlabeled, fig.width= 7, fig.height = 5}
+
+pca1 <- degPCA(assays(dds)$vst, coldata_for_dds,
+              condition = params$factor_of_interest, data = T)[["plot"]]
+pca2 <- degPCA(assays(dds)$vst, coldata_for_dds,
+              condition = params$factor_of_interest, data = T, pc1="PC3", pc2="PC4")[["plot"]]
+
+pca1 + scale_color_cb_friendly()
+pca2 + scale_color_cb_friendly()
+
+```
+
+# Sample Concordance {.tabset}
+
+## Peak enrichment vs. Peak rank
+
+In this plot, we are looking at each individual replicates to evaluate what number of peaks we would retain if threshholding by peak enrichment. It is also valuable to see how this differs between replicates within a sample group.
+
+```{r peak enrichment vs rank}
+ggplot(peaks, aes(x = peak_rank, y = peak_enrichment, color = sample)) + 
+  geom_line() +
+  scale_color_cb_friendly() + 
+  xlab("Peak rank") + ylab("Peak enrichment")
+
+```
+
+## Peak signal distribution
+
+Here, we plot a histogram of peak signal values for each sample. This plot can be used to help determine a minimum value for peak enrichment that can be used for filtering. 
+
+```{r peak signal distribution}
+ggplot(peaks, aes(x = peak_enrichment, fill = .data[[params$factor_of_interest]])) + 
+  geom_histogram(aes(peak_enrichment)) +
+  scale_fill_cb_friendly() +
+  xlab("Peak enrichment")
+
+```
+
+# R session
+
+List and version of tools used for the QC report generation.
+
+```{r}
+sessionInfo()
+```
