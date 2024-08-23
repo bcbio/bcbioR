@@ -32,6 +32,7 @@ params:
   functions_file: ../libs
 ---
 
+Template developed with materials from https://hbctraining.github.io/main/.
 
 ```{r}
 # This set up the working directory to this file so all files can be found
@@ -538,7 +539,7 @@ From the set of differentially expressed genes and using publicly available info
 
 ```{r}
 
-all_in_life=get_databases()
+wiall_in_life=get_databases()
 ```
 
 # Pathway Analysis

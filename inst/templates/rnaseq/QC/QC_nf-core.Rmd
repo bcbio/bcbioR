@@ -27,6 +27,8 @@ params:
   factor_of_interest: sample_type
 ---
 
+Template developed with materials from https://hbctraining.github.io/main/.
+
 ```{r, cache = FALSE, message = FALSE, warning=FALSE}
 # This set up the working directory to this file so all files can be found
 library(rstudioapi)
