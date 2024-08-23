@@ -101,7 +101,7 @@ load_metrics <- function(se_object, multiqc_data_dir, gtf_fn, counts){
   return(metrics)
 }
 
-load_coldata <- function(coldata_fn, column=NULL, numerator=NULL, denominator=NULL, subset_column = NULL, subset_value = NULL){
+load_coldata <- function(coldata_fn, column=NULL, subset_column = NULL, subset_value = NULL){
   coldata=read.csv(coldata_fn) %>%
     dplyr::distinct(sample, .keep_all = T) %>%
     dplyr::select(!matches("fastq"), !matches("strandness")) %>%
@@ -123,8 +123,8 @@ load_coldata <- function(coldata_fn, column=NULL, numerator=NULL, denominator=NU
   rownames(coldata) <- coldata$sample
   coldata$description <- coldata$sample
 
-  if (!is.null(denominator))
-    coldata[[column]] = relevel(as.factor(coldata[[column]]), denominator)
+  # if (!is.null(denominator))
+  #   coldata[[column]] = relevel(as.factor(coldata[[column]]), denominator)
 
   return(coldata)
 }

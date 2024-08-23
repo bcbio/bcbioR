@@ -1,3 +1,11 @@
+# bcbioR 0.3.0
+
+* Support multiple comparisons
+* re-structure templates
+* Add text with best practices
+* Add draft for methylation and spatial
+* Add scQC shiny app
+
 # bcbioR 0.1.3
 
 * fix duplicated gene names

@@ -15,22 +15,21 @@ output:
          collapsed: true
          smooth_scroll: true
 editor_options: 
-  chunk_output_type: console
+  chunk_output_type: inline
 params:
     ## Combatseq and ruv can both be false or ONLY ONE can be true
-  ## Both cannot be true
-  numerator: tumor
-  denominator: normal
-  column: sample_type
+  # numerator: tumor
+  # denominator: normal
+  column: "sample_type"
+  contrasts: !r list(c("sample_type", "tumor", "normal"))
   subset_column: null
   subset_value: null
-  # Put hg38, mm10, mm39, or other
   genome: hg38
   ruv: false
   combatseq: false
   params_file: params_de-example.R
   project_file: ../information.R
-  functions_file: ../libs/load_data.R
+  functions_file: ../libs
 ---
 
 
@@ -42,17 +41,19 @@ setwd(fs::path_dir(getSourceEditorContext()$path))
 
 
 ```{r load_params, cache = FALSE, message = FALSE, warning=FALSE}
+library(tidyverse)
 # 1. Set up input files in this R file (params_de.R)
 source(params$params_file)
 # 2. Set up project file (already done from QC probably)
 source(params$project_file)
 # 3. Load custom functions to load data from coldata/metrics/counts
-source(params$functions_file)
+map(list.files(params$functions_file,pattern = "*.R$",full.names = T),source) %>% invisible()
 # IMPORTANT set these values if you are not using the parameters in the header (lines 22-31)
 genome=params$genome
 column=params$column
-numerator=params$numerator
-denominator=params$denominator
+contrasts=params$contrasts
+# numerator=params$numerator
+# denominator=params$denominator
 subset_column=params$subset_column
 subset_value=params$subset_value
 run_ruv=params$ruv
@@ -80,6 +81,7 @@ library(pheatmap)
 library(janitor)
 library(ggforce)
 library(vegan)
+library(htmltools)
 
 colors=cb_friendly_cols(1:15)
 ggplot2::theme_set(theme_prism(base_size = 14))
@@ -108,13 +110,10 @@ sanitize_datatable = function(df, ...) {
 }
 ```
 
-
-
 ```{r load_data, message=F, warning=F}
 # This code will load from bcbio or nf-core folder
 # NOTE make sure to set numerator and denominator
 coldata <- load_coldata(coldata_fn, column,
-                        numerator, denominator,
                         subset_column, subset_value)
 coldata$sample=row.names(coldata)
 
@@ -128,10 +127,9 @@ rownames(metrics) <- metrics$sample
 # if the names don't match in order or string check files names and coldata information
 counts = counts[,rownames(metrics)]
 coldata = coldata[rownames(metrics),]
+coldata[[contrasts[[1]][1]]] = relevel(as.factor(coldata[[contrasts[[1]][1]]]), contrasts[[1]][3])
 stopifnot(all(names(counts) == rownames(metrics)))
 ```
-
-
 
 # Overview
 
@@ -140,30 +138,6 @@ stopifnot(all(names(counts) == rownames(metrics)))
 -   Analyst: `r analyst`
 -   Experiment: `r experiment`
 -   Aim: `r aim`
--   Comparison: `r ifelse(is.null(subset_value), paste0(numerator, ' vs. ', denominator), paste0(subset_value, ': ', numerator, ' vs. ', denominator))`
-
-```{r create_filenames}
-
-if (!is.null(subset_value) & !is.null(subset_value)){
-  filenames = str_interp("${subset_value}_${numerator}_vs_${denominator}")
-} else {
-  filenames = str_interp("${numerator}_vs_${denominator}")
-}
-
-contrasts = c(column,numerator,denominator)
-coef=paste0(column,"_",numerator,"_vs_",denominator)
-
-name_expression_fn=file.path(
-                             basedir,
-                             str_interp("${filenames}_expression.csv"))
-name_deg_fn=file.path(
-                      basedir,
-                      str_interp("${filenames}_deg.csv"))
-name_pathways_fn=file.path(
-                           basedir,
-                           str_interp("${filenames}_pathways.csv"))
-
-```
 
 ```{r load_counts_data}
 
@@ -172,6 +146,15 @@ rdata = AnnotationDbi::select(org.Hs.eg.db, rownames(counts), 'SYMBOL', 'ENSEMBL
   distinct(gene_id, .keep_all = TRUE)
 
 ```
+
+# Set up
+
+We recommend not to filter before DESeq2 since it will be handling by it. There are cases where pre-filtering could be good:
+
+- large number of drop-outs, to reduce computation
+- large number of samples, to reduce computation
+- unbalanced groups, many less samples for one group than another, maybe filtering by group is an option.
+
 
 ```{r setup_RUV}
 dds_to_use <- DESeqDataSetFromMatrix(counts, coldata, design = ~1)
@@ -209,7 +192,7 @@ pca$plot + ggtitle(paste0("All samples", "\nPCA using ", nrow(vsd_before), " gen
   geom_mark_ellipse(aes(color = sample_type)) +  scale_color_cb_friendly()
 ```
 
-## PERMDISP
+## Analysis of the variance by group
 
 Groups in a univariate analysis can also differ with regard to their mean values, variation around those means, or both. In univariate analyses, dispersion can be examined using Levene’s test.  PERMDISP is a multivariate extension of Levene’s test to examine whether groups differ in variability. In essence, PERMDISP involves calculating the distance from each data point to its group centroid and then testing whether those distances differ among the groups. [Source](https://uw.pressbooks.pub/appliedmultivariatestatistics/chapter/permdisp/)
 
@@ -223,7 +206,6 @@ anova(mod)
 permutest(mod, pairwise = TRUE)
 
 ```
-
 
 
 # Covariate analysis
@@ -240,6 +222,7 @@ degCovariates(
 )
 ```
 
+# Data modeling
 
 
 ```{r init_DESEQ}
@@ -254,23 +237,28 @@ norm_matrix = assay(vsd_before)
 new_cdata <- coldata
 ```
 
+For this study, this formula is  recommended: `r as.character(formula)`
+
 
 ```{r, eval=F, echo=FALSE}
-#### IF YOU ARE RUNNING RUV OR COMBATSEQ RUN THE CHUNKS BELOW OTHERWISE SKIP TO Differential Expression SECTION
-
-### RUV - LINES 261-296
-### COMBATSEQ - LINES 303-369
+#### IF YOU ARE RUNNING RUV OR COMBATSEQ RUN THE CHUNKS BELOW OTHERWISE SKIP TO Differential Expression SECTION or remove this section
 ```
 
-
+## Remove unwanted variation
 
 ```{r, eval=run_ruv, results='asis', echo=run_ruv}
-cat("# Remove Unwanted Variability
+cat("### Assessing unknown factors
 
 When performing differential expression analysis, it is important to ensure that any detected differences are truly a result of the experimental comparison being made and not any additional variability in the data.")
 ```
 
+```{r, eval=!run_ruv, results='asis', echo=run_ruv}
+cat("There is no need to assess unknown factor for this study.")
+```
+
 ```{r do_RUV, eval=run_ruv, echo=run_ruv}
+# TOFIX Add to template: check correlation of dummy variables produced by ruvseq with existing covariates in metadata
+# NOTE ruvseq (used when you don’t know where the unwanted variation is coming from. Package utilizes dummy variable(s), 1-5 used, start with 1, look at PCA, decide if you want more separation) Add any known-created RUV variables to DESeq2 formula. Normalized matrix produced – only for visualization, not for input into DESeq2
 library(RUVSeq)
 
 # If you want to skip the code, just set up formula to be your model in the next chunk of code
@@ -290,7 +278,7 @@ formula <- as.formula(paste0("~ ",
                             collapse = " + "
                           ), " + ", column)
 )
-norm_matrix=ruvset$normalizedCounts
+norm_matrix=ruvset$normalizedCounts # NOTE use this for visualization
 pca2 <- degPCA(norm_matrix, new_cdata, 
        condition = column) + ggtitle('After RUV')
 pca2 + scale_color_cb_friendly()
@@ -298,16 +286,16 @@ pca2 + scale_color_cb_friendly()
 ```
 
 ```{r after_RUV, eval=run_ruv}
-
 dds_to_use <- DESeqDataSetFromMatrix(counts, new_cdata, design = formula)
 vsd_to_use<- vst(dds_to_use, blind=FALSE)
-
 ```
 
+
 ```{r combat-text , eval=run_combatseq, results='asis', echo=run_combatseq}
+# NOTE Combatseq (part of the SVA package) - corrected count, removing the effects while retaining the structure of the data. Used in a scenario where you know what covariate/batch is. Do not add know-removed known covariates to DESeq2 formula. Also, don’t attempt to remove biological effect (e.g. donor), this is not conceptually valid; best for technical variation.
 library(sva)
 
-cat("# Remove Batch Effects
+cat("### Remove Batch Effects
 
 Here we apply Combat-seq (https://github.com/zhangyuqing/ComBat-seq) to try to remove batch effects so we can better tease out the effects of interest. 
 
@@ -315,6 +303,9 @@ Combat-seq uses a negative binomial regression to model batch effects, providing
 
 ```
 
+```{r, eval=!run_combatseq, results='asis', echo=run_combatseq}
+cat("There is no need to remove known factors like batch effect in this study.")
+```
 
 ```{r set_variable_combatseq, eval=run_combatseq, echo=run_combatseq}
 
@@ -348,7 +339,6 @@ treatment = coldata[[to_keep]]
 
 ```
 
-
 ```{r do_combatseq, eval=run_combatseq}
 adjusted_counts <- ComBat_seq(as.matrix(counts), batch=batch, group = treatment)
 
@@ -363,12 +353,11 @@ adjusted_counts <- ComBat_seq(as.matrix(counts), batch=batch, group = treatment)
 dds_to_use <- DESeqDataSetFromMatrix(adjusted_counts, coldata, design = formula)
 vsd_combat<- vst(dds_to_use, blind=FALSE)
 
-combat_matrix = assay(vsd_combat)
+norm_matrix = assay(vsd_combat)
 
-pca_combat <- degPCA(combat_matrix, coldata, 
+pca_combat <- degPCA(norm_matrix, coldata, 
        condition = column) + ggtitle('After Combatseq')
 pca_combat + scale_color_cb_friendly()
-
 ```
 
 
@@ -381,113 +370,166 @@ Before fitting the model, we often look at a metric called dispersion, which is 
 We use the below dispersion plot, which should show an inverse relationship between dispersion and mean expression, to get an idea of whether our data is a good fit for the model. 
 
 ```{r DE}
+# NOTE Note VST won’t regress out this when normalizing
 de <- DESeq(dds_to_use)
-
 DESeq2::plotDispEsts(de)
 ```
 
 Because it is difficult to accurately detect and quantify the expression of lowly expressed genes, differences in their expression between treatment conditions can be unduly exaggerated after the model is fit. We correct for this so that gene LFC is not dependent overall on basal gene expression level.
 
+In cases there are multiple groups and conditions across groups is recommended to use dummy variables instead of interaction terms: https://bioconductor.org/packages/devel/bioc/vignettes/DESeq2/inst/doc/DESeq2.html#interactions.
+
+The LRT is useful for testing multiple terms at once, for example testing 3 or more levels of a factor at once, or all interactions between two variables. The LRT for count data is conceptually similar to an analysis of variance (ANOVA) calculation in linear regression, except that in the case of the Negative Binomial GLM, we use an analysis of deviance (ANODEV), where the deviance captures the difference in likelihood between a full and a reduced model.
+
 ```{r lfc_shrink}
+# NOTE As a note: Use `ashr` for comparisons with many groups to be able to pull out all the contrasts; otherwise `apeglm` is fine. It shrinks less.
+
+# NOTE We recommend LRT for time series
+
 # resultsNames(de) # check the order is right
-resLFC = results(de, contrast=contrasts)
-resLFCS <- lfcShrink(de, coef=coef, type="apeglm")
+names_to_use=lapply(contrasts, function(contrast){coef = paste0(contrast[1], "_", contrast[2], "_vs_", contrast[3])})
+names(contrasts)=names_to_use
+de_list=lapply(contrasts, function(contrast){
+  resLFC = results(de, contrast=contrast)
+  coef = paste0(contrast[1], "_", contrast[2], "_vs_", contrast[3])
+  resLFCS <- lfcShrink(de, coef=coef, type="apeglm")
+  # resLFCS <- lfcShrink(de, contrast=contrast, type="ash")
+  
+  res <- as.data.frame(resLFCS) %>%
+    rownames_to_column('gene_id') %>% left_join(rdata, by = 'gene_id') %>% 
+    relocate(gene_name) %>% dplyr::rename(lfc = log2FoldChange) %>%
+    mutate(pi = abs(lfc) * -log10(padj)) %>% arrange(-pi)
+  
+  ## Filter out genes that have no expression or were filtered out by DESEQ2
+  res <- res[res$baseMean>0,] %>% drop_na(padj) %>% drop_na(pvalue)
+  
+  res_sig <- res %>% filter(padj < 0.05) %>% arrange(padj) %>%
+    mutate(gene_name = ifelse(is.na(gene_name), gene_id, gene_name))
+  results=list(lfc=resLFC, lfcs=resLFCS, all=res, sig=res_sig)
+  return(results)
+})
 
-res <- as.data.frame(resLFCS) %>%
-  rownames_to_column('gene_id') %>% left_join(rdata, by = 'gene_id') %>% 
-  relocate(gene_name) %>% dplyr::rename(lfc = log2FoldChange) %>%
-  mutate(pi = abs(lfc) * -log10(padj)) %>% arrange(-pi)
-
-## Filter out genes that have no expression or were filtered out by DESEQ2
-res <- res[res$baseMean>0,] %>% drop_na(padj) %>% drop_na(pvalue)
-
-res_sig <- res %>% filter(padj < 0.05) %>% arrange(padj) %>%
-  mutate(gene_name = ifelse(is.na(gene_name), gene_id, gene_name))
-
-res_mod <- res %>% mutate(lfc = replace(lfc, lfc < -5, -5)) %>% mutate(lfc = replace(lfc, lfc > 5, 5))
-show <- as.data.frame(res_mod[1:10, c("lfc", "padj", "gene_name")])
-
-degMA(as.DEGSet(resLFC)) + ggtitle('Before LFC Shrinking')
+# NOTE if you add manually any other comparison to the list with the following variables,
+# the code below will make the plots for those as wells:
+# de_list=c(de_list, new_comparison=list(lfc=resLFC, lfcs=resLFCS, all=res, sig=res_sig))
 ```
 
-## MA plot
+## MA plot {.tabset}
 
-```{r after_lfc_shrink}
-degMA(as.DEGSet(resLFCS), limit = 2) + ggtitle('After LFC Shrinking')
+This plot can help to:
+- Identify Differential Expression: Genes that show a significant log-fold change (M value away from 0) indicate changes in expression between conditions.
+- Assess Data Quality: The plot can help in identifying biases or systematic errors in the data. Ideally, most points should scatter around the M=0 line, indicating that there is no significant systematic difference between the conditions.
+- Visualize data dispersion: The distribution of points along the A-axis gives a sense of the spread of expression levels and any patterns or anomalies in the dataset.
 
+```{r after_lfc_shrink, results='asis', message=F, warning=F}
+for (contrast in names(de_list)){
+  cat("### ", contrast, "\n\n")
+  p1=degMA(as.DEGSet(de_list[[contrast]]$lfc)) + ggtitle('Before LFC Shrinking')
+  print(p1)
+  p2=degMA(as.DEGSet(de_list[[contrast]]$lfcs), limit = 2) + ggtitle('After LFC Shrinking')
+  print(p2)
+  cat("\n\n")
+}
 ```
 
-## Volcano plot
+## Volcano plot {.tabset}
 
 This volcano plot shows the genes that are significantly up- and down-regulated as a result of the analysis comparison. The points highlighted in red are genes that have padj < 0.05 and a log2-fold change > 1. Points in blue have a padj < 0.05 and a log2-fold change < 1 and points in green have a padj > 0.05 and a log2-fold change > 2. Grey points are non-significant. The dashed lines correspond to the cutoff values of log2 foldchance and padj that we have chosen.
 
-```{r volcano_plot, fig.height=6}
+```{r volcano_plot, fig.height=6, results='asis'}
 # degVolcano(res_mod[,c('lfc', 'padj')], plot_text = show) 
-EnhancedVolcano(res_mod,
-                lab= res_mod$gene_name, 
-                pCutoff = 0.05, 
-                selectLab = c(res_sig$gene_name[1:15]),
-                FCcutoff = 0.5,
-                x = 'lfc',
-                y = 'padj', 
-                title="Volcano Tumor vs. Normal",
-                col=as.vector(colors[c("dark_grey", "light_blue",
+for (contrast in names(de_list)){
+  cat("### ", contrast, "\n\n")
+  res <- de_list[[contrast]][["all"]]
+  res_mod <- res %>% mutate(lfc = replace(lfc, lfc < -5, -5)) %>% mutate(lfc = replace(lfc, lfc > 5, 5))
+  show <- as.data.frame(res_mod[1:10, c("lfc", "padj", "gene_name")])
+  p1=EnhancedVolcano(res_mod,
+                  lab= res_mod$gene_name, 
+                  pCutoff = 0.05, 
+                  selectLab = c(show$gene_name),
+                  FCcutoff = 0.5,
+                  x = 'lfc',
+                  y = 'padj', 
+                  title=contrast,
+                  col=as.vector(colors[c("dark_grey", "light_blue",
                                          "purple", "purple")]),
-                subtitle = "", drawConnectors = T,  max.overlaps = Inf) 
+                  subtitle = "", drawConnectors = T,  max.overlaps = Inf) 
+  print(p1)
+  cat("\n\n")
+}
 ```
 
-## Heatmap
+## Heatmap {.tabset}
 
-```{r heapmap}
+```{r heapmap, results='asis'}
 ### Run pheatmap using the metadata data frame for the annotation
-ma=norm_matrix[res_sig$gene_id,]
-colma=coldata[,c(column), drop=FALSE]
-colors=lapply(colnames(colma), function(c){
-  l.col=colors[1:length(unique(colma[[c]]))]
-  names(l.col)=unique(colma[[c]])
-  l.col
-})
-names(colors)=colnames(colma)
-pheatmap(ma, 
-         color = inferno(10), 
-         cluster_rows = T, 
-         show_rownames = F,
-         annotation = colma, 
-         annotation_colors = colors,
-         border_color = NA, 
-         fontsize = 10, 
-         scale = "row", 
-         fontsize_row = 10, 
-         height = 20)
+for (contrast in names(de_list)){
+  cat("### ", contrast, "\n\n")
+  res_sig = de_list[[contrast]][["sig"]]
+  ma=norm_matrix[res_sig$gene_id,]
+  colma=coldata[,c(column), drop=FALSE]
+  ma_colors=lapply(colnames(colma), function(c){
+    l.col=colors[1:length(unique(colma[[c]]))]
+    names(l.col)=unique(colma[[c]])
+    l.col
+  })
+  names(ma_colors)=colnames(colma)
+  p1=pheatmap(ma, 
+           color = inferno(10), 
+           cluster_rows = T, 
+           show_rownames = F,
+           annotation = colma, 
+           annotation_colors = ma_colors,
+           border_color = NA, 
+           fontsize = 10, 
+           scale = "row", 
+           fontsize_row = 10, 
+           height = 20)
+  print(p1)
+  cat("\n\n")
+}
 ```
 
 
-## Differentially Expressed Genes
+## Differentially Expressed Genes {.tabset}
 
-```{r sig_genes_table}
-res_sig %>% sanitize_datatable
+```{r sig_genes_table, results='asis'}
+dt_list=list()
+for (contrast in names(de_list)){
+  res_sig=de_list[[contrast]][["sig"]]
+  dt_list=c(dt_list, 
+            list(h3(contrast)), 
+            list(DT::datatable(res_sig)))
+}
+tagList(dt_list)
 ```
 
-## Plot top 16 genes
+## Plot top 16 genes {.tabset}
 
-```{r top n DEGs, fig.height = 6, fig.width = 8}
+```{r top n DEGs, fig.height = 6, fig.width = 8, results='asis'}
 n = 16
-top_n <- res_sig %>% slice_min(order_by = padj, n = n, with_ties = F) %>% 
-  dplyr::select(gene_name, gene_id)
-top_n_exp <- norm_matrix %>% as.data.frame() %>% 
-  rownames_to_column('gene_id') %>%
-  # dplyr::select(-group, -group_name) %>% 
-  pivot_longer(!gene_id, names_to = 'sample', values_to = 'log2_expression') %>%
-  right_join(top_n, relationship = "many-to-many") %>%
-  left_join(coldata, by = 'sample')
 
-ggplot(top_n_exp, aes_string(x = column, y = 'log2_expression')) +
-  geom_boxplot(outlier.shape = NA, linewidth=0.5, color="grey") + 
-  geom_point() +
-  facet_wrap(~gene_name) + 
-  ggtitle(str_interp('Expression of Top ${n} DEGs')) +
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
-
+for (contrast in names(de_list)){
+  cat("### ", contrast, "\n\n")
+  res_sig = de_list[[contrast]][["sig"]]
+  top_n <- res_sig %>% slice_min(order_by = padj, n = n, with_ties = F) %>% 
+    dplyr::select(gene_name, gene_id)
+  top_n_exp <- norm_matrix %>% as.data.frame() %>% 
+    rownames_to_column('gene_id') %>%
+    # dplyr::select(-group, -group_name) %>% 
+    pivot_longer(!gene_id, names_to = 'sample', values_to = 'log2_expression') %>%
+    right_join(top_n, relationship = "many-to-many") %>%
+    left_join(coldata, by = 'sample')
+  
+  p1=ggplot(top_n_exp, aes_string(x = column, y = 'log2_expression')) +
+    geom_boxplot(outlier.shape = NA, linewidth=0.5, color="grey") + 
+    geom_point() +
+    facet_wrap(~gene_name) + 
+    ggtitle(str_interp('Expression of Top ${n} DEGs')) +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+  print(p1)
+  cat("\n\n")
+}
 ```
 
 # Pathway Enrichment
@@ -495,80 +537,120 @@ ggplot(top_n_exp, aes_string(x = column, y = 'log2_expression')) +
 From the set of differentially expressed genes and using publicly available information about gene sets involved in biological processes and functions, we can calculate which biological processes and functions are significantly perturbed as a result of the treatment. 
 
 ```{r}
-universe=res %>% 
-  filter(!is.na(padj)) %>% pull(gene_id)
-mapping = AnnotationDbi::select(org.Hs.eg.db, universe, 'ENTREZID', 'ENSEMBL')
 
-all_in_life=list(
-  msigdbr(species = "human", category = "H") %>% mutate(gs_subcat="Hallmark"),
-  msigdbr(species = "human", category = "C2", subcategory = "CP:REACTOME"),
-  msigdbr(species = "human", category = "C2", subcategory = "CP:KEGG"),
-  msigdbr(species = "human", category = "C2", subcategory = "CP:PID"),
-  msigdbr(species = "human", category = "C5", subcategory = "GO:BP"),
-  msigdbr(species = "human", category = "C5", subcategory = "GO:MF"),
-  msigdbr(species = "human", category = "C5", subcategory = "HPO"),
-  msigdbr(species = "human", category = "C3", subcategory = "TFT:GTRD"),
-  msigdbr(species = "human", category = "C6") %>% mutate(gs_subcat="Oncogenic")
-)
+all_in_life=get_databases()
+```
 
-ora_input = res %>% filter(!is.na(padj), padj<0.01, abs(lfc)>0.3) %>% pull(gene_id)
-input_entrezid <- AnnotationDbi::select(org.Hs.eg.db, ora_input, 'ENSEMBL', columns = c('ENTREZID', 'SYMBOL'))
+# Pathway Analysis
 
-total_deg=length(unique(ora_input))/length(unique(mapping$ENTREZID))
-pathways_ora_all = lapply(all_in_life, function(p){
-  pathway = split(x = p$entrez_gene, f = p$gs_name)
-  db_name = paste(p$gs_cat[1], p$gs_subcat[1],sep=":")
-  respath <- fora(pathways = pathway, 
-                  genes = unique(input_entrezid$ENTREZID),
-                  universe = unique(mapping$ENTREZID),
-                  minSize  = 15,
-                  maxSize  = 500)
-  coll_respath = collapsePathwaysORA(respath[order(pval)][padj < 0.1], 
-                                     pathway, unique(input_entrezid$ENTREZID), unique(mapping$ENTREZID))
-  as_tibble(respath[pathway %in% coll_respath$mainPathways])  %>% 
-    mutate(database=db_name, NES=(overlap/size)/(total_deg))
-}) %>% bind_rows() %>% 
-  mutate(analysis="ORA")
+```{r, warning=F, message=F}
+fa_list=lapply(de_list,function(contrast){
   
-ora_tb = pathways_ora_all %>% unnest(overlapGenes) %>%
-  group_by(pathway) %>% 
-  left_join(mapping, by =c("overlapGenes"="ENTREZID")) %>% 
-  dplyr::select(pathway, padj, NES, ENSEMBL, analysis,
-                database)
+  res=contrast[["all"]]
+  universe=res %>% 
+    filter(!is.na(padj)) %>% pull(gene_id)
+  universe_mapping = AnnotationDbi::select(org.Hs.eg.db, universe, 'ENSEMBL', columns=c('ENTREZID', 'SYMBOL'))
+  
+  ora_input = res %>% filter(!is.na(padj), padj<0.01, abs(lfc)>0.3) %>% pull(gene_id)
+  #change to the right species
+  input_entrezid <- AnnotationDbi::select(org.Hs.eg.db, ora_input, 'ENSEMBL', columns = c('ENTREZID', 'SYMBOL'))
+  all=run_fora(input_entrezid, universe_mapping,all_in_life)
+  
+  ora_input = res %>% filter(!is.na(padj), padj<0.01, lfc>0.3) %>% pull(gene_id)
+  #change to the right species
+  input_entrezid <- AnnotationDbi::select(org.Hs.eg.db, ora_input, 'ENSEMBL', columns = c('ENTREZID', 'SYMBOL'))
+  up=run_fora(input_entrezid, universe_mapping,all_in_life)
 
-pathways_long = ora_tb
+  ora_input = res %>% filter(!is.na(padj), padj<0.01, lfc<0.3) %>% pull(gene_id)
+  #change to the right species
+  input_entrezid <- AnnotationDbi::select(org.Hs.eg.db, ora_input, 'ENSEMBL', columns = c('ENTREZID', 'SYMBOL'))
+  down=run_fora(input_entrezid, universe_mapping,all_in_life)
 
+  list(all=all,up=up,down=down)
+})
+```
+
+## All significant genes {.tabset}
+
+```{r, results='asis'}
+# NOTE DT::datatables doesn't work with tabset and for loops
+# You can use the following code to print dynamically or call manually sanitize_datatable()
+# multiple times
+dt_list=list()
+for (contrast in names(de_list)){
+  res_sig=fa_list[[contrast]][["all"]]
+  dt_list=c(dt_list, 
+            list(h3(contrast)), 
+            list(DT::datatable(res_sig)))
+}
+tagList(dt_list)
 ```
 
 
-```{r pathaways_table}
-pathways_ora_all %>% sanitize_datatable()
+## Down-regulated genes {.tabset}
+
+```{r, results='asis'}
+dt_list=list()
+for (contrast in names(de_list)){
+  res_sig=fa_list[[contrast]][["down"]]
+  dt_list=c(dt_list, 
+            list(h3(contrast)), 
+            list(DT::datatable(res_sig)))
+}
+tagList(dt_list)
 ```
 
 
-```{r write-files}
-counts_norm=norm_matrix %>% as.data.frame() %>% 
-  rownames_to_column("gene_id") %>% 
-  mutate(comparison = str_interp("${numerator}_vs_${denominator}"))
+## Up-regulated genes {.tabset}
 
-res_for_writing <- res %>% 
-  mutate(comparison = str_interp("${numerator}_vs_${denominator}"))
+```{r, results='asis'}
+dt_list=list()
+for (contrast in names(de_list)){
+  res_sig=fa_list[[contrast]][["up"]]
+  dt_list=c(dt_list, 
+            list(h3(contrast)), 
+            list(DT::datatable(res_sig)))
+}
+tagList(dt_list)
+```
 
-pathways_for_writing <- pathways_long %>% 
-  mutate(comparison = str_interp("${numerator}_vs_${denominator}"))
-         
-if (!is.null(subset_value)){
-  counts_norm <- counts_norm %>% 
-    mutate(subset = subset_value)  
-  res_for_writing <- res_for_writing %>% 
-    mutate(subset = subset_value)
-  pathways_for_writing <- pathways_for_writing %>% 
-    mutate(subset = subset_value)
+
+# Save files
+
+```{r write_files}
+if (!is.null(subset_value) & !is.null(subset_value)){
+  filenames = str_interp("${subset_value}")
+} else {
+  filenames = ""
+}
+for (contrast in names(contrasts)){
+  filenames = paste0(filenames, "_", contrast)
+  name_expression_fn=file.path(
+    basedir,
+    str_interp("${filenames}_expression.csv"))
+  
+  name_deg_fn=file.path(
+    basedir,
+    str_interp("${filenames}_deg.csv"))
+  
+  name_pathways_fn=file.path(
+    basedir,
+    str_interp("${filenames}_pathways.csv"))
+
+  counts_norm=norm_matrix %>% as.data.frame() %>% 
+    rownames_to_column("gene_id") %>% 
+    mutate(comparison = contrast)
+  
+  res_for_writing <- de_list[[contrast]][["all"]] %>% 
+    mutate(comparison = contrast)
+  
+  pathways_for_writing <- fa_list[[contrast]][["all"]] %>% 
+    mutate(comparison = contrast)
+  write_csv(counts_norm, name_expression_fn)
+  write_csv(res_for_writing, name_deg_fn)
+  write_csv(pathways_for_writing, name_pathways_fn)
 }
 
-write_csv(counts_norm, name_expression_fn)
-write_csv(res_for_writing, name_deg_fn)
-write_csv(pathways_for_writing, name_pathways_fn)
 ```
 
 # R session
