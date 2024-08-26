@@ -8,11 +8,16 @@ load_metrics <- function(multiqc_data_dir){
   # simply removing T1 is not the correct way to do it 
   fastqc <- read_tsv(file.path(multiqc_data_dir, 'multiqc_fastqc.txt')) %>% clean_names() %>%
     dplyr::select(sample, total_reads = total_sequences) %>%
-    mutate(sample = gsub('_T1', '', sample))
+    mutate(new_sample = gsub('_T[0-9]+', '', sample)) %>%
+    group_by(new_sample) %>% 
+    summarize(new_total_reads = sum(total_reads)) %>%
+    dplyr::select(sample = new_sample, total_reads = new_total_reads)
   samtools <- read_tsv(file.path(multiqc_data_dir, 'multiqc_samtools_stats.txt')) %>% clean_names() %>%
     dplyr::select(sample, mapped_reads = reads_mapped) %>%
-    mutate(sample = gsub('_T1', '', sample))
-  
+    mutate(new_sample = gsub('_T[0-9]+', '', sample)) %>%
+    group_by(new_sample) %>% 
+    summarize(new_mapped_reads = sum(mapped_reads)) %>%
+    dplyr::select(sample = new_sample, mapped_reads = new_mapped_reads)
   
   phantom <- read_tsv(file.path(multiqc_data_dir, 'multiqc_phantompeakqualtools.txt')) %>% clean_names() %>%
     dplyr::select(sample, nsc, rsc)
