@@ -5,13 +5,16 @@ date: "`r Sys.Date()`"
 params:
   ## If you have Ribosomal ratio in your raw seurat object put this as TRUE otherwise leave as FALSE
   ribosomal: FALSE
+  params_file: parameters.R
+  project_file: ../information.R
 ---
 
 # Overview
 
--   Project: project
--   PI: PI
--   Analyst: analyst
+-   Project: `r project`
+-   PI: `r PI`
+-   Analyst: `r analyst`
+-   Experiment: `r experiment`
 
 
 ```{r, eval=FALSE}
@@ -19,17 +22,26 @@ params:
 
 # This is a template for scRNA QC to present to your client. The actual QC can be done using our rshiny app: 
 
-# After you have decided on your QC metrics load your raw object (i.e. right after you first read data into seurat) and create your QC object by editing lines 49-67.
+# After you have decided on your QC metrics load your raw object (i.e. right after you first read data into seurat) and put the parameters.R file you got from the shiny app in the same folder as this rmd.
 
-# Edit text line 246 with your chosen QC cutoffs!
 ```
 
+
+
+```{r}
+# This set up the working directory to this file so all files can be found
+library(rstudioapi)
+setwd(fs::path_dir(getSourceEditorContext()$path))
+```
 
 
 ```{r setup, include=FALSE}
 library(Seurat)
 library(tidyverse)
 library(ggplot2)
+
+# 1. Set up input files in this R file (params_de.R)
+source(params$params_file)
 
 knitr::opts_chunk[["set"]](
     cache = FALSE,
@@ -46,7 +58,7 @@ knitr::opts_chunk[["set"]](
 
 
 
-```{r load and filter}
+```{r load and filter no ribo}
 ## Load data
 
 seurat_raw <- seurat_clust <- readRDS("seurat_pre-filtered.rds")
@@ -54,20 +66,36 @@ seurat_raw <- seurat_clust <- readRDS("seurat_pre-filtered.rds")
 ## Creat QC object USE METRICS YOU CHOSE IN THE RSHINY APP
 
 seurat_qc <- subset(x = seurat_raw,
-                    subset = (nCount_RNA >= 1500)
-                    & (nFeature_RNA >= 2200) 
-                    & (mitoRatio < 0.1)
-                ##  & (riboRatio < 0.4)  
-                    & (Log10GenesPerUMI > 0.80)
+                    subset = (nCount_RNA >= nCount_RNA_cutoff)
+                    & (nFeature_RNA >= nFeature_RNA_cutoff) 
+                    & (mitoRatio < mitoRatio_cutoff)
+                ##  & (riboRatio < riboRatio_cutoff)  
+                    & (Log10GenesPerUMI > Log10GenesPerUMI_cutoff)
                     )
 
 
-## Save QC object
+```
 
-saveRDS(seurat_qc, file = "seurat_post-QC.rds")
+
+```{r load and filter ribo, eval=ribosomal, warning=FALSE, results='asis'}
+
+seurat_qc <- subset(x = seurat_raw,
+                    subset = (nCount_RNA >= nCount_RNA_cutoff)
+                    & (nFeature_RNA >= nFeature_RNA_cutoff) 
+                    & (mitoRatio < mitoRatio_cutoff)
+                    & (riboRatio < riboRatio_cutoff)  
+                    & (Log10GenesPerUMI > Log10GenesPerUMI_cutoff)
+                    )
 
 ```
 
+
+```{r}
+
+## Save QC object
+saveRDS(seurat_qc, file = "seurat_post-QC.rds")
+
+```
 
 
 ```{r prep-info}
@@ -243,7 +271,7 @@ metadata0 %>%
 
 # QC metrics: Filtered data {.tabset}
 
-Based on the above QC metrics, we filtered the dataset to isolate cells passing the following thresholds: **>250 UMIs, >250 genes, <0.2 mitochondrial gene ratio, and >0.8 complexity**.
+Based on the above QC metrics, we filtered the dataset to isolate cells passing the following thresholds: >`nCount_RNA_cutoff` UMIs, >`nFeature_RNA_cutoff` genes, <`mitoRatio_cutoff` mitochondrial gene ratio, and >`Log10GenesPerUMI_cutoff` complexity.
 
 In this section, we review QC metrics for our filtered dataset.
 
@@ -391,10 +419,8 @@ metadata1 %>%
 ```
 
 
-
 # R session
 
 ```{r}
 sessionInfo()
 ```
-
