@@ -45,6 +45,10 @@ seurat_merge$mitoRatio <- seurat_merge@meta.data$mitoRatio/100 # Divide by 100 f
 # Number of genes per UMI for each cell
 seurat_merge$Log10GenesPerUMI <- log10(seurat_merge$nFeature_RNA) / log10(seurat_merge$nCount_RNA)
 
+# Extract cell level metadata
+metadata <- seurat_merge@meta.data
+metadata$barcode <- rownames(metadata)
+
 # Import experimental metadata
 metaexp <- read.csv("/path/to/experimental/metadata/meta.csv")
 
