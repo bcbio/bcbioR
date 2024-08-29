@@ -61,7 +61,7 @@ knitr::opts_chunk[["set"]](
 ```{r load and filter no ribo}
 ## Load data
 
-seurat_raw <- seurat_clust <- readRDS("seurat_pre-filtered.rds")
+seurat_raw <- readRDS("seurat_pre-filtered.rds")
 
 ## Creat QC object USE METRICS YOU CHOSE IN THE RSHINY APP
 
