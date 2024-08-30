@@ -65,6 +65,8 @@ library(DT)
 library(pheatmap)
 library(bcbioR)
 library(janitor)
+library(ChIPpeakAnno)
+library(UpSetR)
 ggplot2::theme_set(theme_light(base_size = 14))
 opts_chunk[["set"]](
     cache = FALSE,
@@ -323,7 +325,7 @@ pca2 + scale_color_cb_friendly()
 
 ```
 
-# Sample Concordance {.tabset}
+# Peak Signal Concordance {.tabset}
 
 ## Peak enrichment vs. Peak rank
 
@@ -346,6 +348,51 @@ ggplot(peaks, aes(x = peak_enrichment, fill = .data[[params$factor_of_interest]]
   geom_histogram(aes(peak_enrichment)) +
   scale_fill_cb_friendly() +
   xlab("Peak enrichment")
+
+```
+
+# Peak Overlap {.tabset}
+
+We examine the amount of overlap between peaks in replicates of the same experimental condition. 
+
+``` {r peak overlap, results = 'asis', fig.width = 8}
+
+for (current_sample_group in unique(peaks$sample_group)){
+  cat("## ", current_sample_group, "\n")
+
+  peaks_sample_group <- peaks %>% filter(sample_group == current_sample_group)
+  
+  peaks_sample_group_granges <- sapply(
+    unique(peaks_sample_group$sample), 
+    function(current_sample) {
+      ChIPpeakAnno::toGRanges(
+        peaks_sample_group %>% filter(sample == current_sample),
+        format = ifelse(grepl('broadPeak', peaks_dir), 'broadPeak', 'narroPeak')
+      )
+    }
+  )
+  
+  # maxgap defaults to -1 which means that two peaks will be merged if they overlap by    at least 1 bp
+  # connectedpeaks examples (https://support.bioconductor.org/p/133486/#133603), if 5     peaks in group1 overlap with 2 peaks in group 2, setting connectedPeaks to "merge"      will add 1 to the overlapping counts
+  overlaps <- findOverlapsOfPeaks(peaks_sample_group_granges, connectedPeaks = 'merge')
+  
+  set_counts <- overlaps$venn_cnt[, colnames(overlaps$venn_cnt)] %>% 
+    as.data.frame() %>% 
+    mutate(group_number = row_number()) %>%
+    pivot_longer(!Counts & !group_number, names_to = 'sample', values_to = 'member') %>%
+    filter(member > 0) %>%
+    group_by(Counts, group_number) %>% 
+    summarize(group = paste(sample, collapse = '&'))
+  
+  set_counts_upset <- set_counts$Counts
+  names(set_counts_upset) <- set_counts$group
+
+  p <- upset(fromExpression(set_counts_upset), order.by = "freq", text.scale = 1.5)
+  print(p)
+  
+  cat('\n\n')
+
+}
 
 ```
 

@@ -80,9 +80,12 @@ load_peaks <- function(peaks_dir){
   names(peaks_fns) <- gsub('_peaks.broadPeak', '', peaks_fns)
   peaks_all <- lapply(peaks_fns, function(fn) {
     peaks <- read_delim(file.path(peaks_dir, fn), col_names = F)
-    peaks_df <- data.frame(peak_enrichment = peaks$X7, peak_rank = rank(dplyr::desc(peaks$X7))) %>% 
+    peaks_df <- data.frame(seqnames = peaks$X1, start = peaks$X2, end = peaks$X3,
+                           peak_enrichment = peaks$X7, peak_rank = rank(dplyr::desc(peaks$X7))) %>% 
       dplyr::arrange(peak_rank)
     return(peaks_df)
   }) %>% bind_rows(.id = 'sample')
+  peaks_all$sample_group <- gsub('_REP[0-9]+', '', peaks_all$sample)
+  
   return(peaks_all)
 }
