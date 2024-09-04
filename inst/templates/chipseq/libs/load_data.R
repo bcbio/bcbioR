@@ -3,9 +3,7 @@ library(SummarizedExperiment)
 library(janitor)
 load_metrics <- function(multiqc_data_dir){
   
-  # the reading-in of these next two files needs changing in order to correctly 
-  # account for samples that have been sequenced multiple times.
-  # simply removing T1 is not the correct way to do it 
+
   fastqc <- read_tsv(file.path(multiqc_data_dir, 'multiqc_fastqc.txt')) %>% clean_names() %>%
     dplyr::select(sample, total_reads = total_sequences) %>%
     mutate(new_sample = gsub('_T[0-9]+', '', sample)) %>%
