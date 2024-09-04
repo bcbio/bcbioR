@@ -367,7 +367,7 @@ for (current_sample_group in unique(peaks$sample_group)){
     function(current_sample) {
       ChIPpeakAnno::toGRanges(
         peaks_sample_group %>% filter(sample == current_sample),
-        format = ifelse(grepl('broadPeak', peaks_dir), 'broadPeak', 'narroPeak')
+        format = ifelse(grepl('broadPeak', peaks_dir), 'broadPeak', 'narrowPeak')
       )
     }
   )

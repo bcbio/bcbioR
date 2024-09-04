@@ -76,8 +76,13 @@ load_counts <- function(counts_fn){
 }
 
 load_peaks <- function(peaks_dir){
-  peaks_fns <- list.files(peaks_dir, pattern = '_peaks.broadPeak')
-  names(peaks_fns) <- gsub('_peaks.broadPeak', '', peaks_fns)
+  if(grepl('broadPeak', peaks_dir)){
+    peaks_fns <- list.files(peaks_dir, pattern = '_peaks.broadPeak')
+    names(peaks_fns) <- gsub('_peaks.broadPeak', '', peaks_fns)
+  } else {
+    peaks_fns <- list.files(peaks_dir, pattern = '_peaks.narrowPeak')
+    names(peaks_fns) <- gsub('_peaks.narrowPeak', '', peaks_fns)
+  }
   peaks_all <- lapply(peaks_fns, function(fn) {
     peaks <- read_delim(file.path(peaks_dir, fn), col_names = F)
     peaks_df <- data.frame(seqnames = peaks$X1, start = peaks$X2, end = peaks$X3,
