@@ -29,7 +29,7 @@ get_databases=function(){
     #  msigdbr(species = "human", category = "C3", subcategory = "TFT:GTRD"),
     #  msigdbr(species = "human", category = "C6") %>% mutate(gs_subcat="Oncogenic")
   )
-all_in_life
+  all_in_life
 }
 
 run_fora_v2=function(input, uni, all_in_life){
@@ -72,9 +72,9 @@ run_fora=function(input, uni,all_in_life){
                     universe = unique(uni$ENTREZID),
                     minSize  = 15,
                     maxSize  = 500)
-    coll_respath = collapsePathwaysORA(respath[order(pval)][padj < 0.1],
-                                       pathway, unique(input$ENTREZID), unique(uni$ENTREZID))
-    as_tibble(respath[pathway %in% coll_respath$mainPathways])  %>%
+    # coll_respath = collapsePathwaysORA(respath[order(pval)][padj < 0.1],
+    #                                    pathway, unique(input$ENTREZID), unique(uni$ENTREZID))
+    as_tibble(respath)  %>%
       mutate(database=db_name, NES=(overlap/size)/(total_deg))
   }) %>% bind_rows() %>%
     mutate(analysis="ORA")
@@ -86,5 +86,32 @@ run_fora=function(input, uni,all_in_life){
     group_by(pathway,padj,NES,database,analysis) %>%
     summarise(genes=paste(SYMBOL,collapse = ","))
   ora_tb
+
+}
+
+run_fgsea=function(input, all_in_life){
+  # browser()
+  input_gsea <- input$lfc
+  names(input_gsea) <- input$ENTREZID
+  pathways_all = lapply(all_in_life, function(p){
+    pathway = split(x = p$entrez_gene, f = p$gs_name)
+    db_name = paste(p$gs_cat[1], p$gs_subcat[1],sep=":")
+    respath <- fgsea(pathways = pathway,
+                     stats = input_gsea,
+                     minSize  = 15,
+                     maxSize  = 500)
+
+    as_tibble(respath)  %>%
+      mutate(database=db_name)
+  }) %>% bind_rows() %>%
+    mutate(analysis="GSEA")
+  tb = pathways_all %>% unnest(leadingEdge) %>%
+    group_by(pathway) %>%
+    left_join(input, by =c("leadingEdge"="ENTREZID")) %>%
+    dplyr::select(pathway, padj, size, NES, SYMBOL, analysis,
+                  database) %>%
+    group_by(pathway, padj, size, NES, database, analysis) %>%
+    summarise(genes=paste(SYMBOL,collapse = ","))
+  tb
 
 }
