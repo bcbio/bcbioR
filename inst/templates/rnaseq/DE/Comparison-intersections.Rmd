@@ -20,29 +20,6 @@ params:
   project_file: ../information.R
 ---
 
-```{r load_params, cache = FALSE, message = FALSE, warning=FALSE}
-## Adjusted P-value used for significance
-padj_co <- 0.05
-## Log2FC used for significance. If no cutoff used put 0
-LFC <- 0.5
-## Normalized counts for ALL samples
-# norm <- "/Users/emb016/Documents/comparisons_templates/norm_counts.csv"
-# Load the count data, for this example it is the last columns of the DE table
-norm_counts <- read.csv("https://raw.githubusercontent.com/bcbio/bcbioR-test-data/main/rnaseq/cross-comparison/norm_counts.csv.gz",
-         row.names = 1)
-
-# Load the meta data, here we are making one for the exmaple
-metadata <- read_csv("https://raw.githubusercontent.com/bcbio/bcbioR-test-data/main/rnaseq/cross-comparison/meta.csv.gz") %>% as.data.frame()
-
-## Full results file (all genes) for contrast 1
-files=c("https://raw.githubusercontent.com/bcbio/bcbioR-test-data/main/rnaseq/cross-comparison/all_results_DMSO_vs_Group1.csv.gz",
-      "https://raw.githubusercontent.com/bcbio/bcbioR-test-data/main/rnaseq/cross-comparison/all_results_DMSO_vs_Group2.csv.gz",
-      "https://raw.githubusercontent.com/bcbio/bcbioR-test-data/main/rnaseq/cross-comparison/all_results_DMSO_vs_Group3.csv.gz")
-
-```
-
-
-
 ```{r load_libraries, cache = FALSE, message = FALSE, warning=FALSE}
 library(rtracklayer)
 library(tidyverse)
@@ -82,6 +59,27 @@ set.seed(1234567890L)
 ```
 
 
+```{r load_params, cache = FALSE, message = FALSE, warning=FALSE}
+## Adjusted P-value used for significance
+padj_co <- 0.05
+## Log2FC used for significance. If no cutoff used put 0
+LFC <- 0.5
+## Normalized counts for ALL samples
+# norm <- "/Users/emb016/Documents/comparisons_templates/norm_counts.csv"
+# Load the count data, for this example it is the last columns of the DE table
+norm_counts <- read.csv("https://raw.githubusercontent.com/bcbio/bcbioR-test-data/main/rnaseq/cross-comparison/norm_counts.csv.gz",
+         row.names = 1)
+
+# Load the meta data, here we are making one for the exmaple
+metadata <- read_csv("https://raw.githubusercontent.com/bcbio/bcbioR-test-data/main/rnaseq/cross-comparison/meta.csv.gz") %>% as.data.frame()
+
+## Full results file (all genes) for contrast 1
+files=c("https://raw.githubusercontent.com/bcbio/bcbioR-test-data/main/rnaseq/cross-comparison/all_results_DMSO_vs_Group1.csv.gz",
+      "https://raw.githubusercontent.com/bcbio/bcbioR-test-data/main/rnaseq/cross-comparison/all_results_DMSO_vs_Group2.csv.gz",
+      "https://raw.githubusercontent.com/bcbio/bcbioR-test-data/main/rnaseq/cross-comparison/all_results_DMSO_vs_Group3.csv.gz")
+
+```
+
 # Load Data
 
 We load our dataset
@@ -111,9 +109,7 @@ sign_genes=lapply(names(files), function(name){
 ```
 
 
-
 # Make list of comparisons
-
 
 ```{r, fig.height=8, fig.width=8, warning=FALSE, error=FALSE, message=FALSE}
 de=lapply(sign_genes, function(x){
@@ -126,16 +122,13 @@ names(de) <- comp_names
 
 Because we have done so many tests venn diagrams no longer work for our data. Instead we will use upset plots. *These plots are relatively intuitive for 2 or 3 categories, but can tend to get more complex for >3 categories. In all cases, you will find the categories being compared and their size listed below the bar plots on the left. As you look to the right (directly below each bar) there are dots with connecting lines that denote which categories the overlap is between, or if there is no overlap (just a dot). The numbers at the top of the bars denote the size of the overlap.*
 
-
 ```{r, fig.height=8, fig.width=12}
 upset(fromList(de), order.by = "freq", nsets=N)
-
 ```
 
 ## Pull intersect(s) of interest
 
 After identifying intersect(s) of interest we can determine which genes are found in which intersections
-
 
 ```{r, warning=FALSE, error=FALSE, message=FALSE}
 ## Grab intersection
@@ -158,38 +151,34 @@ df_int <- lapply(gene_names$gene,function(x){
 }) %>%  bind_rows()
 ```
 
-
 ```{r, eval=F}
 ## Run this code to find the name of your intersect of interest. You will use this in the next code chunk
 table(df_int$int)
 ```
 
 ```{r, warning=FALSE, error=FALSE, message=FALSE}
-## subset interaction of interest replace the intersect name with the name of the intersect from above. You can copy and paste the below commands to grab multiple intersects.
+## NOTE: subset interaction of interest replace the intersect name with the name of the intersect from above. You can copy and paste the below commands to grab multiple intersects.
 
 Intersect1 <- subset(df_int, df_int$int=="DMSO vs Group2|DMSO vs Group3")
 ```
 
 ## Get annotation data
-```{r, warning=FALSE, error=FALSE, message=FALSE}
 
-# edit this to be the correct organism. One set of annotations per intersect.
+```{r, warning=FALSE, error=FALSE, message=FALSE}
+# NOTE: edit this to be the correct organism. One set of annotations per intersect.
 # rdata = AnnotationDbi::select(org.Hs.eg.db, Intersect1$gene, 'SYMBOL', 'ENSEMBL') %>%
 #   dplyr::select(gene_id = ENSEMBL, gene_name = SYMBOL) %>%  distinct(gene_id, .keep_all = T)
 
-# FIX: following code is only for test data, use the above with real data
+# NOTE: following code is only for test data, use the above with real data
 rdata=data.frame(gene_id=row.names(norm_counts), gene_name=row.names(norm_counts))
 ```
-
-
 
 ## Heatmap of intersect
 
 We generate a heatmap with all samples to see the patterns contained in this intersect. 
 
 ```{r, fig.height=6, warning=FALSE, error=FALSE, message=FALSE}
-## Assign factors of interest. These need to correspond to columns in your metadata.
-
+## NOTE: Assign factors of interest. These need to correspond to columns in your metadata.
 factor1 <- "Treatment"
 factor2 <- "Cell_line"
 
@@ -223,13 +212,12 @@ pheatmap(norm_sig,
     height = 20)
 ```
 
-
-## Graph all genes in intersect
+## Graph genes in intersect
 
 ```{r, warning=FALSE, error=FALSE, message=FALSE}
 Intersect1_annot <- Intersect1 %>% left_join(rdata, by=c("gene"="gene_id"))
 # REMOVE to plot all
-Intersect1_annot <- Intersect1_annot[1:10]
+Intersect1_annot <- Intersect1_annot[1:10,]
 
 graphs <- length(Intersect1_annot$gene)
 to_test <- t(norm_counts)
@@ -245,7 +233,8 @@ to_graph$Factor2 <- metadata[,factor2]
 for (i in seq(1,graphs)) {
   to_graph$temp=to_graph[[i]]
   print(ggplot(to_graph,aes(x=Factor1,y=temp,color=Factor2)) +
-    geom_boxplot() + geom_point(alpha=0.5) +  ylab(paste0(names[[i]]))  + xlab(factor1) +  scale_color_discrete(name = "Covariate"))
+    geom_boxplot() + geom_point(alpha=0.5, position = position_dodge(width = .75)) +
+      ylab(paste0(names[[i]]))  + xlab(factor1) +  scale_color_discrete(name = "Covariate"))
 }
 ```
 
