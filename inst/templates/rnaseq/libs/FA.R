@@ -1,30 +1,38 @@
-# library(msigdb)
-# msigdb.hs = getMsigdb(org = 'hs', id = 'SYM', version = '7.5')
-#
-# get_databases_v2=function(){
-#   all_in_life=list(
-#     GOBP=subsetCollection(msigdb.hs, 'c5', 'GO:BP'),
-#     GOMF=subsetCollection(msigdb.hs, 'c5', 'GO:MF'),
-#     HALLMARK=subsetCollection(msigdb.hs, 'h'),
-#     KEGG=subsetCollection(msigdb.hs, 'c2', 'CP:KEGG')
-#   ) %>% lapply(., function(geneset){
-#     gs=lapply(geneset, function(x){
-#       geneIds(x)
-#     })
-#     names(gs)=sapply(geneset, setName)
-#     gs
-#   })
-#   all_in_life
-# }
+library(msigdbr)
+library(clusterProfiler)
 
-get_databases=function(){
+get_databases_v2=function(sps=human){
+  gmt.files=list(human=c("h.all.v2024.1.Hs.entrez.gmt",
+                         "c5.go.v2024.1.Hs.entrez.gmt",
+                         "c5.go.mf.v2024.1.Hs.entrez.gmt",
+                         "c5.go.cc.v2024.1.Hs.entrez.gmt",
+                         "c5.go.bp.v2024.1.Hs.entrez.gmt",
+                         "c2.cp.reactome.v2024.1.Hs.entrez.gmt",
+                         "c2.cp.kegg_legacy.v2024.1.Hs.entrez.gmt"),
+                 mouse=c("mh.all.v2024.1.Mm.entrez.gmt",
+                         "m5.go.v2024.1.Mm.entrez.gmt",
+                         "m5.go.mf.v2024.1.Mm.entrez.gmt",
+                         "m5.go.cc.v2024.1.Mm.entrez.gmt",
+                         "m5.go.bp.v2024.1.Mm.entrez.gmt",
+                         "m2.cp.reactome.v2024.1.Mm.entrez.gmt",
+                         "m2.cp.kegg_legacy.v2024.1.Mm.entrez.gmt"))
+  all_in_life=lapply(gmt.files[[sps]], function(gmt){
+    df=read.gmt(file.path(source,gmt))
+    names(df)=c("gs_name", "entrez_gene")
+    df
+  })
+  names(all_in_life) = str_remove(gmt.files[[sps]], ".v2024.*$")
+  all_in_life
+}
+
+get_databases=function(sps="human"){
   all_in_life=list(
-    msigdbr(species = "human", category = "H") %>% mutate(gs_subcat="Hallmark"),
+    msigdbr(species = sps, category = "H") %>% mutate(gs_subcat="Hallmark"),
     #  msigdbr(species = "human", category = "C2", subcategory = "CP:REACTOME"),
-    msigdbr(species = "human", category = "C2", subcategory = "CP:KEGG"),
+    msigdbr(species = sps, category = "C2", subcategory = "CP:KEGG"),
     #  msigdbr(species = "human", category = "C2", subcategory = "CP:PID"),
-    msigdbr(species = "human", category = "C5", subcategory = "GO:BP"),
-    msigdbr(species = "human", category = "C5", subcategory = "GO:MF")
+    msigdbr(species = sps, category = "C5", subcategory = "GO:BP"),
+    msigdbr(species = sps, category = "C5", subcategory = "GO:MF")
     #  msigdbr(species = "human", category = "C5", subcategory = "HPO"),
     #  msigdbr(species = "human", category = "C3", subcategory = "TFT:GTRD"),
     #  msigdbr(species = "human", category = "C6") %>% mutate(gs_subcat="Oncogenic")
