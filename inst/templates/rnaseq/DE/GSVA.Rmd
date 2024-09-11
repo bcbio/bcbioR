@@ -23,8 +23,9 @@ params:
   project_file: ../information.R
   params_file: params_de-example.R
   functions_file: ../libs
-  # if working on o2, select from gene set repository at /n/app/bcbio/platform/gene_sets/20240904
-  geneset_fn: ~/Downloads/h.all.v2024.1.Hs.entrez.gmt
+  # select from gene set repository at https://github.com/bcbio/resources/tree/main/gene_sets/gene_sets
+  # choose geneset, click "Raw', and copy url
+  geneset_fn: https://raw.githubusercontent.com/bcbio/resources/main/gene_sets/gene_sets/20240904/human/h.all.v2024.1.Hs.entrez.gmt
 ---
 ```{r libraries, message = FALSE, warning=FALSE}
 # path to libraries if working on O2
@@ -46,6 +47,7 @@ library(ggprism)
 library(knitr)
 library(rstudioapi)
 library(tidyverse)
+library(clusterProfiler)
 
 colors=cb_friendly_cols(1:15)
 ggplot2::theme_set(theme_prism(base_size = 14))
@@ -110,6 +112,12 @@ counts <- counts[,colnames(counts) %in% coldata$sample]
 
 ```
 
+# Method
+
+Gene Set Variation Analysis (GSVA) is a non-parametric, unsupervised method for estimating variation of gene set enrichment through the samples of a expression data set. GSVA performs a change in coordinate systems, transforming the data from a gene by sample matrix to a gene-set by sample matrix, thereby allowing the evaluation of pathway enrichment for each sample. This new matrix of GSVA enrichment scores facilitates applying standard analytical methods like functional enrichment, survival analysis, clustering, CNV-pathway analysis or cross-tissue pathway analysis, in a pathway-centric manner. More info in the vignette [here](https://bioconductor.org/packages/release/bioc/vignettes/GSVA/inst/doc/GSVA.html).
+
+Hänzelmann S, Castelo R, Guinney J (2013). “GSVA: gene set variation analysis for microarray and RNA-Seq data.” BMC Bioinformatics, 14, 7. doi:10.1186/1471-2105-14-7, [https://doi.org/10.1186/1471-2105-14-7](https://doi.org/10.1186/1471-2105-14-7)
+
 # Data
 
 ```{r show_coldata}
@@ -146,15 +154,10 @@ rownames(counts_entrez) <- entrezid
 
 ```{r load_genesets}
 
-gene_sets = read_table(params$geneset_fn, col_names = F)
-names(gene_sets)[1:2] <- c('pathway', 'url')
+# gene_sets = read_table(params$geneset_fn, col_names = F)
+gene_sets <- read.gmt(params$geneset_fn)
 
-gene_sets_long = gene_sets %>% 
-  dplyr::select(-url) %>% 
-  pivot_longer(!pathway, names_to = 'column_num', values_to = 'entrez_id') %>%
-  filter(!is.na(entrez_id))
-
-genes_by_pathway <- split(gene_sets_long$entrez_id, gene_sets_long$pathway)
+genes_by_pathway <- split(gene_sets$gene, gene_sets$term)
 
 ```
 
@@ -185,23 +188,34 @@ res %>% sanitize_datatable()
 scores <- t(gsva.es)
 
 sig <- subset(res, res$adj.P.Val < 0.1)
-pathways <- rownames(sig)[1:5]
 
-to_graph = data.frame(scores[,pathways]) %>% rownames_to_column('sample') %>%
-  pivot_longer(!sample, names_to = 'pathway', values_to = 'enrichment_score')
-to_graph <- left_join(to_graph, coldata)
+if(nrow(sig) >= 5){
+  pathways <- rownames(sig)[1:5]
+} else if(nrow(sig) == 0) {
+  pathways <- c()
+} else {
+  pathways <- rownames(sig)
+}
 
-for (single_pathway in pathways) {
+if (length(pathways) > 0){
+  to_graph = data.frame(scores[,pathways]) %>% rownames_to_column('sample') %>%
+    pivot_longer(!sample, names_to = 'pathway', values_to = 'enrichment_score')
+  to_graph <- left_join(to_graph, coldata)
   
-  cat('### ', single_pathway, '\n')
-  
-  to_graph_single_pathway <- to_graph %>% filter(pathway == single_pathway)
-  p <- ggplot(to_graph_single_pathway, aes(x = .data[[column]], y = enrichment_score)) + geom_boxplot() + 
-    geom_point(alpha=0.5) + ggtitle(single_pathway)
-  print(p)
-  
-  cat('\n\n')
-  
+  for (single_pathway in pathways) {
+    
+    cat('### ', single_pathway, '\n')
+    
+    to_graph_single_pathway <- to_graph %>% filter(pathway == single_pathway)
+    p <- ggplot(to_graph_single_pathway, aes(x = .data[[column]], y = enrichment_score)) + geom_boxplot() + 
+      geom_point(alpha=0.5) + ggtitle(single_pathway)
+    print(p)
+    
+    cat('\n\n')
+    
+  }
+} else {
+  cat('No pathways were detected as significantly enriched')
 }
 
 ```
