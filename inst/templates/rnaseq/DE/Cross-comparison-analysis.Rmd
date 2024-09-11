@@ -20,31 +20,6 @@ params:
   project_file: ../information.R
 ---
 
-
-
-```{r load_params, cache = FALSE, message = FALSE, warning=FALSE}
-# 1. Set up input files in this R file (params_pairwisecomp.R)
-## Full results file (all genes) for contrastt 1
-comp1_fn <- 'https://raw.githubusercontent.com/bcbio/bcbioR-test-data/main/rnaseq/cross-comparison/all_results_DMSO_vs_Group1.csv.gz'
-## Name of contrast 1. This will be displayed on the figures
-comp1_name <- "DMSO vs. Group1"
-## Full results file (all genes) for contrast 2
-comp2_fn <- 'https://raw.githubusercontent.com/bcbio/bcbioR-test-data/main/rnaseq/cross-comparison/all_results_DMSO_vs_Group2.csv.gz'
-## Name of contrast 2. This will be displayed on the figures
-comp2_name <- "DMSO vs. Group2"
-## Adjusted P-value used for significance
-padj_co <- 0.05
-## Log2FC used for significance. If no cutoff used put 0
-LFC <- 0.5
-
-comp1 <- read_csv(comp1_fn) %>%
-        dplyr::filter(padj <= 1)
-comp2 <- read_csv(comp2_fn) %>%
-        dplyr::filter(padj <= 1)
-```
-
-
-
 ```{r load_libraries, cache = FALSE, message = FALSE, warning=FALSE}
 library(rtracklayer)
 library(tidyverse)
@@ -78,8 +53,30 @@ opts_chunk[["set"]](
 set.seed(1234567890L)
 ```
 
+# Compare two differential expression analysis
 
-# Load Data
+```{r load_params, cache = FALSE, message = FALSE, warning=FALSE}
+# 1. Set up input files in this R file (params_pairwisecomp.R)
+## Full results file (all genes) for contrastt 1
+comp1_fn <- 'https://raw.githubusercontent.com/bcbio/bcbioR-test-data/main/rnaseq/cross-comparison/all_results_DMSO_vs_Group1.csv.gz'
+## Name of contrast 1. This will be displayed on the figures
+comp1_name <- "DMSO vs. Group1"
+## Full results file (all genes) for contrast 2
+comp2_fn <- 'https://raw.githubusercontent.com/bcbio/bcbioR-test-data/main/rnaseq/cross-comparison/all_results_DMSO_vs_Group2.csv.gz'
+## Name of contrast 2. This will be displayed on the figures
+comp2_name <- "DMSO vs. Group2"
+## Adjusted P-value used for significance
+padj_co <- 0.05
+## Log2FC used for significance. If no cutoff used put 0
+LFC <- 0.5
+
+comp1 <- read_csv(comp1_fn) %>%
+        dplyr::filter(padj <= 1)
+comp2 <- read_csv(comp2_fn) %>%
+        dplyr::filter(padj <= 1)
+```
+
+## Load Data
 
 We load our dataset
 
@@ -93,7 +90,6 @@ comp1_sig <- comp1  %>%
 comp2_sig <- comp2  %>%
         dplyr::filter(padj < padj_co, abs(lfc) > LFC)
 ```
-
 
 
 # Comparisons
@@ -167,7 +163,6 @@ ggplot(lfc, aes(x=comp1, y=comp2, color=col)) + geom_point() +
   ylab(paste0("Log2FC in ",paste0(comp2_name)))
 
 ```
-
 
 
 ## Compare ajusted P-values
