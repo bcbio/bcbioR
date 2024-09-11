@@ -538,11 +538,55 @@ for (contrast in names(de_list)){
 From the set of differentially expressed genes and using publicly available information about gene sets involved in biological processes and functions, we can calculate which biological processes and functions are significantly perturbed as a result of the treatment. 
 
 ```{r}
-
-wiall_in_life=get_databases()
+all_in_life=get_databases()
 ```
 
-# Pathway Analysis
+# Pathway Analysis- GSEA
+
+Gene Set Enrichment Analysis (GSEA) is a computational method used to determine whether a predefined set of genes shows statistically significant, concordant differences between two biological states (e.g., disease vs. normal) in RNA-seq data or other types of gene expression data. Advantages of GSEA.
+
+- Biological Insight: Helps in understanding the underlying biological processes and pathways affected, rather than focusing on individual genes.
+- Incorporation of Prior Knowledge: Utilizes predefined gene sets, allowing integration of existing biological knowledge.
+- Contextual Relevance: Can reveal subtle but coordinated changes in biologically meaningful gene sets that might not be apparent when looking at individual genes.
+
+```{r, warning=F, message=F}
+fa_gsea_list=lapply(de_list,function(contrast){
+  
+  res=contrast[["all"]]
+  gsea_input = res %>% filter(!is.na(padj)) %>% dplyr::select(gene_id, lfc)
+  #change to the right species
+  input_entrezid <- AnnotationDbi::select(org.Hs.eg.db, gsea_input$gene_id, 'ENSEMBL', columns = c('ENTREZID', 'SYMBOL'))
+  input_entrezid <- inner_join(gsea_input, input_entrezid, by=c("gene_id"="ENSEMBL")) %>%
+    filter(!is.na(ENTREZID)) %>% 
+    distinct(ENTREZID, .keep_all=TRUE)
+  
+  tb = run_fgsea(input_entrezid, all_in_life)
+  tb %>%  filter(padj<0.05)
+ }) 
+```
+
+```{r, results='asis'}
+# NOTE DT::datatables doesn't work with tabset and for loops
+# You can use the following code to print dynamically or call manually sanitize_datatable()
+# multiple times
+dt_list=list()
+for (contrast in names(de_list)){
+  res_sig=fa_gsea_list[[contrast]]
+  dt_list=c(dt_list, 
+            list(h3(contrast)), 
+            list(sanitize_datatable(res_sig)))
+}
+tagList(dt_list)
+```
+
+
+# Pathway Analysis- Over-representation
+
+Over-Representation Analysis (ORA) is a statistical method used to determine whether a predefined set of genes (e.g., genes belonging to a specific biological pathway or function) is over-represented (or enriched) among a list of differentially expressed genes (DEGs) from RNA-seq data. Adventages of ORA:
+
+- Simplicity: Easy to perform and interpret.
+- Biological Insight: Helps to identify pathways and processes that are significantly affected in the condition studied.
+- Prior Knowledge Integration: Utilizes existing biological knowledge through predefined gene sets.
 
 ```{r, warning=F, message=F}
 fa_list=lapply(de_list,function(contrast){
@@ -582,7 +626,7 @@ for (contrast in names(de_list)){
   res_sig=fa_list[[contrast]][["all"]]
   dt_list=c(dt_list, 
             list(h3(contrast)), 
-            list(DT::datatable(res_sig)))
+            list(sanitize_datatable(res_sig)))
 }
 tagList(dt_list)
 ```
@@ -596,7 +640,7 @@ for (contrast in names(de_list)){
   res_sig=fa_list[[contrast]][["down"]]
   dt_list=c(dt_list, 
             list(h3(contrast)), 
-            list(DT::datatable(res_sig)))
+            list(sanitize_datatable(res_sig)))
 }
 tagList(dt_list)
 ```
@@ -610,7 +654,7 @@ for (contrast in names(de_list)){
   res_sig=fa_list[[contrast]][["up"]]
   dt_list=c(dt_list, 
             list(h3(contrast)), 
-            list(DT::datatable(res_sig)))
+            list(sanitize_datatable(res_sig)))
 }
 tagList(dt_list)
 ```
@@ -645,8 +689,11 @@ for (contrast in names(contrasts)){
   res_for_writing <- de_list[[contrast]][["all"]] %>% 
     mutate(comparison = contrast)
   
+  # NOTE choose what pathway to save, all, down or up, or everything, just
+  #.     need to add more lines
   pathways_for_writing <- fa_list[[contrast]][["all"]] %>% 
     mutate(comparison = contrast)
+  
   write_csv(counts_norm, name_expression_fn)
   write_csv(res_for_writing, name_deg_fn)
   write_csv(pathways_for_writing, name_pathways_fn)
