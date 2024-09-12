@@ -31,8 +31,10 @@ setwd("/path/to/analysis/folder")
 The following code will pop up a Rmd template will populate that folder with HCBC data structure guidelines
 
 ```
-bcbio_templates(path,pipeline="nf-core/rnaseq")
-bcbio_templates(path,pipeline="singlecell")
+path="/path/to/analysis/folder"
+bcbio_templates(type="base", outpath=path)
+bcbio_templates(type="rnaseq", outpath=path)
+bcbio_templates(type="singlecell", outpath=path)
 ```
 
 ### Set RNAseq report folder
@@ -79,3 +81,8 @@ Some best practices when developing:
 -   James Billingsley
 -   Zhu Zhuo
 -   Elizabeth Partan
+-   Noor Sohail
+-   Meeta Mistry
+-   Will Gammerdinger
+-   Upen Bhattarai
+-   Shannan Ho Sui
