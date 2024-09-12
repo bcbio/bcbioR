@@ -14,7 +14,6 @@ docs
 /Meta/
 .DS*
 inst/rmarkdown/templates/rnaseq/skeleton/DE/Multiplicative_DGE_Analysis.Rmd
-tests/*
 .Rdata
 .httr-oauth
 .DS_Store
