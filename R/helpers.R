@@ -187,6 +187,9 @@ copy_templates <- function(path, pipeline){
   #                  value = TRUE, invert = TRUE)
   # ui_info("{ui_value(length(ls_files))} amount of files to copy")
   copy_files_in_folder(analysis_template, path)
+  # check org folder is in there
+  # search for param + _README.md
+  # concat file to README.md
   deploy_apps(apps, path)
 }
 

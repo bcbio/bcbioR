@@ -17,8 +17,8 @@
 -   [ ] Use the same project name to create a folder in *Dropbox* and a repo in *GitHub*
 -   [ ] If you didn't provide the pipeline when creating this project:
         Use the function `bcbio_templates` to create templates inside `reports` for each type of analysis. For instance, for *RNAseq*:
-    -   `use_bcbio_analysis(".", 'nf-core/rnaseq', copy = TRUE)` or
-    -   `use_bcbio_analysis(".", 'singlecell', copy = TRUE)`
+    -   `bcbio_templates(type="rnaseq", outpath=path)` or
+    -   `bcbio_templates(type="singlecell", outpath=path)`
     -   Then go to that folder and read the `README.md`
 
 ## Folders
