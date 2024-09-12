@@ -126,6 +126,14 @@ bcbio_params <-function(nfcore_path, pipeline, metadata, copy){
 
 }
 
+detect_gitignores <- function(path){
+  gits <- fs::dir_ls(path, recurse = TRUE, regexp = 'gitignore')
+  sapply(gits, function(fn){
+    hidden <- file.path(dirname(fn), paste0(".", basename(fn)))
+    fs::file_move(fn, hidden)
+  })
+}
+
 copy_files_in_folder<- function(origin, remote){
   to_copy <- fs::dir_ls(origin,all = TRUE)
   to_copy <- grep("org", to_copy,
@@ -142,6 +150,7 @@ copy_files_in_folder<- function(origin, remote){
         fs::file_copy(element, full_new_path)
     }
   }
+  detect_gitignores(remote)
 }
 
 deploy_apps <- function(apps, path){
