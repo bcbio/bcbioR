@@ -203,7 +203,7 @@ metrics %>%
                fill = antibody)) +
     geom_bar(stat = "identity") +
     coord_flip() +
-    scale_y_continuous(name = "NSC coefficient") +
+    scale_y_continuous(name = "RSC coefficient") +
     scale_x_discrete(limits = rev) +
     scale_fill_cb_friendly() + xlab("") + 
     ggtitle("Relative Strand Cross-Correlation")
