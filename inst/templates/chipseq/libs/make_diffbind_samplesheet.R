@@ -1,6 +1,7 @@
 library(tidyverse)
 library(tools)
-
+library(DiffBind)
+library(qs)
 source('../libs/load_data.R')
 source('params_diffbind-example.R')
 
@@ -24,3 +25,8 @@ samplesheet <- coldata_for_diffbind %>%
   left_join(bam_files %>% select(SampleID = sample, bamReads = bam), by = 'SampleID') %>%
   left_join(bam_files %>% select(ControlID = sample, bamControl = bam), by = 'ControlID') %>%
   left_join(peak_files, by = 'SampleID')
+
+diffbind_obj <- dba(sampleSheet = samplesheet, scoreCol = 5)
+diffbind_count <- dba.count(diffbind_obj, bUseSummarizeOverlaps = TRUE)
+qsave(diffbind_count, 'diffbind_count.qs')
+
