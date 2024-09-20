@@ -1,9 +1,9 @@
 library(tidyverse)
 library(SummarizedExperiment)
 library(janitor)
+
 load_metrics <- function(multiqc_data_dir){
   
-
   fastqc <- read_tsv(file.path(multiqc_data_dir, 'multiqc_fastqc.txt')) %>% clean_names() %>%
     dplyr::select(sample, total_reads = total_sequences) %>%
     mutate(new_sample = gsub('_T[0-9]+', '', sample)) %>%
@@ -91,4 +91,26 @@ load_peaks <- function(peaks_dir){
   peaks_all$sample_group <- gsub('_REP[0-9]+', '', peaks_all$sample)
   
   return(peaks_all)
+}
+
+make_diffbind_samplesheet <- function(coldata, bam_dir, peaks_dir, column = NULL){
+  bam_files <- data.frame(bam = list.files(bam_dir, pattern = '.bam$', full.names = T)) %>%
+    mutate(sample = sub("\\..*", "",basename(bam)))
+  
+  peak_files <- data.frame(Peaks = list.files(peaks_dir, pattern = 'Peak$', full.names = T)) %>%
+    mutate(SampleID = sub("\\..*", "",basename(Peaks))) %>%
+    mutate(SampleID = gsub('_peaks', '', SampleID))
+  
+  coldata_for_diffbind <- coldata %>% 
+    filter(!is.na(control) & control != '') %>%
+    dplyr::rename(ControlID = control, SampleID = sample, Condition = antibody) %>% 
+    separate(SampleID, into = c('sample', 'Replicate'), remove = F, sep = '_REP') 
+  coldata_for_diffbind$Factor <- coldata_for_diffbind[[column]]
+  
+  samplesheet <- coldata_for_diffbind %>%
+    left_join(bam_files %>% select(SampleID = sample, bamReads = bam), by = 'SampleID') %>%
+    left_join(bam_files %>% select(ControlID = sample, bamControl = bam), by = 'ControlID') %>%
+    left_join(peak_files, by = 'SampleID')
+  
+  return(samplesheet)
 }

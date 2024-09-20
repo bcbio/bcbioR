@@ -1,0 +1,127 @@
+---
+title: "ChIPSeq DiffBind"
+author: "Harvard Chan Bioinformatics Core"
+date: "`r Sys.Date()`"
+output:
+   html_document:
+      code_folding: hide
+      df_print: paged
+      highlights: pygments
+      number_sections: true
+      self_contained: true
+      theme: default
+      toc: true
+      toc_float:
+         collapsed: true
+         smooth_scroll: true
+editor_options: 
+  chunk_output_type: console
+params:
+  # Fill this file with the right paths to nfcore output
+  params_file: params_diffbind-example.R
+  project_file: ../information.R
+  functions_file: ../libs/load_data.R
+  # .qs file name for saving DiffBind Counts object
+  diffbind_counts_file: diffbind_counts.qs 
+  factor_of_interest: genotype
+---
+
+```{r, cache = FALSE, message = FALSE, warning=FALSE}
+# This set up the working directory to this file so all files can be found
+# library(rstudioapi)
+# setwd(fs::path_dir(getSourceEditorContext()$path))
+```
+
+
+```{r source_params, cache = FALSE, message = FALSE, warning=FALSE}
+# 1. set up factor_of_interest parameter from parameter above or manually
+#    this is used to color plots, it needs to be part of the metadata
+# 2. Set input files in this file
+source(params$params_file)
+# 3. If you set up this file, project information will be printed below and
+#.   it can be reused for other Rmd files.
+source(params$project_file)
+# 4. Load custom functions to load data from coldata/metrics/counts
+source(params$functions_file)
+```
+
+# Overview
+
+-   Project: `r project`
+-   PI: `r PI`
+-   Analyst: `r analyst`
+-   Experiment: `r experiment`
+
+
+```{r load_libraries, cache = FALSE, message = FALSE, warning=FALSE}
+library(tidyverse)
+library(knitr)
+# library(rtracklayer)
+library(DESeq2)
+library(DEGreport)
+library(ggrepel)
+# library(RColorBrewer)
+library(DT)
+library(pheatmap)
+library(bcbioR)
+library(janitor)
+# library(ChIPpeakAnno)
+library(UpSetR)
+library(DiffBind)
+ggplot2::theme_set(theme_light(base_size = 14))
+opts_chunk[["set"]](
+    cache = FALSE,
+    cache.lazy = FALSE,
+    dev = c("png", "pdf"),
+    error = TRUE,
+    highlight = TRUE,
+    message = FALSE,
+    prompt = FALSE,
+    tidy = FALSE,
+    warning = FALSE,
+    fig.height = 4)
+```
+
+
+```{r sanitize-datatable}
+sanitize_datatable = function(df, ...) {
+ # remove dashes which cause wrapping
+ DT::datatable(df, ..., rownames=gsub("-", "_", rownames(df)),
+                   colnames=gsub("-", "_", colnames(df)))
+}
+```
+
+# Samples and metadata
+
+```{r load_data, message=F, warning=F}
+coldata <- load_coldata(coldata_fn)
+
+# DiffBind requires a very specific samplesheet in order to create the peak counts object, see https://www.rdocumentation.org/packages/DiffBind/versions/2.0.2/topics/dba for further details
+
+# make_diffbind_samplesheet is a function provided by bcbioR to help assemble DiffBind's samplesheet 
+# using the nf-core samplesheet and output. In the resulting DiffBind counts object, it
+# encodes your factor of interest as "Factor" and the antibody as "Condition"
+
+samplesheet <- make_diffbind_samplesheet(coldata, bam_dir, peaks_dir, params$factor_of_interest)
+
+# if necessary, one additional covariate of interest can be encoded as "Tissue" 
+
+```
+
+```{r show_metadata}
+samplesheet %>% select(SampleID, Replicate, Condition, Factor, ControlID) %>% sanitize_datatable()
+```
+
+# DiffBind
+
+```{r create diffbind counts object, eval = !file.exists()}
+
+diffbind_obj <- dba(sampleSheet = samplesheet, scoreCol = 5)
+
+# This command may take several minutes. Recommend using multiple cores and lots of memory
+diffbind_counts <- dba.count(diffbind_obj, bUseSummarizeOverlaps = TRUE, bParallel = T)
+
+# save object when time-intensive command is finished, so that this cell only need run once
+qsave(diffbind_counts, params$diffbind_counts_file)
+
+```

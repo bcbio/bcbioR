@@ -23,7 +23,6 @@ params:
   project_file: ../information.R
   functions_file: ../libs/load_data.R
   factor_of_interest: genotype
-
 ---
 
 ```{r, cache = FALSE, message = FALSE, warning=FALSE}
@@ -94,7 +93,6 @@ sanitize_datatable = function(df, ...) {
 
 ```{r load_data, message=F, warning=F}
 # This code will load from bcbio or nf-core folder
-# NOTE make sure to set numerator and denominator
 coldata <- load_coldata(coldata_fn)
 coldata$sample=row.names(coldata)
 
