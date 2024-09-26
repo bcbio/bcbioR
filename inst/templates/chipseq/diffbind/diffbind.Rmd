@@ -18,18 +18,20 @@ editor_options:
   chunk_output_type: console
 params:
   # Fill this file with the right paths to nfcore output
+  # .qs file name for saving DiffBind Counts object
   params_file: params_diffbind-example.R
   project_file: ../information.R
   functions_file: ../libs/load_data.R
-  # .qs file name for saving DiffBind Counts object
   diffbind_counts_file: diffbind_counts.qs 
   factor_of_interest: genotype
+  numerator: cKO
+  denominator: WT
 ---
 
 ```{r, cache = FALSE, message = FALSE, warning=FALSE}
 # This set up the working directory to this file so all files can be found
-# library(rstudioapi)
-# setwd(fs::path_dir(getSourceEditorContext()$path))
+library(rstudioapi)
+setwd(fs::path_dir(getSourceEditorContext()$path))
 ```
 
 
@@ -68,7 +70,11 @@ library(janitor)
 # library(ChIPpeakAnno)
 library(UpSetR)
 library(DiffBind)
-ggplot2::theme_set(theme_light(base_size = 14))
+library(qs)
+library(EnhancedVolcano)
+library(ggprism)
+colors=cb_friendly_cols(1:15)
+ggplot2::theme_set(theme_prism(base_size = 14))
 opts_chunk[["set"]](
     cache = FALSE,
     cache.lazy = FALSE,
@@ -80,6 +86,9 @@ opts_chunk[["set"]](
     tidy = FALSE,
     warning = FALSE,
     fig.height = 4)
+
+# set seed for reproducibility
+set.seed(1234567890L)
 ```
 
 
@@ -112,9 +121,7 @@ samplesheet <- make_diffbind_samplesheet(coldata, bam_dir, peaks_dir, params$fac
 samplesheet %>% select(SampleID, Replicate, Condition, Factor, ControlID) %>% sanitize_datatable()
 ```
 
-# DiffBind
-
-```{r create diffbind counts object, eval = !file.exists()}
+```{r create diffbind counts object, eval = !file.exists(params$diffbind_counts_file)}
 
 diffbind_obj <- dba(sampleSheet = samplesheet, scoreCol = 5)
 
@@ -124,4 +131,75 @@ diffbind_counts <- dba.count(diffbind_obj, bUseSummarizeOverlaps = TRUE, bParall
 # save object when time-intensive command is finished, so that this cell only need run once
 qsave(diffbind_counts, params$diffbind_counts_file)
 
+```
+
+# PCA 
+```{r PCA}
+
+diffbind_counts <- qread(params$diffbind_counts_file)
+
+diffbind_norm <- dba.normalize(diffbind_counts)
+
+norm_counts <- dba.peakset(diffbind_norm, bRetrieve=TRUE, DataType=DBA_DATA_FRAME) %>%
+  mutate(peak = paste(CHR, START, END, sep = '_')) %>%
+  select(-CHR, -START, -END) 
+rownames(norm_counts) <- norm_counts$peak
+norm_counts <- norm_counts %>% select(-peak) %>% as.matrix()
+norm_counts_log <- log2(norm_counts + 1)
+
+coldata_for_pca <- coldata[colnames(norm_counts), ]
+
+stopifnot(all(colnames(norm_counts) == rownames(coldata_for_pca)))
+
+degPCA(norm_counts_log, coldata_for_pca, condition = params$factor_of_interest) +
+  scale_color_cb_friendly()
+
+```
+
+# Differentially Bound Peaks
+
+## Table
+```{r DE analysis}
+diffbind_norm <- dba.contrast(diffbind_norm, contrast = c('Factor', params$numerator, params$denominator))
+results <- dba.analyze(diffbind_norm, bGreylist = F)
+
+results_report <- dba.report(results, th = 1) %>% as.data.frame()
+results_report_sig <- results_report %>% filter(FDR < 0.05)
+
+results_report_sig %>% sanitize_datatable()
+
+```
+
+## Volcano plot
+```{r volcano, fig.height = 8}
+results_report_mod <- results_report %>% 
+  mutate(Fold = replace(Fold, Fold < -5, -5)) %>% 
+  mutate(Fold = replace(Fold, Fold > 5, 5)) %>%
+  mutate(peak = paste(seqnames, start, end, sep = '_'))
+show <- as.data.frame(results_report_mod[1:6, c("Fold", "FDR", "peak")])
+EnhancedVolcano(results_report_mod,
+                lab= results_report_mod$peak, 
+                pCutoff = 0.05, 
+                selectLab = c(show$peak),
+                FCcutoff = 0.5,
+                x = 'Fold',
+                y = 'FDR', 
+                title = paste(params$factor_of_interest, ':', params$numerator, 'vs', params$denominator),
+                col=as.vector(colors[c("dark_grey", "light_blue",
+                                       "purple", "purple")]),
+                subtitle = "", drawConnectors = T,  max.overlaps = Inf) 
+
+```
+
+## Plot top peaks
+```{r plot top peaks, fig.width = 8, fig.height = 6}
+norm_counts_log_long <- norm_counts_log %>% as.data.frame() %>%
+  rownames_to_column('peak') %>%
+  pivot_longer(!peak, names_to = 'sample', values_to = 'norm_counts_log2') %>%
+  left_join(coldata)
+
+norm_counts_log_long_top <- norm_counts_log_long %>% filter(peak %in% show$peak)
+
+ggplot(norm_counts_log_long_top, aes(x = .data[[params$factor_of_interest]], y = norm_counts_log2)) + 
+  facet_wrap(~peak, scale = 'free_y') + geom_boxplot()
 ```
