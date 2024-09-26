@@ -19,9 +19,9 @@ load_metrics <- function(multiqc_data_dir){
   
   phantom <- read_tsv(file.path(multiqc_data_dir, 'multiqc_phantompeakqualtools.txt')) %>% clean_names() %>%
     dplyr::select(sample, nsc, rsc)
-  frip <- read_tsv(file.path(multiqc_data_dir, 'multiqc_frip_score-plot.txt')) %>% select(-Sample) %>% 
+  frip <- read_tsv(file.path(multiqc_data_dir, 'multiqc_frip_score-plot.txt')) %>% dplyr::select(-Sample) %>% 
     pivot_longer(everything(), names_to = 'sample', values_to = 'frip') %>% filter(!is.na(frip))
-  peak_count <- read_tsv(file.path(multiqc_data_dir, 'multiqc_peak_count-plot.txt')) %>% select(-Sample) %>% 
+  peak_count <- read_tsv(file.path(multiqc_data_dir, 'multiqc_peak_count-plot.txt')) %>% dplyr::select(-Sample) %>% 
     pivot_longer(everything(), names_to = 'sample', values_to = 'peak_count') %>% filter(!is.na(peak_count))
   nrf <- read_tsv(file.path(multiqc_data_dir, 'mqc_picard_deduplication_1.txt')) %>% clean_names() %>%
     mutate(nrf = unique_unpaired / (unique_unpaired + duplicate_unpaired)) %>%
@@ -108,8 +108,8 @@ make_diffbind_samplesheet <- function(coldata, bam_dir, peaks_dir, column = NULL
   coldata_for_diffbind$Factor <- coldata_for_diffbind[[column]]
   
   samplesheet <- coldata_for_diffbind %>%
-    left_join(bam_files %>% select(SampleID = sample, bamReads = bam), by = 'SampleID') %>%
-    left_join(bam_files %>% select(ControlID = sample, bamControl = bam), by = 'ControlID') %>%
+    left_join(bam_files %>% dplyr::select(SampleID = sample, bamReads = bam), by = 'SampleID') %>%
+    left_join(bam_files %>% dplyr::select(ControlID = sample, bamControl = bam), by = 'ControlID') %>%
     left_join(peak_files, by = 'SampleID')
   
   return(samplesheet)

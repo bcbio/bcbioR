@@ -26,6 +26,8 @@ params:
   factor_of_interest: genotype
   numerator: cKO
   denominator: WT
+  # species = mouse or human
+  species: mouse
 ---
 
 ```{r, cache = FALSE, message = FALSE, warning=FALSE}
@@ -73,6 +75,19 @@ library(DiffBind)
 library(qs)
 library(EnhancedVolcano)
 library(ggprism)
+library(ChIPseeker)
+
+if (params$species == 'mouse'){
+  library(TxDb.Mmusculus.UCSC.mm10.knownGene)
+  txdb <- TxDb.Mmusculus.UCSC.mm10.knownGene
+  anno_db <- 'org.Mm.eg.db'
+} else if (params$species == human){
+  library(TxDb.Hsapiens.UCSC.hg38.knownGene)
+  txdb <- TxDb.Hsapiens.UCSC.hg38.knownGene
+  anno_db <- 'org.Hs.eg.db'
+}
+
+
 colors=cb_friendly_cols(1:15)
 ggplot2::theme_set(theme_prism(base_size = 14))
 opts_chunk[["set"]](
@@ -89,6 +104,7 @@ opts_chunk[["set"]](
 
 # set seed for reproducibility
 set.seed(1234567890L)
+
 ```
 
 
@@ -118,7 +134,7 @@ samplesheet <- make_diffbind_samplesheet(coldata, bam_dir, peaks_dir, params$fac
 ```
 
 ```{r show_metadata}
-samplesheet %>% select(SampleID, Replicate, Condition, Factor, ControlID) %>% sanitize_datatable()
+samplesheet %>% dplyr::select(SampleID, Replicate, Condition, Factor, ControlID) %>% sanitize_datatable()
 ```
 
 ```{r create diffbind counts object, eval = !file.exists(params$diffbind_counts_file)}
@@ -142,9 +158,9 @@ diffbind_norm <- dba.normalize(diffbind_counts)
 
 norm_counts <- dba.peakset(diffbind_norm, bRetrieve=TRUE, DataType=DBA_DATA_FRAME) %>%
   mutate(peak = paste(CHR, START, END, sep = '_')) %>%
-  select(-CHR, -START, -END) 
+  dplyr::select(-CHR, -START, -END) 
 rownames(norm_counts) <- norm_counts$peak
-norm_counts <- norm_counts %>% select(-peak) %>% as.matrix()
+norm_counts <- norm_counts %>% dplyr::select(-peak) %>% as.matrix()
 norm_counts_log <- log2(norm_counts + 1)
 
 coldata_for_pca <- coldata[colnames(norm_counts), ]
@@ -161,24 +177,27 @@ degPCA(norm_counts_log, coldata_for_pca, condition = params$factor_of_interest) 
 ## Table
 ```{r DE analysis}
 diffbind_norm <- dba.contrast(diffbind_norm, contrast = c('Factor', params$numerator, params$denominator))
-results <- dba.analyze(diffbind_norm, bGreylist = F)
+results_obj <- dba.analyze(diffbind_norm, bGreylist = F)
 
-results_report <- dba.report(results, th = 1) %>% as.data.frame()
-results_report_sig <- results_report %>% filter(FDR < 0.05)
+results_report <- dba.report(results_obj, th = 1) 
+results_report_sig <- dba.report(results_obj)
 
-results_report_sig %>% sanitize_datatable()
+results <- results_report %>% as.data.frame()
+results_sig <- results_report_sig %>% as.data.frame()
+
+results_sig %>% sanitize_datatable()
 
 ```
 
 ## Volcano plot
 ```{r volcano, fig.height = 8}
-results_report_mod <- results_report %>% 
+results_mod <- results %>% 
   mutate(Fold = replace(Fold, Fold < -5, -5)) %>% 
   mutate(Fold = replace(Fold, Fold > 5, 5)) %>%
   mutate(peak = paste(seqnames, start, end, sep = '_'))
-show <- as.data.frame(results_report_mod[1:6, c("Fold", "FDR", "peak")])
-EnhancedVolcano(results_report_mod,
-                lab= results_report_mod$peak, 
+show <- as.data.frame(results_mod[1:6, c("Fold", "FDR", "peak")])
+EnhancedVolcano(results_mod,
+                lab= results_mod$peak, 
                 pCutoff = 0.05, 
                 selectLab = c(show$peak),
                 FCcutoff = 0.5,
@@ -202,4 +221,28 @@ norm_counts_log_long_top <- norm_counts_log_long %>% filter(peak %in% show$peak)
 
 ggplot(norm_counts_log_long_top, aes(x = .data[[params$factor_of_interest]], y = norm_counts_log2)) + 
   facet_wrap(~peak, scale = 'free_y') + geom_boxplot()
+```
+
+## Annotate DB peaks
+
+```{r annotate, echo = F}
+
+results_sig_anno <- annotatePeak(results_report_sig, 
+                                 tssRegion = c(-2000, 2000), 
+                                 TxDb = txdb, 
+                                 annoDb = params$anno_db, 
+                                 verbose = F)
+results_sig_anno_df <- results_sig_anno %>% as.data.frame()
+
+plotAnnoPie(results_sig_anno)
+
+plotDistToTSS(results_sig_anno)
+
+anno_data <- toGRanges(txdb, feature = 'gene')
+results_sig_anno_batch <- annotatePeakInBatch(results_report_sig, 
+                                              AnnotationData = anno_data,
+                                              output = 'overlapping',
+                                              maxgap = 1000)
+
+results_sig_anno_batch_df <- results_sig_anno_batch %>% as.data.frame()
 ```
