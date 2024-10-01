@@ -5,8 +5,8 @@ Make sure there is a project name for this.
 ## Run data with nf-core rnaseq
 
 - Make sure you have access to our [Seqera WorkSpace](https://cloud.seqera.io/orgs/HBC/workspaces/core_production/launchpad)
-- Transfer data to HCBC S3: Ask Alex/Lorena. Files will be at our S3 bucket `input/rawdata` folder
-- Prepare the CSV file according this [instructions](https://nf-co.re/rnaseq/3.14.0/docs/usage#multiple-runs-of-the-same-sample). File should look like this:
+- Transfer data to HCBC S3: Ask Alex/Lorena. Files will be at our S3 bucket `input` folder
+- Prepare the CSV file according these [instructions](https://nf-co.re/rnaseq/3.14.0/docs/usage#multiple-runs-of-the-same-sample). File should look like this:
 
 ```csv
 sample,fastq_1,fastq_2,strandedness
@@ -22,11 +22,11 @@ You can add more columns to this file with more metadata, and use this file as t
 - Upload file to our `Datasets` in Seqera using the name of the project but starting with `rnaseq-pi_lastname-hbc_code`
 - Go to `Launchpad`, select `nf-core_rnaseq` pipeline, and select the previous created `Datasets` in the `input` parameter after clicking in `Browser`
   - Select an output directory with the same name used for the `Dataset` inside the `results` folder in S3
-- When pipeline is down, data will be copied to our on-premise HPC in the scratch system under `scratch/groups/hsph/hbc/bcbio/` folder
+- When pipeline is done, data will be copied to our on-premise HPC in the scratch system under `scratch/groups/hsph/hbc/bcbio/` folder
 
 ## Downstream analysis
 
-Please, modify `information.R` with the right information. You can use this file with any other Rmd to include the project/analysis information.
+Modify `information.R` with the right information. You can use this file with any other Rmd to include the project/analysis information.
 
 ### QC
 
@@ -37,7 +37,7 @@ Read instruction in the R and Rmd scripts to render it.
 
 ### DE
 
-`DE/DEG.Rmd` is a template for two groups comparison. `params_de.R` has the information of the input files to load. You can point to `bcbio` or `nf-core/rnaseq` output files.
+`DE/DEG.Rmd` is a template for comparison between two groups. `params_de.R` has the information for the input files to load. You can point to `bcbio` or `nf-core/rnaseq` output files.
 
 On the `YAML` header file of the `Rmd` you can specify some parameters or just set them up in the first chunk of code of the template. This template has examples of:
 
