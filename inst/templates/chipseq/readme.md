@@ -43,3 +43,4 @@ On the YAML header file of the Rmd you can specify some parameters including the
 * peak annotation
 * functional analysis (coming soon)
 
+This template writes to CSV a log2 normalized counts matrix of peaks x samples as well as the annotated significant results of the differential binding analysis. 
