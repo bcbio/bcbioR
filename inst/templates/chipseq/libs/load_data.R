@@ -103,9 +103,9 @@ make_diffbind_samplesheet <- function(coldata, bam_dir, peaks_dir, column = NULL
   
   coldata_for_diffbind <- coldata %>% 
     filter(!is.na(control) & control != '') %>%
-    dplyr::rename(ControlID = control, SampleID = sample, Condition = antibody) %>% 
+    dplyr::rename(ControlID = control, SampleID = sample, Factor = antibody) %>% 
     separate(SampleID, into = c('sample', 'Replicate'), remove = F, sep = '_REP') 
-  coldata_for_diffbind$Factor <- coldata_for_diffbind[[column]]
+  coldata_for_diffbind$Condition <- coldata_for_diffbind[[column]]
   
   samplesheet <- coldata_for_diffbind %>%
     left_join(bam_files %>% dplyr::select(SampleID = sample, bamReads = bam), by = 'SampleID') %>%

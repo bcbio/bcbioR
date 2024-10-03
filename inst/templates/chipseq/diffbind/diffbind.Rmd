@@ -23,7 +23,7 @@ params:
   project_file: ../information.R
   functions_file: ../libs/load_data.R
   diffbind_counts_file: diffbind_counts.qs 
-  factor_of_interest: genotype
+  condition_of_interest: genotype
   numerator: cKO
   denominator: WT
   # species = mouse or human
@@ -41,7 +41,7 @@ setwd(fs::path_dir(getSourceEditorContext()$path))
 
 
 ```{r source_params, cache = FALSE, message = FALSE, warning=FALSE}
-# 1. set up factor_of_interest parameter from parameter above or manually
+# 1. set up condition_of_interest parameter from parameter above or manually
 #    this is used to color plots, it needs to be part of the metadata
 # 2. Set input files in this file
 source(params$params_file)
@@ -144,9 +144,9 @@ coldata <- load_coldata(coldata_fn)
 
 # make_diffbind_samplesheet is a function provided by bcbioR to help assemble DiffBind's samplesheet 
 # using the nf-core samplesheet and output. In the resulting DiffBind counts object, it
-# encodes your factor of interest as "Factor" and the antibody as "Condition"
+# encodes your condition of interest as "Condition" and the antibody as "Factor"
 
-samplesheet <- make_diffbind_samplesheet(coldata, bam_dir, peaks_dir, params$factor_of_interest)
+samplesheet <- make_diffbind_samplesheet(coldata, bam_dir, peaks_dir, params$condition_of_interest)
 
 # if necessary, one additional covariate of interest can be encoded as "Tissue" 
 
@@ -217,10 +217,11 @@ coldata_for_pca <- coldata[colnames(norm_counts), ]
 
 stopifnot(all(colnames(norm_counts) == rownames(coldata_for_pca)))
 
-degPCA(norm_counts_log, coldata_for_pca, condition = params$factor_of_interest) +
+degPCA(norm_counts_log, coldata_for_pca, condition = params$condition_of_interest) +
   scale_color_cb_friendly()
 
 ```
+
 
 # Differentially Bound Peaks
 
@@ -229,20 +230,43 @@ including estimation of size factors and dispersions, fitting and testing the
 model, evaluating the supplied contrast, and shrinking the LFCs. A p-value and FDR 
 is assigned to each candidate binding site indicating confidence that they are differentially bound.
 
-## Table
-```{r DE analysis}
-diffbind_norm <- dba.contrast(diffbind_norm, contrast = c('Factor', params$numerator, params$denominator))
+```{r DB analysis}
+diffbind_norm <- dba.contrast(diffbind_norm, contrast = c('Condition', params$numerator, params$denominator))
 results_obj <- dba.analyze(diffbind_norm, bGreylist = F)
 
 results_report <- dba.report(results_obj, th = 1) 
 results_report_sig <- dba.report(results_obj)
 
+
 results <- results_report %>% as.data.frame()
 results_sig <- results_report_sig %>% as.data.frame()
+```
+
+## MA plot
+
+This plot can help to:
+- Identify Differential Binding: Sites that show a significant log-fold change (M value away from 0) indicate changes in binding between conditions.
+- Assess Data Quality: The plot can help in identifying biases or systematic errors in the data. Ideally, most points should scatter around the M=0 line, indicating that there is no significant systematic difference between the conditions.
+- Visualize data dispersion: The distribution of points along the A-axis gives a sense of the spread of binding levels and any patterns or anomalies in the dataset.
+
+```{r MA plot}
+results_for_ma <- results%>%
+  mutate(peak = paste(seqnames, start, end, sep = '_')) %>%
+  mutate(t = 0) %>% 
+  dplyr::select(peak, AveExpr = Conc, logFC = Fold, P.Value = p.value, adj.P.Val = FDR, t)
+rownames(results_for_ma) <- results_for_ma$peak
+degMA(as.DEGSet(results_for_ma, contrast = paste(params$numerator, params$denominator, sep = ' vs. ')))
+
+```
+
+## Table of differentially bound peaks
+
+```{r DB table}
 
 results_sig %>% sanitize_datatable()
 
 ```
+
 
 ## Volcano plot
 
@@ -261,7 +285,7 @@ EnhancedVolcano(results_mod,
                 FCcutoff = 0.5,
                 x = 'Fold',
                 y = 'FDR', 
-                title = paste(params$factor_of_interest, ':', params$numerator, 'vs', params$denominator),
+                title = paste(params$condition_of_interest, ':', params$numerator, 'vs', params$denominator),
                 col=as.vector(colors[c("dark_grey", "light_blue",
                                        "purple", "purple")]),
                 subtitle = "", drawConnectors = T,  max.overlaps = Inf) 
@@ -280,7 +304,7 @@ norm_counts_log_long <- norm_counts_log %>% as.data.frame() %>%
 
 norm_counts_log_long_top <- norm_counts_log_long %>% filter(peak %in% show$peak)
 
-ggplot(norm_counts_log_long_top, aes(x = .data[[params$factor_of_interest]], y = norm_counts_log2)) + 
+ggplot(norm_counts_log_long_top, aes(x = .data[[params$condition_of_interest]], y = norm_counts_log2)) + 
   facet_wrap(~peak, scale = 'free_y') + geom_boxplot()
 ```
 
