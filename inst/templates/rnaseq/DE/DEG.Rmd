@@ -25,7 +25,7 @@ params:
   subset_column: null
   subset_value: null
   genome: hg38
-  ruv: false
+  ruv: true
   combatseq: false
   params_file: params_de-example.R
   project_file: ../information.R
@@ -59,6 +59,7 @@ subset_column=params$subset_column
 subset_value=params$subset_value
 run_ruv=params$ruv
 run_combatseq=params$combatseq
+run_rmv=run_ruv | run_combatseq
 factor_of_interest <- column
 ```
 
@@ -240,21 +241,22 @@ new_cdata <- coldata
 
 For this study, this formula is  recommended: `r as.character(formula)`
 
-
 ```{r, eval=F, echo=FALSE}
 #### IF YOU ARE RUNNING RUV OR COMBATSEQ RUN THE CHUNKS BELOW OTHERWISE SKIP TO Differential Expression SECTION or remove this section
 ```
 
 ## Remove unwanted variation
 
-```{r, eval=run_ruv, results='asis', echo=run_ruv}
-cat("### Assessing unknown factors
+Removing unwanted variation from RNA-seq analysis is essential to ensure that the results reflect biological rather than technical differences. Methods like ComBat, RUVseq, or surrogate variable analysis (SVA) can be applied to adjust for batch effects, library preparation discrepancies, or other confounders. These techniques model and subtract the unwanted variation, enhancing the ability to detect true biological signals in the data. Proper normalization and careful experimental design are also crucial steps to mitigate such unwanted variation.
 
-When performing differential expression analysis, it is important to ensure that any detected differences are truly a result of the experimental comparison being made and not any additional variability in the data.")
-```
+### Assessing unknown factors
 
-```{r, eval=!run_ruv, results='asis', echo=run_ruv}
-cat("There is no need to assess unknown factor for this study.")
+```{r, results='asis'}
+if (run_ruv){
+  cat("When performing differential expression analysis, it is important to ensure that any detected differences are truly a result of the experimental comparison being made and not any additional variability in the data.")
+}else{
+  cat("There is no need to assess unknown factor for this study.")
+}
 ```
 
 ```{r do_RUV, eval=run_ruv, echo=run_ruv}
@@ -291,15 +293,13 @@ dds_to_use <- DESeqDataSetFromMatrix(counts, new_cdata, design = formula)
 vsd_to_use<- vst(dds_to_use, blind=FALSE)
 ```
 
+### Remove Batch Effects
 
 ```{r combat-text , eval=run_combatseq, results='asis', echo=run_combatseq}
 # NOTE Combatseq (part of the SVA package) - corrected count, removing the effects while retaining the structure of the data. Used in a scenario where you know what covariate/batch is. Do not add know-removed known covariates to DESeq2 formula. Also, don’t attempt to remove biological effect (e.g. donor), this is not conceptually valid; best for technical variation.
 library(sva)
 
-cat("### Remove Batch Effects
-
-Here we apply Combat-seq (https://github.com/zhangyuqing/ComBat-seq) to try to remove batch effects so we can better tease out the effects of interest. 
-
+cat("Here we apply Combat-seq (https://github.com/zhangyuqing/ComBat-seq) to try to remove batch effects so we can better tease out the effects of interest. 
 Combat-seq uses a negative binomial regression to model batch effects, providing adjusted data by mapping the original data to an expected distribution if there were no batch effects. The adjusted data preserves the integer nature of counts, so that it is compatible with the assumptions of state-of-the-art differential expression software (e.g. edgeR, DESeq2, which specifically request untransformed count data).")
 
 ```
@@ -309,10 +309,9 @@ cat("There is no need to remove known factors like batch effect in this study.")
 ```
 
 ```{r set_variable_combatseq, eval=run_combatseq, echo=run_combatseq}
+# NOTE work on this code if you need to run combatseq
 
-## FILL OUT THIS CHUNK OF CODE IF YOU WANT TO RUN COMBATSEQ
-
-## Set your batch effect variable here this is the variable that combatseq will try to remove
+# Set your batch effect variable here this is the variable that combatseq will try to remove
 
 ## Column name of your batch variable
 to_remove = "batch"
@@ -321,10 +320,8 @@ to_remove = "batch"
 
 to_keep = "sample_type"
 
-
 coldata[[to_remove]] <- as.factor(coldata[[to_remove]])
 coldata[[to_keep]] <- as.factor(coldata[[to_keep]])
-
 
 batch = coldata[[to_remove]]
 treatment = coldata[[to_keep]]
@@ -335,18 +332,15 @@ treatment = coldata[[to_keep]]
 #treatment2 = metrics[[to_keep]]
 #treatment3 = metrics[[to_keep]]
 
-
 # imp = cbind(as.numeric(as.character(treatment1)),as.numeric(as.character(treatment2)), as.numeric(as.character(treatment3)))
-
 ```
 
 ```{r do_combatseq, eval=run_combatseq}
 adjusted_counts <- ComBat_seq(as.matrix(counts), batch=batch, group = treatment)
 
-## For multiple variables of interest
+#NOTE For multiple variables of interest
 
 # adjusted_counts <- ComBat_seq(as.matrix(counts2), batch=batch, covar_mod = imp)
-
 ```
 
 ```{r after_combatseq, eval=run_combatseq}
@@ -360,7 +354,6 @@ pca_combat <- degPCA(norm_matrix, coldata,
        condition = column) + ggtitle('After Combatseq')
 pca_combat + scale_color_cb_friendly()
 ```
-
 
 # Differential Expression
 
@@ -578,7 +571,6 @@ for (contrast in names(de_list)){
 }
 tagList(dt_list)
 ```
-
 
 # Pathway Analysis- Over-representation
 
