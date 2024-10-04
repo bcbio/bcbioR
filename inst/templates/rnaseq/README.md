@@ -9,7 +9,7 @@ We recommend to use the samplesheet.csv used with nf-core as metadata file, wher
 
 ## Downstream analysis
 
-Please, modify `information.R` with the right information. You can use this file with any other Rmd to include the project/analysis information.
+Modify `information.R` with the right information. You can use this file with any other Rmd to include the project/analysis information.
 
 ### QC
 
@@ -20,7 +20,7 @@ Read instruction in the R and Rmd scripts to render it.
 
 ### DE
 
-`DE/DEG.Rmd` is a template for two groups comparison. `params_de.R` has the information of the input files to load. You can point to `bcbio` or `nf-core/rnaseq` output files.
+`DE/DEG.Rmd` is a template for comparison between two groups. `params_de.R` has the information for the input files to load. You can point to `bcbio` or `nf-core/rnaseq` output files.
 
 On the `YAML` header file of the `Rmd` you can specify some parameters or just set them up in the first chunk of code of the template. This template has examples of:
 

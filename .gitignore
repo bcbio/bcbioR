@@ -20,3 +20,5 @@ inst/rmarkdown/templates/rnaseq/skeleton/DE/Multiplicative_DGE_Analysis.Rmd
 .quarto
 inst/templates/chipseq/QC/QC.html
 *.html
+*.csv
+*.qs
