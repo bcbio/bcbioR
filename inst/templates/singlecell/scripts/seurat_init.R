@@ -1,3 +1,12 @@
+library(rstudioapi)
+library(tidyverse)
+setwd(fs::path_dir(getSourceEditorContext()$path))
+# NOTE: This code will check version, this is our recommendation, it may work
+#.      other versions
+stopifnot(R.version$major>= 4) # requires R4
+stopifnot(compareVersion(R.version$minor,"3.3")==0) # requires >=4.3.3
+stopifnot(compareVersion(BiocManager::version(), "3.18")>=0)
+stopifnot(compareVersion(package.version("Seurat"), "5.0.0")>=0)
 
 library(Seurat)
 library(data.table)

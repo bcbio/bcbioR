@@ -26,6 +26,20 @@ params:
   umap_dim: approximateumap_8c6f278e.b9f4.4535.aeca.8955c1dff614_1
 ---
 
+```{r, cache = FALSE, message = FALSE, warning=FALSE}
+# This set up the working directory to this file so all files can be found
+library(rstudioapi)
+setwd(fs::path_dir(getSourceEditorContext()$path))
+# NOTE: This code will check version, this is our recommendation, it may work
+#.      other versions
+stopifnot(R.version$major>= 4) # requires R4
+stopifnot(compareVersion(R.version$minor,"3.3")==0) # requires >=4.3.3
+stopifnot(compareVersion(BiocManager::version(), "3.18")>=0)
+stopifnot(compareVersion(package.version("Seurat"), "5.0.0")>=0)
+```
+
+This code is in this ![](https://img.shields.io/badge/status-draft-grey) revision.
+
 ```{r load_params, echo = F}
 source(params$project_file)
 ```
@@ -75,7 +89,6 @@ sanitize_datatable = function(df, ...) {
 -   Analyst: `r analyst`
 -   Experiment: `r experiment`
 -   Aim: `r aim`
--   Sample: `r params$seurat_fn`
 
 ```{r read rds}
 

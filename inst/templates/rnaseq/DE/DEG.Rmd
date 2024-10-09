@@ -38,8 +38,14 @@ Template developed with materials from https://hbctraining.github.io/main/.
 # This set up the working directory to this file so all files can be found
 library(rstudioapi)
 setwd(fs::path_dir(getSourceEditorContext()$path))
+# NOTE: This code will check version, this is our recommendation, it may work
+#.      other versions
+stopifnot(R.version$major>= 4) # requires R4
+stopifnot(compareVersion(R.version$minor,"3.3")==0) # requires >=4.3.3
+stopifnot(compareVersion(BiocManager::version(), "3.18")>=0)
 ```
 
+This code is in this ![](https://img.shields.io/badge/status-stable-green) revision.
 
 ```{r load_params, cache = FALSE, message = FALSE, warning=FALSE}
 library(tidyverse)

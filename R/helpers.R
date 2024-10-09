@@ -44,6 +44,7 @@ bcbio_nfcore_check <- function(file){
 #' @param type string indicating the type of analysis, supported: rnaseq.
 #'
 #' @param outpath string path indicating where to copy all the files to
+#' @param org string with the organization name. To deploy specific files.
 #' @examples
 #'  \dontrun{
 #'   path <- withr::local_tempdir()
@@ -51,32 +52,40 @@ bcbio_nfcore_check <- function(file){
 #'   fs::dir_ls(path,all=T)
 #'  }
 #' @export
-bcbio_templates <- function(type="rnaseq", outpath){
+bcbio_templates <- function(type="rnaseq", outpath=NULL, org=NULL){
+  if (type=="all"){
+    usethis::ui_info("Showing analysis:")
+    msg <- basename(fs::dir_ls(fs::path_package("bcbioR", "templates")))
+    return(msg)
+  }
+  if (is.null(outpath)){
+    usethis::ui_stop("outpath needs to be defined.")
+  }
   fs::dir_create(outpath)
   switch(type,
          base={
            #file.copy(fpath, outpath, recursive = T)
-           copy_templates(outpath, "base")
+           copy_templates(outpath, "base", org)
          },
          rnaseq={
            #file.copy(fpath, outpath, recursive = T)
-           copy_templates(outpath, "nf-core/rnaseq")
+           copy_templates(outpath, "nf-core/rnaseq", org)
          },
          singlecell={
            #file.copy(fpath, outpath, recursive = T)
-           copy_templates(outpath, "singlecell")
+           copy_templates(outpath, "singlecell", org)
          },
          singlecell_delux={
            #file.copy(fpath, outpath, recursive = T)
-           copy_templates(outpath, "singlecell_delux")
+           copy_templates(outpath, "singlecell_delux", org)
          },
          spatial={
            #file.copy(fpath, outpath, recursive = T)
-           copy_templates(outpath, "spatial")
+           copy_templates(outpath, "spatial", org)
          },
          multiomics={
            #file.copy(fpath, outpath, recursive = T)
-           copy_templates(outpath, "multiomics")
+           copy_templates(outpath, "multiomics", org)
          },
          {
            stop('project type not recognize, please choose: ', 'rnaseq', 'singlecell','singlecell_delux','spatial')
@@ -134,20 +143,22 @@ detect_gitignores <- function(path){
   })
 }
 
-copy_files_in_folder<- function(origin, remote){
+copy_files_in_folder<- function(origin, remote, is_org=FALSE){
   to_copy <- fs::dir_ls(origin,all = TRUE)
-  to_copy <- grep("org", to_copy,
-                  value = TRUE, invert = TRUE)
+  if (!is_org) {
+    to_copy <- grep("org", to_copy,
+                    value = TRUE, invert = TRUE)
+  }
   for (element in to_copy){
     full_new_path <- fs::path_join(c(remote, fs::path_file(element)))
 
     if (fs::is_dir(element)){
-      if (!(fs::dir_exists(full_new_path)))
-        fs::dir_copy(element, full_new_path)
+      if (!(fs::dir_exists(full_new_path)) | is_org)
+        fs::dir_copy(element, full_new_path, overwrite = is_org)
     }
     if (fs::is_file(element)){
-      if (!(fs::file_exists(full_new_path)))
-        fs::file_copy(element, full_new_path)
+      if (!(fs::file_exists(full_new_path)) | is_org)
+        fs::file_copy(element, full_new_path, overwrite = is_org)
     }
   }
   detect_gitignores(remote)
@@ -164,7 +175,7 @@ deploy_apps <- function(apps, path){
   })
 }
 
-copy_templates <- function(path, pipeline){
+copy_templates <- function(path, pipeline, org=NULL){
   apps=list()
   base = c("bcbioR")
   if (pipeline=="base"){
@@ -182,11 +193,16 @@ copy_templates <- function(path, pipeline){
     parts = c("templates/spatial")
   }
   analysis_template <- fs::path_package(base, parts)
+  org_template <- fs::path_package(base, parts, "org", org)
+
   ui_info("Getting templates from {ui_value(analysis_template)}")
   # ls_files <- grep("org", list.files(analysis_template, full.names = TRUE),
   #                  value = TRUE, invert = TRUE)
   # ui_info("{ui_value(length(ls_files))} amount of files to copy")
   copy_files_in_folder(analysis_template, path)
+  ui_info("Getting templates from {ui_value(org_template)}")
+  copy_files_in_folder(org_template, path, is_org=TRUE)
+
   # check org folder is in there
   # search for param + _README.md
   # concat file to README.md

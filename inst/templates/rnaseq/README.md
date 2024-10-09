@@ -4,7 +4,7 @@ Make sure there is a project name for this.
 
 ## Run data with nf-core rnaseq
 
-This templates assume data has been processed by [nf-core/rnasea](https://nf-co.re/rnaseq/3.14.0/docs/usage).
+This templates assume data has been processed by [nf-core/rnaseq](https://nf-co.re/rnaseq/3.14.0/docs/usage).
 We recommend to use the samplesheet.csv used with nf-core as metadata file, where other relevant columns can be there even if they are not used by the pipeline.
 
 ## Downstream analysis

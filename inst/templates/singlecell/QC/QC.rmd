@@ -5,17 +5,23 @@ date: "`r Sys.Date()`"
 params:
   ## If you have Ribosomal ratio in your raw seurat object put this as TRUE otherwise leave as FALSE
   ribosomal: FALSE
-  params_file: parameters.R
+  params_file: https://github.com/bcbio/bcbioR-test-data/raw/refs/heads/main/singlecell/parameters.R
   project_file: ../information.R
 ---
 
-# Overview
+```{r, cache = FALSE, message = FALSE, warning=FALSE}
+# This set up the working directory to this file so all files can be found
+library(rstudioapi)
+setwd(fs::path_dir(getSourceEditorContext()$path))
+# NOTE: This code will check version, this is our recommendation, it may work
+#.      other versions
+stopifnot(R.version$major>= 4) # requires R4
+stopifnot(compareVersion(R.version$minor,"3.3")==0) # requires >=4.3.3
+stopifnot(compareVersion(BiocManager::version(), "3.18")>=0)
+stopifnot(compareVersion(package.version("Seurat"), "5.0.0")>=0)
+```
 
--   Project: `r project`
--   PI: `r PI`
--   Analyst: `r analyst`
--   Experiment: `r experiment`
-
+This code is in this ![](https://img.shields.io/badge/status-alpha-yellow) revision.
 
 ```{r, eval=FALSE}
 ### READ ME FIRST
@@ -26,14 +32,12 @@ params:
 
 ```
 
+# Overview
 
-
-```{r}
-# This set up the working directory to this file so all files can be found
-library(rstudioapi)
-setwd(fs::path_dir(getSourceEditorContext()$path))
-```
-
+-   Project: `r project`
+-   PI: `r PI`
+-   Analyst: `r analyst`
+-   Experiment: `r experiment`
 
 ```{r setup, include=FALSE}
 library(Seurat)
@@ -41,7 +45,15 @@ library(tidyverse)
 library(ggplot2)
 
 # 1. Set up input files in this R file (params_de.R)
-source(params$params_file)
+# Loading QC'd object
+parameters = params$params_file
+if (isUrl(seurat_obj)){
+  source(url(parameters))
+}else{
+  source(parameters)
+}
+
+seurat_obj = "~/Downloads/filtered_gene_bc_matrices/tiny.rds"
 
 knitr::opts_chunk[["set"]](
     cache = FALSE,
@@ -60,8 +72,7 @@ knitr::opts_chunk[["set"]](
 
 ```{r load and filter no ribo}
 ## Load data
-
-seurat_raw <- readRDS("seurat_pre-filtered.rds")
+seurat_raw <- readRDS(seurat_obj)
 
 ## Creat QC object USE METRICS YOU CHOSE IN THE RSHINY APP
 
@@ -94,21 +105,15 @@ seurat_qc <- subset(x = seurat_raw,
 
 ## Save QC object
 saveRDS(seurat_qc, file = "seurat_post-QC.rds")
-
 ```
 
 
 ```{r prep-info}
-
 ## Prep information for plotting 
 metadata0 <- seurat_raw@meta.data
-
 metadata0 = metadata0 %>%  dplyr::rename(nUMI = nCount_RNA,
                 nGene = nFeature_RNA)
-
 metadata1 <- seurat_qc@meta.data
-
-
 metadata1 = metadata1 %>%  dplyr::rename(nUMI = nCount_RNA,
                 nGene = nFeature_RNA)
 ```
