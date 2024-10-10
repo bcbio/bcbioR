@@ -27,8 +27,8 @@ params:
 
 ```{r, cache = FALSE, message = FALSE, warning=FALSE}
 # This set up the working directory to this file so all files can be found
-# library(rstudioapi)
-# setwd(fs::path_dir(getSourceEditorContext()$path))
+library(rstudioapi)
+setwd(fs::path_dir(getSourceEditorContext()$path))
 ```
 
 
@@ -66,6 +66,8 @@ library(bcbioR)
 library(janitor)
 library(ChIPpeakAnno)
 library(UpSetR)
+
+colors=cb_friendly_cols(1:15)
 ggplot2::theme_set(theme_light(base_size = 14))
 opts_chunk[["set"]](
     cache = FALSE,
@@ -353,8 +355,7 @@ ggplot(peaks, aes(x = peak_enrichment, fill = .data[[params$factor_of_interest]]
 
 We examine the amount of overlap between peaks in replicates of the same experimental condition. 
 
-``` {r peak overlap, results = 'asis', fig.width = 8}
-
+``` {r peak overlap, results = 'asis', fig.width = 8, fig.height = 6}
 for (current_sample_group in unique(peaks$sample_group)){
   cat("## ", current_sample_group, "\n")
 
@@ -374,19 +375,27 @@ for (current_sample_group in unique(peaks$sample_group)){
   # connectedpeaks examples (https://support.bioconductor.org/p/133486/#133603), if 5     peaks in group1 overlap with 2 peaks in group 2, setting connectedPeaks to "merge"      will add 1 to the overlapping counts
   overlaps <- findOverlapsOfPeaks(peaks_sample_group_granges, connectedPeaks = 'merge')
   
-  set_counts <- overlaps$venn_cnt[, colnames(overlaps$venn_cnt)] %>% 
-    as.data.frame() %>% 
-    mutate(group_number = row_number()) %>%
-    pivot_longer(!Counts & !group_number, names_to = 'sample', values_to = 'member') %>%
-    filter(member > 0) %>%
-    group_by(Counts, group_number) %>% 
-    summarize(group = paste(sample, collapse = '&'))
-  
-  set_counts_upset <- set_counts$Counts
-  names(set_counts_upset) <- set_counts$group
+  n_samples <- length(names(overlaps$overlappingPeaks))
 
-  p <- upset(fromExpression(set_counts_upset), order.by = "freq", text.scale = 1.5)
-  print(p)
+  if (n_samples > 3){
+    set_counts <- overlaps$venn_cnt[, colnames(overlaps$venn_cnt)] %>% 
+      as.data.frame() %>% 
+      mutate(group_number = row_number()) %>%
+      pivot_longer(!Counts & !group_number, names_to = 'sample', values_to = 'member') %>%
+      filter(member > 0) %>%
+      group_by(Counts, group_number) %>% 
+      summarize(group = paste(sample, collapse = '&'))
+    
+    set_counts_upset <- set_counts$Counts
+    names(set_counts_upset) <- set_counts$group
+  
+    p <- upset(fromExpression(set_counts_upset), order.by = "freq", text.scale = 1.5)
+    print(p)
+  } else{
+    venn_sample_names <- gsub(paste0(current_sample_group, '_'), '', names(overlaps$all.peaks))
+    invisible(capture.output(makeVennDiagram(overlaps, connectedPeaks = "merge", fill = colors[1:n_samples], 
+                    NameOfPeaks = venn_sample_names)))
+  }
   
   cat('\n\n')
 
