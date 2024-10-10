@@ -29,7 +29,7 @@ params:
   denominator: WT
   species: mouse
   counts_fn: diffbind_counts.csv
-  results_sig_anno_fn: diffbind_results_sig_anno.csv
+  results_sig_anno_fn: diffbind_results_anno.csv
 ---
 Template developed with materials from https://hbctraining.github.io/main/.
 
@@ -37,11 +37,12 @@ Template developed with materials from https://hbctraining.github.io/main/.
 # This set up the working directory to this file so all files can be found
 library(rstudioapi)
 setwd(fs::path_dir(getSourceEditorContext()$path))
+
 # NOTE: This code will check version, this is our recommendation, it may work
 #.      other versions
-stopifnot(R.version$major>= 4) # requires R4
-stopifnot(compareVersion(R.version$minor,"3.3")==0) # requires >=4.3.3
-stopifnot(compareVersion(BiocManager::version(), "3.18")>=0)
+# stopifnot(R.version$major>= 4) # requires R4
+# stopifnot(compareVersion(R.version$minor,"3.3")==0) # requires >=4.3.3
+# stopifnot(compareVersion(BiocManager::version(), "3.18")>=0)
 ```
 
 This code is in this ![](https://img.shields.io/badge/status-alpha-yellow) revision.
@@ -107,10 +108,12 @@ if (params$species == 'mouse'){
   library(TxDb.Mmusculus.UCSC.mm10.knownGene)
   txdb <- TxDb.Mmusculus.UCSC.mm10.knownGene
   anno_db <- 'org.Mm.eg.db'
+  library(org.Mm.eg.db)
 } else if (params$species == human){
   library(TxDb.Hsapiens.UCSC.hg38.knownGene)
   txdb <- TxDb.Hsapiens.UCSC.hg38.knownGene
   anno_db <- 'org.Hs.eg.db'
+  library(org.Hs.eg.db)
 }
 
 
@@ -237,6 +240,10 @@ including estimation of size factors and dispersions, fitting and testing the
 model, evaluating the supplied contrast, and shrinking the LFCs. A p-value and FDR 
 is assigned to each candidate binding site indicating confidence that they are differentially bound.
 
+We use [ChIPpeakAnno](https://bioconductor.org/packages/release/bioc/html/ChIPpeakAnno.html) 
+to identify any gene features within 1000 bp of a differentially bound site. 
+
+
 ```{r DB analysis}
 diffbind_norm <- dba.contrast(diffbind_norm, contrast = c('Condition', params$numerator, params$denominator))
 results_obj <- dba.analyze(diffbind_norm, bGreylist = F)
@@ -244,10 +251,31 @@ results_obj <- dba.analyze(diffbind_norm, bGreylist = F)
 results_report <- dba.report(results_obj, th = 1) 
 results_report_sig <- dba.report(results_obj)
 
-
 results <- results_report %>% as.data.frame()
-results_sig <- results_report_sig %>% as.data.frame()
+
 ```
+
+```{r annotate DB peaks}
+
+anno_data <- toGRanges(txdb, feature = 'gene')
+results_anno_batch <- annotatePeakInBatch(results_report, 
+                                              AnnotationData = anno_data,
+                                              output = 'overlapping',
+                                              maxgap = 1000)
+
+results_anno_batch_df <- results_anno_batch %>% as.data.frame()
+
+entrez_to_symbol <- AnnotationDbi::select(org.Mm.eg.db, results_anno_batch_df$feature, 
+                                          "ENTREZID", columns = 'SYMBOL') %>%
+  filter(!is.na(ENTREZID)) %>% distinct()
+
+results_anno_batch_df <- results_anno_batch_df %>% 
+  left_join(entrez_to_symbol %>% dplyr::select(feature = ENTREZID, gene_name = SYMBOL))
+
+write_csv(results_anno_batch_df, params$results_sig_anno_fn)
+
+```
+
 
 ## MA plot
 
@@ -257,11 +285,10 @@ This plot can help to:
 - Visualize data dispersion: The distribution of points along the A-axis gives a sense of the spread of binding levels and any patterns or anomalies in the dataset.
 
 ```{r MA plot}
-results_for_ma <- results%>%
+results_for_ma <- results_anno_batch_df%>%
   mutate(peak = paste(seqnames, start, end, sep = '_')) %>%
   mutate(t = 0) %>% 
   dplyr::select(peak, AveExpr = Conc, logFC = Fold, P.Value = p.value, adj.P.Val = FDR, t)
-rownames(results_for_ma) <- results_for_ma$peak
 degMA(as.DEGSet(results_for_ma, contrast = paste(params$numerator, params$denominator, sep = ' vs. ')))
 
 ```
@@ -270,7 +297,9 @@ degMA(as.DEGSet(results_for_ma, contrast = paste(params$numerator, params$denomi
 
 ```{r DB table}
 
-results_sig %>% sanitize_datatable()
+results_sig_anno_batch_df <- results_anno_batch_df %>% filter(FDR < 0.05)
+results_sig_anno_batch_df %>% dplyr::select(names(results), feature, gene_name) %>%
+  sanitize_datatable()
 
 ```
 
@@ -280,15 +309,17 @@ results_sig %>% sanitize_datatable()
 This volcano plot shows the binding sites that are significantly up- and down-regulated as a result of the analysis comparison. The points highlighted in purple are sites that have padj < 0.05 and a log2-fold change magnitude > 0.5. Points in blue have a padj > 0.05 and a log2-fold change magnitude > 0.5. Grey points are non-significant. The dashed lines correspond to the cutoff values of log2-fold change and padj that we have chosen.
 
 ```{r volcano, fig.height = 8}
-results_mod <- results %>% 
+results_mod <- results_sig_anno_batch_df %>% 
   mutate(Fold = replace(Fold, Fold < -5, -5)) %>% 
   mutate(Fold = replace(Fold, Fold > 5, 5)) %>%
-  mutate(peak = paste(seqnames, start, end, sep = '_'))
-show <- as.data.frame(results_mod[1:6, c("Fold", "FDR", "peak")])
+  mutate(peak = paste(seqnames, start, end, sep = '_')) 
+# show <- as.data.frame(results_mod[1:6, c("Fold", "FDR", "gene_name")])
+
+show <- results_mod %>% filter(!is.na(gene_name)) %>% slice_min(n = 6, order_by = FDR)
 EnhancedVolcano(results_mod,
-                lab= results_mod$peak, 
+                lab= results_mod$gene_name,
                 pCutoff = 0.05, 
-                selectLab = c(show$peak),
+                # selectLab = c(show$gene_name),
                 FCcutoff = 0.5,
                 x = 'Fold',
                 y = 'FDR', 
@@ -321,15 +352,12 @@ We use the [ChIPseeker](https://www.bioconductor.org/packages/release/bioc/html/
 package to determine the genomic context of the differentially bound peaks and 
 visualize these annotations. We consider the promoter region to be within 2000 bp in either direction of the TSS. 
 
-We also use [ChIPpeakAnno](https://bioconductor.org/packages/release/bioc/html/ChIPpeakAnno.html) 
-to identify any gene features within 1000 bp of a differentially bound site. 
-
 ```{r annotate, echo = F}
 
 results_sig_anno <- annotatePeak(results_report_sig, 
                                  tssRegion = c(-2000, 2000), 
                                  TxDb = txdb, 
-                                 annoDb = params$anno_db, 
+                                 annoDb = anno_db, 
                                  verbose = F)
 results_sig_anno_df <- results_sig_anno %>% as.data.frame()
 
@@ -337,15 +365,6 @@ plotAnnoPie(results_sig_anno)
 
 plotDistToTSS(results_sig_anno)
 
-anno_data <- toGRanges(txdb, feature = 'gene')
-results_sig_anno_batch <- annotatePeakInBatch(results_report_sig, 
-                                              AnnotationData = anno_data,
-                                              output = 'overlapping',
-                                              maxgap = 1000)
-
-results_sig_anno_batch_df <- results_sig_anno_batch %>% as.data.frame()
-
-write_csv(results_sig_anno_batch_df, params$results_sig_anno_fn)
 ```
 
 # Functional Enrichment
