@@ -24,14 +24,31 @@ params:
   cellchat_grade0_fn: ../data/snrna_cellchat_grade0.qs
 ---
 
-```{r load_libraries, cache = FALSE, message = FALSE, warning=FALSE, echo=FALSE,}
+```{r, cache = FALSE, message = FALSE, warning=FALSE}
+# This set up the working directory to this file so all files can be found
+library(rstudioapi)
+setwd(fs::path_dir(getSourceEditorContext()$path))
+# NOTE: This code will check version, this is our recommendation, it may work
+#.      other versions
+stopifnot(R.version$major>= 4) # requires R4
+stopifnot(compareVersion(R.version$minor,"3.3")==0) # requires >=4.3.3
+stopifnot(compareVersion(BiocManager::version(), "3.18")>=0)
+stopifnot(compareVersion(package.version("Seurat"), "5.0.0")>=0)
+```
 
+This code is in this ![](https://img.shields.io/badge/status-draft-grey) revision.
+
+```{r load_libraries, cache = FALSE, message = FALSE, warning=FALSE, echo=FALSE}
+# NOTE change or remove according your environment
 reticulate::use_virtualenv("/n/app/bcbio/R4.3.1_python_cellchat")
 reticulate::py_config() # should show v3.9.14
 Sys.getenv("PYTHONPATH") # should be empty
 
 current_libs <- .libPaths()
 .libPaths(c('/n/app/bcbio/R4.3.1_cellchat/', current_libs))
+```
+
+```{r}
 library(CellChat)
 
 library(tidyverse)
@@ -66,7 +83,6 @@ set.seed(1234567890L)
 
 cellchat_ran <- file.exists(params$cellchat_fn)
 cellchat_rejection_ran <- file.exists(params$cellchat_grade2_fn) & file.exists(params$cellchat_grade0_fn)
-
 ```
 
 # Clustering

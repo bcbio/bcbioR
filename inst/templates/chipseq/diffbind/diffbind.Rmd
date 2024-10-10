@@ -19,6 +19,7 @@ editor_options:
 params:
   # Fill this file with the right paths to nfcore output
   # .qs file name for saving DiffBind Counts object
+  # species = mouse or human
   params_file: params_diffbind-example.R
   project_file: ../information.R
   functions_file: ../libs/load_data.R
@@ -26,7 +27,6 @@ params:
   condition_of_interest: genotype
   numerator: cKO
   denominator: WT
-  # species = mouse or human
   species: mouse
   counts_fn: diffbind_counts.csv
   results_sig_anno_fn: diffbind_results_sig_anno.csv
@@ -37,7 +37,14 @@ Template developed with materials from https://hbctraining.github.io/main/.
 # This set up the working directory to this file so all files can be found
 library(rstudioapi)
 setwd(fs::path_dir(getSourceEditorContext()$path))
+# NOTE: This code will check version, this is our recommendation, it may work
+#.      other versions
+stopifnot(R.version$major>= 4) # requires R4
+stopifnot(compareVersion(R.version$minor,"3.3")==0) # requires >=4.3.3
+stopifnot(compareVersion(BiocManager::version(), "3.18")>=0)
 ```
+
+This code is in this ![](https://img.shields.io/badge/status-alpha-yellow) revision.
 
 
 ```{r source_params, cache = FALSE, message = FALSE, warning=FALSE}

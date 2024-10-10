@@ -27,6 +27,22 @@ params:
   # choose geneset, click "Raw', and copy url
   geneset_fn: https://raw.githubusercontent.com/bcbio/resources/main/gene_sets/gene_sets/20240904/human/h.all.v2024.1.Hs.entrez.gmt
 ---
+
+```{r, message=FALSE, warning=FALSE}
+# This set up the working directory to this file so all files can be found
+library(rstudioapi)
+library(tidyverse)
+setwd(fs::path_dir(getSourceEditorContext()$path))
+# NOTE: This code will check version, this is our recommendation, it may work
+#.      other versions
+stopifnot(R.version$major>= 4) # requires R4
+stopifnot(compareVersion(R.version$minor,"3.3")==0) # requires >=4.3.3
+stopifnot(compareVersion(BiocManager::version(), "3.18")>=0)
+stopifnot(compareVersion(package.version("Seurat"), "5.0.0")>=0)
+```
+
+This code is in this ![](https://img.shields.io/badge/status-alpha-yellow) revision.
+
 ```{r libraries, message = FALSE, warning=FALSE}
 # path to libraries if working on O2
 # .libPaths("/n/app/bcbio/R4.3.1_rnaseq/")
@@ -68,10 +84,6 @@ opts_chunk[["set"]](
 set.seed(1234567890L)
 ```
 
-```{r}
-# This set up the working directory to this file so all files can be found
-setwd(fs::path_dir(getSourceEditorContext()$path))
-```
 
 ```{r load_params, cache = FALSE, message = FALSE, warning=FALSE}
 source(params$project_file)

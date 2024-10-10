@@ -17,18 +17,41 @@ output:
 editor_options: 
   chunk_output_type: inline
 params:
-   params_file: parameters.R
    project_file: ../information.R
 ---
 
 Template developed with materials from https://hbctraining.github.io/main/.
 
-```{r}
+```{r, message=FALSE, warning=FALSE}
 # This set up the working directory to this file so all files can be found
 library(rstudioapi)
+library(tidyverse)
 setwd(fs::path_dir(getSourceEditorContext()$path))
+# NOTE: This code will check version, this is our recommendation, it may work
+#.      other versions
+stopifnot(R.version$major>= 4) # requires R4
+stopifnot(compareVersion(R.version$minor,"3.3")==0) # requires >=4.3.3
+stopifnot(compareVersion(BiocManager::version(), "3.18")>=0)
+stopifnot(compareVersion(package.version("Seurat"), "5.0.0")>=0)
 ```
 
+This code is in this ![](https://img.shields.io/badge/status-alpha-yellow) revision.
+
+```{r}
+# parameters
+## Cell cycle markers for c.elegans, human, mouse, D. rerio, and D. melanogaster can be found here: https://github.com/hbc/tinyatlas/tree/1e2136a35e773f14d97ae9cbdb6c375327b2dd2b/cell_cycle
+## This files needs gene_name and phase columns to work with this template
+
+cell_cycle_file="https://github.com/bcbio/resources/raw/refs/heads/main/singlecell/human_cell_cycle.csv"
+# Source cell cycle markers
+cc_markers = read_csv(cell_cycle_file)
+stopifnot(c("gene_name", "phase") %in% colnames(cc_markers))
+
+seurat_obj="https://github.com/bcbio/bcbioR-test-data/raw/refs/heads/main/singlecell/tiny.rds"
+seurat_output="/tmp/seurat_clust.rds"
+
+source(params$project_file)
+```
 
 
 ```{r setup, cache=FALSE, message=FALSE, warning=FALSE, echo=FALSE}
@@ -38,7 +61,6 @@ library(Seurat)
 library(harmony)
 library(knitr)
 library(rmarkdown)
-library(tidyverse)
 library(data.table)
 library(DT)
 library(patchwork)
@@ -81,14 +103,14 @@ The Seurat object used as input for this report was prepared with the thresholds
 
 
 ```{r load_data, cache = TRUE}
-
 # Loading QC'd object
-seurat_qc <- readRDS( "seurat_post-QC.rds")
+if (isUrl(seurat_obj)){
+  seurat_qc <- readRDS(url(seurat_obj))  
+}else{
+  seurat_qc <- readRDS(seurat_obj)
+}
+
 DefaultAssay(seurat_qc) <- "RNA"
-
-# Fix number of PCs for RNA assay
-rpcs <- 50
-
 
 # Define color scales for up to 24 clusters/samples
 colsD <- RColorBrewer::brewer.pal(8, "Dark2")
@@ -97,7 +119,6 @@ colsL <- RColorBrewer::brewer.pal(8, "Pastel2")
 # Stack same colors from dark to pastel
 cols3 <- unlist(strsplit(paste(colsD, colsM, colsL, sep = "_"), "_"))
 cols2 <- c(unlist(strsplit(paste(colsD, colsM, sep = "_"), "_")), "deepskyblue2")
-
 ```
 
 
@@ -114,11 +135,10 @@ In this section, we look at potential confounding variables in our (post-QC) dat
 
 To enable meaningful visualization of the data, we apply a minimal normalization to our raw data (log-normalization). We then identify the top 2000 most variable genes across the log-normalized data, i.e. those with the greatest variability in expression level from one cell to the next. Finally, we calculate principal components (PCs) based on these top 2000 most variable genes, and use the first 50 PCs to derive reduced UMAP (Uniform Manifold Approximation and Projection) components.
 
-
 **We start with log normalization because it is good to observe the data and any trends using a simple transformation. More complex methods like SCT can alter the data in a way that is not as intuitive to interpret.**
 
 ```{r rna_norm0, warning=FALSE, message=FALSE}
- #Normalize data
+#Normalize data
 seurat_lognorm <- NormalizeData(seurat_qc,
                              normalization.method = "LogNormalize",
                              scale.factor = 10000)
@@ -133,10 +153,7 @@ seurat_lognorm <- ScaleData(seurat_lognorm, model.use = "linear")
 # Calculate PCs and UMAP
 seurat_lognorm <- RunPCA(seurat_lognorm)
 seurat_lognorm <- RunUMAP(seurat_lognorm, 1:50)
-
-
 ```
-
 
 ## Examine highly variable genes
 
@@ -153,25 +170,15 @@ p <- VariableFeaturePlot(seurat_lognorm)
 LabelPoints(plot = p, points = top_genes, repel = TRUE)
 ```
 
-
-
-
-
 ## Sample x covariates
 
 We then use the UMAP reduction to explore our dataset and assess how different variables influence cell clustering. Throughout this report, **UMAP representations are split by various covariates**, to enable checking for potential phenotype-specific clustering.
 
-
 ```{r}
-
 ## Below is an example plot, change the group.by and split.by parameters to make plots with your own covariates.
 
-
-UMAPPlot(seurat_norm, group.by = "orig.ident", split.by = "Sex") + ggtitle("UMAP (split by Surgery)") 
-
-
+UMAPPlot(seurat_lognorm, group.by = "orig.ident") + ggtitle("UMAP") 
 ```
-
 
 ## Cell cycle
 
@@ -183,36 +190,24 @@ Unless cells very strongly cluster by phase of the cell cycle (which is not the 
 
 ```{r cell_cycle_scoring, message=FALSE, warning=FALSE}
 # Step 1 - Get cell cycle markers
-## Cell cycle markers for c.elegans, human, mouse, D. rerio, and D. melanogaster can be found here: https://github.com/hbc/tinyatlas/tree/1e2136a35e773f14d97ae9cbdb6c375327b2dd2b/cell_cycle
-
-
-# Source cell cycle markers
-cc_markers = read.csv("/path/to/cell/cycle/markers", sep=",")
-
-
 
 # Compute cell cycle score for each cell
-seurat_norm <- CellCycleScoring(seurat_norm,
-                                g2m.features = cc_markers$external_gene_name[cc_markers$phase=="G2/M"],
-                                s.features = cc_markers$external_gene_name[cc_markers$phase=="S"])
-
+## NOTE use the right column names for cc_markers if they are different than
+#   external_gene_name and phase
+seurat_lognorm <- CellCycleScoring(seurat_lognorm,
+                                g2m.features = cc_markers$gene_name[cc_markers$phase=="G2/M"],
+                                s.features = cc_markers$gene_name[cc_markers$phase=="S"])
 
 ## Plot cell cycle (grouped by) along with covariates (split.by).  Add in your covariates of interest
 
-UMAPPlot(seurat_norm, group.by = "Phase", split.by = "sex") + ggtitle("UMAP (split by sex)") 
-
-
+UMAPPlot(seurat_lognorm, group.by = "Phase") + ggtitle("UMAP") 
 ```
-
-
 
 ## mitoRatio
 
 The mitochondrial to nuclear gene ratio (mitoRatio) is a marker of cellular stress and might also affect cell clustering. For this dataset, we have seen during QC that the fraction of mitochondrial genes was negligible (which is good). Therefore, we do not expect the need to regress out this variable for normalization purposes, but it's always good to check.
 
 ```{r mito_ratio}
-
-
 ## This custom function by Amelie Jule creates great plots for looking at different QC parameters across the UMAP
 
 signaturePlot <- function(seurat_object,
@@ -244,71 +239,46 @@ signaturePlot <- function(seurat_object,
   
 }
 
-
-
 ### Here we apply the function. gene_signature is whatever qc metric you care about and split_var should be a covariate of interest. Adjust the titles to match the covariate groups. If you have more than 2 covariate groups then you will have multiple plots g[[3]]....g[[n]]
 
-g <- signaturePlot(seurat_norm, 
+g <- signaturePlot(seurat_lognorm, 
                    gene_signature = "mitoRatio",
-                   split_var = "sex")
-g[[1]] + ggtitle("Female") | g[[2]] + ggtitle("Male")
-
+                   split_var = "orig.ident")
+g[[1]] + ggtitle("S1") | g[[2]]+ ggtitle("S2")
 ```
-
 
 ## nUMIs (nCount)
 
-
 ```{r}
-
 ### Here we apply the function. gene_signature is whatever qc metric you care about and split_var should be a covariate of interest. Adjust the titles to match the covariate groups. If you have more than 2 covariate groups then you will have multiple plots g[[3]]....g[[n]]
 
-g <- signaturePlot(seurat_norm, 
+g <- signaturePlot(seurat_lognorm, 
                    gene_signature = "nCount_RNA",
-                   split_var = "sex")
-g[[1]] + ggtitle("Female") | g[[2]] + ggtitle("Male")
-
-
-
+                   split_var = "subj")
+g[[1]] + ggtitle("S1") | g[[2]]+ ggtitle("S2")
 ```
-
-
 
 ## nGenes (nFeature)
 
-
 ```{r}
-
 ### Here we apply the function. gene_signature is whatever qc metric you care about and split_var should be a covariate of interest. Adjust the titles to match the covariate groups. If you have more than 2 covariate groups then you will have multiple plots g[[3]]....g[[n]]
 
-
-g <- signaturePlot(seurat_norm, 
+g <- signaturePlot(seurat_lognorm, 
                    gene_signature = "nFeature_RNA",
-                   split_var = "sex")
-g[[1]] + ggtitle("Female") | g[[2]] + ggtitle("Male")
-
-
+                   split_var = "orig.ident")
+g[[1]] + ggtitle("S1") | g[[2]]+ ggtitle("S2")
 ```
-
 
 ## Complexity
 
-
 ```{r}
-
 ### Here we apply the function. gene_signature is whatever qc metric you care about and split_var should be a covariate of interest. Adjust the titles to match the covariate groups. If you have more than 2 covariate groups then you will have multiple plots g[[3]]....g[[n]]
 
-
-g <- signaturePlot(seurat_norm, 
+g <- signaturePlot(seurat_lognorm, 
                    gene_signature = "Log10GenesPerUMI",
-                   split_var = "sex")
-g[[1]] + ggtitle("Female") | g[[2]] + ggtitle("Male")
-
-
-
+                   split_var = "orig.ident")
+g[[1]] + ggtitle("S1") | g[[2]]+ ggtitle("S2")
 ```
-
-
 
 # SCT Normalization  {.tabset}
 
@@ -318,33 +288,45 @@ All genes cannot be treated the same, as such, the SCTransform method constructs
 
 We searched for the top 3000 genes with the largest variability in expression level from cell to cell after SCT-normalization, and re-calculated our principal and UMAP components based on the SCT-normalized data for these top genes. 
 
-
 **We keep each sample separate for SCT normalization.**
 
-```{r rna_norm1, warning=FALSE, message=FALSE, eval=FALSE}
 
+```{r, eval=file.exists("seurat_sct.rds")}
+#NOTE run the chunck below to create this object, and loading will be used while
+#     knitting to speed up the rendering
+seurat_sctnorm = readRDS("seurat_sct.rds")
+```
+
+```{r rna_norm1, warning=FALSE, message=FALSE, eval=!exists("seurat_sctnorm")}
+#NOTE: this should be ran previous rendering to prepare the object
 ## Note that this single command replaces NormalizeData(), ScaleData(), and FindVariableFeatures()
 
 ## SCT can be run with and without regressing out variables. Generally we do not regress out covariates. However, we provide both options below.
 
-
 ## To properly integrate with harmony we split our object by sample first.
 
-seurat_sctnorm <- SplitObject(seurat_norm, split.by = "orig.ident")
-
-for (i in 1:length(split_sctnorm)) {
-    split_sctnorm[[i]] <- SCTransform(split_sctnorm[[i]], vst.flavor = "v2", variable.features.n = 3000)
-}
-
-
+# split_sctnorm <- SplitObject(seurat_lognorm, split.by = "orig.ident")
+# 
+# for (i in 1:length(split_sctnorm)) {
+#     split_sctnorm[[i]] <- SCTransform(split_sctnorm[[i]],
+#                                       vst.flavor = "v2",
+#                                       variable.features.n = 3000)
+# }
+# 
+# integ_features <- SelectIntegrationFeatures(object.list = split_seurat, 
+#                                             nfeatures = 3000) 
+# split_seurat <- PrepSCTIntegration(object.list = split_seurat, 
+#                                    anchor.features = integ_features)
 #for (i in 1:length(split_seurat)) {
 #    split_seurat[[i]] <- SCTransform(split_seurat[[i]], vars.to.regress = c("mitoRatio"), vst.flavor = "v2", variable.features.n = 3000)
-}
+# }
 
-
-
+seurat_lognorm[["RNA"]] <- split(seurat_lognorm[["RNA"]], f= seurat_lognorm$orig.ident)
+seurat_sctnorm <- SCTransform(seurat_lognorm,
+                                      vst.flavor = "v2",
+                                      variable.features.n = 3000)
+saveRDS(seurat_sctnorm, file="seurat_sct.rds")
 ```
-
 
 ## Look at UMAPs post SCT
 
@@ -352,22 +334,13 @@ The plots below show the same variables as before, this time **displayed on the 
 
 We qualitatively reviewed the "structure" in our normalized data projection . We were particularly interested in seeing whether similar cell populations across samples clustered together (i.e. overlapped on the UMAP). 
 
-
-
 ```{r, fig.width=10}
-
-
 DefaultAssay(seurat_sctnorm) <- "SCT"
-
-
-UMAPPlot(seurat_sctnorm, group.by = "sex") + ggtitle("UMAP by sex")
-
+seurat_sctnorm <- RunPCA(seurat_sctnorm)
+UMAPPlot(seurat_sctnorm, group.by = "orig.ident") + ggtitle("UMAP")
 ```
 
-
-
-
-### Cell cycle
+## Cell cycle
 
 The phase of the cell cycle that cells are in at the time of sample preparation can introduce some variability in the transcriptome that we are not interested in exploring. 
 
@@ -375,38 +348,23 @@ To examine cell cycle variation in our data, we assign a score to each cell, der
 
 Unless cells very strongly cluster by phase of the cell cycle (which is not the case here), we do not recommend to regress out the effect of the cell cycle.
 
-```{r cell_cycle_scoring, message=FALSE, warning=FALSE}
+```{r cell_cycle_scoring2, message=FALSE, warning=FALSE}
 # Step 1 - Get cell cycle markers
 ## Cell cycle markers for c.elegans, human, mouse, D. rerio, and D. melanogaster can be found here: https://github.com/hbc/tinyatlas/tree/1e2136a35e773f14d97ae9cbdb6c375327b2dd2b/cell_cycle
-
-
-# Source cell cycle markers
-cc_markers = read.csv("/path/to/cell/cycle/markers", sep=",")
-
-
-
 # Compute cell cycle score for each cell
 seurat_sctnorm <- CellCycleScoring(seurat_sctnorm,
-                                g2m.features = cc_markers$external_gene_name[cc_markers$phase=="G2/M"],
-                                s.features = cc_markers$external_gene_name[cc_markers$phase=="S"])
-
+                                g2m.features = cc_markers$gene_name[cc_markers$phase=="G2/M"],
+                                s.features = cc_markers$gene_name[cc_markers$phase=="S"])
 
 ## Plot cell cycle (grouped by) along with covariates (split.by).  Add in your covariates of interest
-
-UMAPPlot(seurat_sctnorm, group.by = "Phase", split.by = "sex") + ggtitle("UMAP (split by sex)") 
-
-
+UMAPPlot(seurat_sctnorm, group.by = "Phase", split.by = "orig.ident") + ggtitle("UMAP") 
 ```
 
-
-
-### mitoRatio
+## mitoRatio
 
 The mitochondrial to nuclear gene ratio (mitoRatio) is a marker of cellular stress and might also affect cell clustering. For this dataset, we have seen during QC that the fraction of mitochondrial genes was negligible (which is good). Therefore, we do not expect the need to regress out this variable for normalization purposes, but it's always good to check.
 
-```{r mito_ratio}
-
-
+```{r mito_ratio2}
 ## This custom function by Amelie Jule creates great plots for looking at different QC parameters across the UMAP
 
 signaturePlot <- function(seurat_object,
@@ -438,71 +396,49 @@ signaturePlot <- function(seurat_object,
   
 }
 
-
-
 ### Here we apply the function. gene_signature is whatever qc metric you care about and split_var should be a covariate of interest. Adjust the titles to match the covariate groups. If you have more than 2 covariate groups then you will have multiple plots g[[3]]....g[[n]]
 
 g <- signaturePlot(seurat_sctnorm, 
                    gene_signature = "mitoRatio",
-                   split_var = "sex")
-g[[1]] + ggtitle("Female") | g[[2]] + ggtitle("Male")
-
+                   split_var = "orig.ident")
+g[[1]] + ggtitle("S1") | g[[2]] + ggtitle("S2")
 ```
 
-
-### nUMIs (nCount)
-
+## nUMIs (nCount)
 
 ```{r}
-
 ### Here we apply the function. gene_signature is whatever qc metric you care about and split_var should be a covariate of interest. Adjust the titles to match the covariate groups. If you have more than 2 covariate groups then you will have multiple plots g[[3]]....g[[n]]
 
 g <- signaturePlot(seurat_sctnorm, 
                    gene_signature = "nCount_RNA",
-                   split_var = "sex")
-g[[1]] + ggtitle("Female") | g[[2]] + ggtitle("Male")
-
-
-
+                   split_var = "orig.ident")
+g[[1]] + ggtitle("S1") | g[[2]] + ggtitle("S2")
 ```
 
-
-
-### nGenes (nFeature)
-
+## nGenes (nFeature)
 
 ```{r}
-
 ### Here we apply the function. gene_signature is whatever qc metric you care about and split_var should be a covariate of interest. Adjust the titles to match the covariate groups. If you have more than 2 covariate groups then you will have multiple plots g[[3]]....g[[n]]
-
 
 g <- signaturePlot(seurat_sctnorm, 
                    gene_signature = "nFeature_RNA",
-                   split_var = "sex")
-g[[1]] + ggtitle("Female") | g[[2]] + ggtitle("Male")
-
-
+                   split_var = "orig.ident")
+g[[1]] + ggtitle("S1") | g[[2]] + ggtitle("S2")
 ```
 
-
 ## Complexity
-
 
 ```{r}
 
 ### Here we apply the function. gene_signature is whatever qc metric you care about and split_var should be a covariate of interest. Adjust the titles to match the covariate groups. If you have more than 2 covariate groups then you will have multiple plots g[[3]]....g[[n]]
 
-
 g <- signaturePlot(seurat_sctnorm, 
                    gene_signature = "Log10GenesPerUMI",
-                   split_var = "sex")
-g[[1]] + ggtitle("Female") | g[[2]] + ggtitle("Male")
-
-
-
+                   split_var = "orig.ident")
+g[[1]] + ggtitle("S1") | g[[2]] + ggtitle("S2")
 ```
 
-## Run harmony and umaps again
+# Run harmony and umaps again
 
 If cells cluster by sample, condition, batch, dataset, modality, this integration step can greatly improve the clustering and the downstream analyses.
 
@@ -510,15 +446,21 @@ To integrate, we will use the shared highly variable genes (identified using SCT
 
 We use [`Harmony`](https://portals.broadinstitute.org/harmony/articles/quickstart.html), which is based on a transformation of principal components (PCs) to find similarities across datasets. Here we group samples by the original sample id.
 
-```{r}
+```{r, eval=file.exists("seurat_sct.rds")}
+#NOTE run the chunck below to create this object, and loading will be used while
+#     knitting to speed up the rendering
+seurat_harmony = readRDS("seurat_sct.rds")
+```
 
+```{r, eval=exists("seurat_harmony"), warning=FALSE, message=FALSE}
 ## Here seurat will integrate on the level of sample id. If you want to integrate on other aspects the SCT normalization will need to be done with all of the data together.  
-
-seurat_harmony <- IntegrateLayers(object = seurat_sctnorm, method = HarmonyIntegration,
+seurat_harmony <- IntegrateLayers(object = seurat_sctnorm,
+                                  method = HarmonyIntegration,
   orig.reduction = "pca", new.reduction = 'harmony',
   assay = "SCT", verbose = FALSE)
+seurat_sctnorm <- RunPCA(seurat_sctnorm)
 seurat_harmony <- RunUMAP(seurat_harmony, reduction = "harmony", dims = 1:40, reduction.name = "umap.harmony")
-
+saveRDS(seurat_harmony, file="seurat_harmony.rds")
 ```
 
 
@@ -534,36 +476,28 @@ p2 <- DimPlot(seurat_harmony, group.by = "orig.ident",
   theme(legend.position = "bottom") +
   ggtitle("post-integration")
 
-
 p1 | p2
 ```
 
-
 ## Clustering 
 
-For single-modality scRNA-seq analysis, `Seurat` clusters the cells using a Louvain clustering approach. First, a K-nearest neighbor (KNN) graph is built, where cells are connected if they have a similar transcriptome, as determined from their scores on the first `r rpcs` PCs. Then, the graph is partitioned into "communities" or "clusters" of interconnected cells that are more tightly connected with each other than with cells outside of the corresponding cluster.
+For single-modality scRNA-seq analysis, `Seurat` clusters the cells using a Louvain clustering approach. First, a K-nearest neighbor (KNN) graph is built, where cells are connected if they have a similar transcriptome, as determined from their scores on the first PCs. Then, the graph is partitioned into "communities" or "clusters" of interconnected cells that are more tightly connected with each other than with cells outside of the corresponding cluster.
 
 A limitation of this approach is that the number of identified clusters depends on the chosen resolution, a parameter that must be set by the user and does not necessarily reflect the underlying biology of the dataset. For most single-cell datasets, a resolution of 0.1 to 1 will provide a reasonable number of clusters. Complex datasets with multiple cell types may require a larger resolution, and vice versa.
 
-
-
 ```{r find_neighbors all,  echo=TRUE}
-seurat_harmony <- FindNeighbors(seurat_harmony, reduction = "harmony", dims = 1:40)
-
-
+seurat_harmony <- FindNeighbors(seurat_harmony, assay = "SCT",
+                                reduction = "harmony", dims = 1:40)
+# check graph names names(seurat_harmony@graphs)
+# DefaultAssay(object = seurat_harmony[["pca"]])
 seurat_clust <- FindClusters(object = seurat_harmony,
-                              resolution = c(0.1, 0.2, 0.4, 0.6, 0.8, 1.0), verbose = FALSE)
-
+                             resolution = c(0.1, 0.2, 0.4, 0.6, 0.8, 1.0),
+                             verbose = FALSE)
 ```
-
-
 
 ## Clustering Tree 
 
-
 We build a clustering tree using the [clustree](https://lazappi.github.io/clustree/articles/clustree.html) package to show how cells move as the clustering resolution is increased. Each cluster forms a node in the tree and edges are constructed by considering the cells in a cluster at a lower resolution (say 𝑘=2) that end up in a cluster at the next highest resolution (say 𝑘=3). By connecting clusters in this way we can see how clusters are related to each other, which are clearly distinct and which are unstable. The size of each node is related to the number of samples in each cluster and the color indicates the clustering resolution. Edges are colored according to the number of samples they represent and the transparency shows the incoming node proportion, the number of samples in the edge divided by the number of samples in the node it points to. 
-
-
 
 ```{r, fig.height=10, fig.width=8}
 library(clustree)
@@ -571,12 +505,8 @@ library(clustree)
 meta = seurat_clust@meta.data
 meta = na.omit(meta)
 
-
 ## Change the prefix to match your clusters
-
 clustree(meta, prefix = "SCT_snn_res.")
-
-
 ```
 
 ## Visualize clusters {.tabset}
@@ -586,16 +516,15 @@ We take a look at how the clusters look at resolutions 0.1, 0.2,0.4, and 0.6
 ### 0.1
 
 ```{r umap_0.1}
-cluster_res <- 0.1
+cluster_res <- 0.2
 Idents(object = seurat_clust) <- paste0("SCT_snn_res.", cluster_res)
 DimPlot(seurat_clust,
-        reduction = "umap",
-        split.by = "surgery",
+        reduction = "umap.harmony",
+        split.by = "orig.ident",
         label = TRUE)
 ```
 
 * * *
-
 
 ### 0.2
 
@@ -603,14 +532,12 @@ DimPlot(seurat_clust,
 cluster_res <- 0.2
 Idents(object = seurat_clust) <- paste0("SCT_snn_res.", cluster_res)
 DimPlot(seurat_clust,
-        reduction = "umap",
-        split.by = "surgery",
+        reduction = "umap.harmony",
+        split.by = "orig.ident",
         label = TRUE)
 ```
 
 * * *
-
-
 
 ### 0.4
 
@@ -618,22 +545,20 @@ DimPlot(seurat_clust,
 cluster_res <- 0.4
 Idents(object = seurat_clust) <- paste0("SCT_snn_res.", cluster_res)
 DimPlot(seurat_clust,
-        reduction = "umap",
-        split.by = "surgery",
+        reduction = "umap.harmony",
+        split.by = "orig.ident",
         label = TRUE)
 ```
 
 * * *
-
-
 ### 0.6
 
 ```{r umap_0.6}
 cluster_res <- 0.6
 Idents(object = seurat_clust) <- paste0("SCT_snn_res.", cluster_res)
 DimPlot(seurat_clust,
-        reduction = "umap",
-        split.by = "surgery",
+        reduction = "umap.harmony",
+        split.by = "orig.ident",
         label = TRUE)
 ```
 
@@ -641,6 +566,6 @@ DimPlot(seurat_clust,
 
 
 ```{r}
-saveRDS(seurat_clust, "seurat_clust.RDs")
+saveRDS(seurat_clust, file=seurat_output)
 ```
 
