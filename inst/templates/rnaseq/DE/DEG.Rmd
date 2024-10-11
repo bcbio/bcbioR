@@ -604,7 +604,7 @@ fa_list=lapply(de_list,function(contrast){
   input_entrezid <- AnnotationDbi::select(org.Hs.eg.db, ora_input, 'ENSEMBL', columns = c('ENTREZID', 'SYMBOL'))
   up=run_fora(input_entrezid, universe_mapping,all_in_life)
 
-  ora_input = res %>% filter(!is.na(padj), padj<0.01, lfc<0.3) %>% pull(gene_id)
+  ora_input = res %>% filter(!is.na(padj), padj<0.01, lfc<-0.3) %>% pull(gene_id)
   #change to the right species
   input_entrezid <- AnnotationDbi::select(org.Hs.eg.db, ora_input, 'ENSEMBL', columns = c('ENTREZID', 'SYMBOL'))
   down=run_fora(input_entrezid, universe_mapping,all_in_life)

@@ -103,6 +103,8 @@ library(qs)
 library(EnhancedVolcano)
 library(ggprism)
 library(ChIPseeker)
+library(msigdbr)
+library(fgsea)
 
 if (params$species == 'mouse'){
   library(TxDb.Mmusculus.UCSC.mm10.knownGene)
@@ -265,9 +267,15 @@ results_anno_batch <- annotatePeakInBatch(results_report,
 
 results_anno_batch_df <- results_anno_batch %>% as.data.frame()
 
-entrez_to_symbol <- AnnotationDbi::select(org.Mm.eg.db, results_anno_batch_df$feature, 
-                                          "ENTREZID", columns = 'SYMBOL') %>%
-  filter(!is.na(ENTREZID)) %>% distinct()
+if(params$species == 'mouse'){
+  entrez_to_symbol <- AnnotationDbi::select(org.Mm.eg.db, results_anno_batch_df$feature, 
+                                            "ENTREZID", columns = 'SYMBOL') %>%
+    filter(!is.na(ENTREZID)) %>% distinct()
+} else if (params$species == 'human'){
+  entrez_to_symbol <- AnnotationDbi::select(org.Hs.eg.db, results_anno_batch_df$feature, 
+                                            "ENTREZID", columns = 'SYMBOL') %>%
+    filter(!is.na(ENTREZID)) %>% distinct()
+}
 
 results_anno_batch_df <- results_anno_batch_df %>% 
   left_join(entrez_to_symbol %>% dplyr::select(feature = ENTREZID, gene_name = SYMBOL))
@@ -316,10 +324,12 @@ results_mod <- results_sig_anno_batch_df %>%
 # show <- as.data.frame(results_mod[1:6, c("Fold", "FDR", "gene_name")])
 
 show <- results_mod %>% filter(!is.na(gene_name)) %>% slice_min(n = 6, order_by = FDR)
+
+results_mod <- results_mod %>% mutate(gene_name = ifelse(peak %in% show$peak  , gene_name, NA))
 EnhancedVolcano(results_mod,
                 lab= results_mod$gene_name,
                 pCutoff = 0.05, 
-                # selectLab = c(show$gene_name),
+                selectLab = c(show$gene_name),
                 FCcutoff = 0.5,
                 x = 'Fold',
                 y = 'FDR', 
@@ -368,6 +378,64 @@ plotDistToTSS(results_sig_anno)
 ```
 
 # Functional Enrichment
+
+Over-Representation Analysis (ORA) is a statistical method used to determine whether a predefined set of genes (e.g., genes belonging to a specific biological pathway or function) is over-represented (or enriched) among a list of differentially bound genes (DEGs) from ChIP-seq. Adventages of ORA:
+
+- Simplicity: Easy to perform and interpret.
+- Biological Insight: Helps to identify pathways and processes that are significantly affected in the condition studied.
+- Prior Knowledge Integration: Utilizes existing biological knowledge through predefined gene sets.
+
+```{r get databases}
+if(params$species == 'human'){
+  all_in_life=get_databases()
+} else if (params$species == 'mouse'){
+  all_in_life = get_databases('Mus musculus')
+}
+```
+
+```{r ora}
+
+universe_mapping = results_anno_batch_df %>% 
+    filter(!is.na(FDR), !is.na(feature)) %>% 
+  dplyr::select(ENTREZID = feature, SYMBOL = gene_name) %>% distinct()
+
+ora_input = results_anno_batch_df %>% 
+  filter(!is.na(FDR), FDR < 0.01, abs(Fold) > 0.3, !is.na(feature)) %>% 
+  dplyr::select(ENTREZID = feature, SYMBOL = gene_name) %>% distinct()
+all = run_fora(ora_input, universe_mapping, all_in_life)
+
+ora_input = results_anno_batch_df %>% 
+  filter(!is.na(FDR), FDR < 0.01, Fold > 0.3, !is.na(feature)) %>% 
+  dplyr::select(ENTREZID = feature, SYMBOL = gene_name) %>% distinct()
+up = run_fora(ora_input, universe_mapping, all_in_life)
+
+ora_input = results_anno_batch_df %>% 
+  filter(!is.na(FDR), FDR < 0.01, Fold < -0.3, !is.na(feature)) %>% 
+  dplyr::select(ENTREZID = feature, SYMBOL = gene_name) %>% distinct()
+down = run_fora(ora_input, universe_mapping, all_in_life)
+  
+```
+
+
+## Significant pathways using all DB genes
+
+```{r all pathways}
+all %>% sanitize_datatable()
+```
+
+
+## Significant pathways using increased DB genes
+
+```{r up pathways}
+up %>% sanitize_datatable()
+```
+
+
+## Significant pathways using decreased DB genes
+
+```{r down pathways, results='asis'}
+down %>% sanitize_datatable()
+```
 
 # R session
 
