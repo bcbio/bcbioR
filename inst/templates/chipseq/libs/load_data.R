@@ -114,3 +114,47 @@ make_diffbind_samplesheet <- function(coldata, bam_dir, peaks_dir, column = NULL
   
   return(samplesheet)
 }
+
+get_databases=function(sps="human"){
+  all_in_life=list(
+    msigdbr(species = sps, category = "H") %>% mutate(gs_subcat="Hallmark"),
+    #  msigdbr(species = "human", category = "C2", subcategory = "CP:REACTOME"),
+    msigdbr(species = sps, category = "C2", subcategory = "CP:KEGG"),
+    #  msigdbr(species = "human", category = "C2", subcategory = "CP:PID"),
+    msigdbr(species = sps, category = "C5", subcategory = "GO:BP"),
+    msigdbr(species = sps, category = "C5", subcategory = "GO:MF")
+    #  msigdbr(species = "human", category = "C5", subcategory = "HPO"),
+    #  msigdbr(species = "human", category = "C3", subcategory = "TFT:GTRD"),
+    #  msigdbr(species = "human", category = "C6") %>% mutate(gs_subcat="Oncogenic")
+  )
+  all_in_life
+}
+
+run_fora=function(input, uni,all_in_life){
+  # browser()
+  total_deg=length(unique(input))/length(unique(uni$ENTREZID))
+  pathways_ora_all = lapply(all_in_life, function(p){
+    pathway = split(x = p$entrez_gene, f = p$gs_name)
+    db_name = paste(p$gs_cat[1], p$gs_subcat[1],sep=":")
+    respath <- fora(pathways = pathway,
+                    genes = unique(input$ENTREZID),
+                    universe = unique(uni$ENTREZID),
+                    minSize  = 15,
+                    maxSize  = 500)
+    # coll_respath = collapsePathwaysORA(respath[order(pval)][padj < 0.1],
+    #                                    pathway, unique(input$ENTREZID), unique(uni$ENTREZID))
+    as_tibble(respath)  %>%
+      mutate(database=db_name, NES=(overlap/size)/(total_deg))
+  }) %>% bind_rows() %>%
+    mutate(analysis="ORA")
+  ora_tb = pathways_ora_all %>% unnest(overlapGenes) %>%
+    group_by(pathway) %>%
+    left_join(uni, by =c("overlapGenes"="ENTREZID")) %>%
+    dplyr::select(pathway, padj, NES, SYMBOL, analysis,
+                  database) %>%
+    group_by(pathway,padj,NES,database,analysis) %>%
+    summarise(genes=paste(SYMBOL,collapse = ","))
+  ora_tb
+  
+}
+
