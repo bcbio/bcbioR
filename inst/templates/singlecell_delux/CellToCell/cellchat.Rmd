@@ -1,0 +1,456 @@
+---
+title: "CellChat"
+author: "Harvard Chan Bioinformatics Core"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+  code_folding: hide
+  df_print: paged
+  highlights: pygments
+  number_sections: false
+  self_contained: true
+  theme: default
+  toc: true
+  toc_float:
+    collapsed: true
+    smooth_scroll: true
+editor_options: 
+  chunk_output_type: console
+params:
+  project_file: information.R
+  seurat_fn: ../data/fDat_sn_RC.rds
+  cellchat_fn: ../data/snrna_cellchat.qs
+  cellchat_grade2_fn: ../data/snrna_cellchat_grade2.qs
+  cellchat_grade0_fn: ../data/snrna_cellchat_grade0.qs
+---
+
+```{r, cache = FALSE, message = FALSE, warning=FALSE}
+# This set up the working directory to this file so all files can be found
+library(rstudioapi)
+setwd(fs::path_dir(getSourceEditorContext()$path))
+# NOTE: This code will check version, this is our recommendation, it may work
+#.      other versions
+stopifnot(R.version$major>= 4) # requires R4
+stopifnot(compareVersion(R.version$minor,"3.3")==0) # requires >=4.3.3
+stopifnot(compareVersion(as.character(BiocManager::version()), "3.18")>=0)
+stopifnot(compareVersion(as.character(packageVersion("Seurat")), "5.0.0")>=0)
+```
+
+This code is in this ![](https://img.shields.io/badge/status-draft-grey) revision.
+
+```{r load_libraries, cache = FALSE, message = FALSE, warning=FALSE, echo=FALSE}
+# NOTE change or remove according your environment
+reticulate::use_virtualenv("/n/app/bcbio/R4.3.1_python_cellchat")
+reticulate::py_config() # should show v3.9.14
+Sys.getenv("PYTHONPATH") # should be empty
+
+current_libs <- .libPaths()
+.libPaths(c('/n/app/bcbio/R4.3.1_cellchat/', current_libs))
+```
+
+```{r}
+library(CellChat)
+
+library(tidyverse)
+library(Seurat)
+library(bcbioR)
+library(ggprism)
+library(knitr)
+library(tools)
+library(qs)
+library(patchwork)
+library(ComplexHeatmap)
+
+options(stringsAsFactors = FALSE)
+
+colors=cb_friendly_cols(1:15)
+ggplot2::theme_set(theme_prism(base_size = 14))
+opts_chunk[["set"]](
+    cache = F,
+    cache.lazy = FALSE,
+    dev = c("png", "pdf"),
+    error = TRUE,
+    highlight = TRUE,
+    message = FALSE,
+    prompt = FALSE,
+    tidy = FALSE,
+    warning = FALSE,
+    echo = T, 
+    fig.height = 4)
+
+# set seed for reproducibility
+set.seed(1234567890L)
+
+cellchat_ran <- file.exists(params$cellchat_fn)
+cellchat_rejection_ran <- file.exists(params$cellchat_grade2_fn) & file.exists(params$cellchat_grade0_fn)
+```
+
+# Clustering
+
+```{r load_data }
+
+snrna <- readRDS(params$seurat_fn)
+
+# in this case, Chris_annot = cell_type
+DimPlot(snrna, reduction = 'umap', group.by = 'Chris_annot')
+
+```
+
+```{r prep cellchat inputs, eval = !cellchat_ran }
+
+# need to use normalized counts as input
+data.input <- snrna[["SCT"]]@data 
+labels <- snrna$Chris_annot
+meta <- data.frame(labels = labels, row.names = names(labels), samples = snrna$orig.ident) 
+
+```
+
+```{r create cellchat object, eval = !cellchat_ran }
+cellchat <- createCellChat(object = data.input, meta = meta, group.by = "labels")
+
+```
+
+```{r set cellchat db, eval = !cellchat_ran}
+CellChatDB <- CellChatDB.human 
+CellChatDB.use <- subsetDB(CellChatDB)
+cellchat@DB <- CellChatDB.use
+
+```
+
+```{r subset and preprocess data, eval = !cellchat_ran }
+
+cellchat <- subsetData(cellchat) 
+cellchat <- updateCellChat(cellchat)
+future::plan("multisession", workers = 8) # recommend running with at 8-16 cores
+cellchat <- identifyOverExpressedGenes(cellchat) # may take a couple minutes
+cellchat <- identifyOverExpressedInteractions(cellchat) # may take a couple minutes
+
+```
+
+```{r compute communication prob, eval = !cellchat_ran}
+
+# Not recommended: project gene expression data onto protein-protein interaction network. 
+# Useful with shallow sequencing depth but introduces many weak communications. 
+# If used, must set raw.use = FALSE when running computeCommunProb
+# cellchat <- projectData(cellchat, PPI.human)
+
+
+# this next command takes 0.5-2+ hours
+# can choose various methods for caculating average gene exp per group, 
+# 'triMean' allegedly produces fewer but stronger interactions
+cellchat <- computeCommunProb(cellchat, type = "triMean") 
+
+#  filter out the cell-cell communication if < 50 cells per group
+cellchat <- filterCommunication(cellchat, min.cells = 50)
+
+qsave(cellchat, '../data/snrna_cellchat.qs', preset = 'fast')
+
+```
+
+# Overall Results 
+
+```{r load cellchat, eval = cellchat_ran}
+cellchat <- qread(params$cellchat_fn)
+
+df.net <- subsetCommunication(cellchat) %>% dplyr::arrange(pval) 
+df.net %>% sanitize_datatable()
+
+```
+
+## Top interactions {.tabset}
+```{r check pairs, results = 'asis', fig.width = 8, fig.height = 12}
+
+top_ints <- (df.net %>% pull(interaction_name) %>% unique)[1:10] 
+for (interaction in top_ints){
+  cat('\n')
+  cat('### ', as.character(interaction), '\n')
+  interactors <- unlist(strsplit(as.character(interaction), '_'))
+  p1 <- VlnPlot(snrna, features = interactors, group.by = 'Chris_annot', 
+                pt.size = 0.1, log = T, ncol = 1) 
+  print(p1)
+  cat('\n')
+}
+
+```
+
+```{r compute pathway communication probs, eval = cellchat_ran}
+cellchat <- computeCommunProbPathway(cellchat)
+cellchat <- aggregateNet(cellchat)
+
+```
+
+## Visualize Cell-Cell Communication Networks
+
+```{r chord plots, fig.width = 10, fig.height = 8, eval = cellchat_ran}
+
+groupSize <- as.numeric(table(cellchat@idents))
+par(mfrow = c(1,2), xpd=TRUE)
+netVisual_circle(cellchat@net$count, vertex.weight = rowSums(cellchat@net$count), 
+                 weight.scale = T, label.edge= F, title.name = "Number of interactions")
+netVisual_circle(cellchat@net$weight, vertex.weight = rowSums(cellchat@net$weight), 
+                 weight.scale = T, label.edge= F, title.name = "Interaction weights/strength")
+
+```
+
+```{r heatmaps, eval = cellchat_ran}
+
+netVisual_heatmap(cellchat, measure = "count", color.heatmap = "Blues")
+netVisual_heatmap(cellchat, measure = "weight", color.heatmap = "Blues")
+
+```
+
+# Comparison Results
+
+Here we run the CellChat analysis twice, once on the Grade 2 rejection samples and once on the Grade 0 rejection samples. We compare the significant signaling interactions and investigate changes in them between rejection grades. 
+
+```{r prep inputs rejection, eval=!cellchat_rejection_ran}
+
+grade2 <- subset(snrna, orig.ident %in% c('BRI-2396', 'BRI-2402'))
+grade0 <- subset(snrna, orig.ident %in% c('BRI-2395', 'BRI-2411'))
+
+data.input_grade2 <- grade2[["SCT"]]@data 
+labels_grade2 <- grade2$Chris_annot
+meta_grade2 <- data.frame(labels = labels_grade2, row.names = names(labels_grade2), samples = grade2$orig.ident) 
+
+data.input_grade0 <- grade0[["SCT"]]@data 
+labels_grade0 <- grade0$Chris_annot
+meta_grade0 <- data.frame(labels = labels_grade0, row.names = names(labels_grade0), samples = grade0$orig.ident) 
+
+```
+
+```{r create cellchat object rejection, eval=!cellchat_rejection_ran}
+cellchat_grade2 <- createCellChat(object = data.input_grade2, meta = meta_grade2, group.by = "labels")
+cellchat_grade0 <- createCellChat(object = data.input_grade0, meta = meta_grade0, group.by = "labels")
+
+```
+
+```{r subset and preprocess data rejection, eval=!cellchat_rejection_ran}
+
+future::plan("multisession", workers = 8) # recommend running with at 8-16 cores
+
+cellchat_grade2@DB <- CellChatDB.use
+cellchat_grade0@DB <- CellChatDB.use
+
+cellchat_grade2 <- subsetData(cellchat_grade2) 
+cellchat_grade2 <- updateCellChat(cellchat_grade2)
+cellchat_grade2 <- identifyOverExpressedGenes(cellchat_grade2) # may take a couple minutes
+cellchat_grade2 <- identifyOverExpressedInteractions(cellchat_grade2) # may take a couple minutes
+
+cellchat_grade0 <- subsetData(cellchat_grade0) 
+cellchat_grade0 <- updateCellChat(cellchat_grade0)
+cellchat_grade0 <- identifyOverExpressedGenes(cellchat_grade0) # may take a couple minutes
+cellchat_grade0 <- identifyOverExpressedInteractions(cellchat_grade0) # may take a couple minutes
+
+```
+
+```{r compute communication prob rejection, eval=!cellchat_rejection_ran}
+cellchat_grade2 <- computeCommunProb(cellchat_grade2, type = "triMean") # command takes 0.5-2+ hours
+cellchat_grade2 <- filterCommunication(cellchat_grade2, min.cells = 50)
+qsave(cellchat_grade2, params$cellchat_grade2_fn, preset = 'fast')
+
+cellchat_grade0 <- computeCommunProb(cellchat_grade0, type = "triMean") # command takes 0.5-2+ hours
+cellchat_grade0 <- filterCommunication(cellchat_grade0, min.cells = 50)
+qsave(cellchat_grade0, params$cellchat_grade0_fn, preset = 'fast')
+
+```
+
+```{r load cellchat rejection, eval = cellchat_rejection_ran}
+
+cellchat_grade2 <- qread(params$cellchat_grade2_fn)
+cellchat_grade0 <- qread(params$cellchat_grade0_fn)
+
+cellchat_grade2 <- filterCommunication(cellchat_grade2, min.cells = 50)
+cellchat_grade0 <- filterCommunication(cellchat_grade0, min.cells = 50)
+
+df.net_grade2 <- subsetCommunication(cellchat_grade2)%>% dplyr::arrange(pval) 
+df.net_grade0 <- subsetCommunication(cellchat_grade0)%>% dplyr::arrange(pval) 
+
+```
+
+## Grade 2
+
+```{r datatable grade 2, eval = cellchat_rejection_ran}
+df.net_grade2 %>% sanitize_datatable()
+
+```
+
+### Top interactions {.tabset}
+```{r check pairs grade 2, results = 'asis', fig.width = 8, fig.height = 12}
+
+top_ints <- (df.net_grade2 %>% pull(interaction_name) %>% unique)[1:10] 
+for (interaction in top_ints){
+  cat('\n')
+  cat('#### ', as.character(interaction), '\n')
+  interactors <- unlist(strsplit(as.character(interaction), '_'))
+  p1 <- VlnPlot(snrna, features = interactors, group.by = 'Chris_annot', pt.size = 0.1, log = T, ncol = 1) 
+  print(p1)
+  cat('\n')
+}
+
+```
+
+
+## Grade 0
+
+```{r datatable grade 0, eval = cellchat_rejection_ran}
+df.net_grade0 %>% sanitize_datatable()
+
+```
+
+### Top interactions {.tabset}
+```{r check pairs grade 0, results = 'asis', fig.width = 8, fig.height = 12}
+
+top_ints <- (df.net_grade0 %>% pull(interaction_name) %>% unique)[1:10] 
+for (interaction in top_ints){
+  cat('\n')
+  cat('#### ', as.character(interaction), '\n')
+  interactors <- unlist(strsplit(as.character(interaction), '_'))
+  p1 <- VlnPlot(snrna, features = interactors, group.by = 'Chris_annot', pt.size = 0.1, log = T, ncol = 1) 
+  print(p1)
+  cat('\n')
+}
+
+```
+
+```{r merge rejection objects, eval = cellchat_rejection_ran}
+
+cellchat_grade2 <- computeCommunProbPathway(cellchat_grade2)
+cellchat_grade2 <- aggregateNet(cellchat_grade2)
+cellchat_grade2 <- netAnalysis_computeCentrality(cellchat_grade2)
+cellchat_grade0 <- computeCommunProbPathway(cellchat_grade0)
+cellchat_grade0 <- aggregateNet(cellchat_grade0)
+cellchat_grade0 <- netAnalysis_computeCentrality(cellchat_grade0)
+
+object.list <- list(grade0 = cellchat_grade0, grade2 = cellchat_grade2)
+cellchat_merged <- mergeCellChat(object.list, add.names = names(object.list))
+
+df.net_merged <- subsetCommunication(cellchat_merged)
+
+```
+
+## Compare Interactions/Interaction Strength
+
+```{r compare interactions, eval = cellchat_rejection_ran}
+
+gg1 <- compareInteractions(cellchat_merged, show.legend = F, group = c(1,2))
+gg2 <- compareInteractions(cellchat_merged, show.legend = F, group = c(1,2), measure = "weight")
+gg1 + gg2
+
+```
+
+```{r chord plots merged, eval = cellchat_rejection_ran, fig.width = 10, fig.height = 8}
+par(mfrow = c(1,2), xpd=TRUE)
+netVisual_diffInteraction(cellchat_merged, weight.scale = T)
+netVisual_diffInteraction(cellchat_merged, weight.scale = T, measure = "weight")
+
+```
+
+```{r heatmaps merged, eval = cellchat_rejection_ran, fig.width = 10, fig.height = 8}
+
+gg1 <- netVisual_heatmap(cellchat_merged)
+gg2 <- netVisual_heatmap(cellchat_merged, measure = "weight")
+gg1 + gg2
+
+```
+
+## Compare Major Pathway Sources and Targets
+
+From the CellChat documentation: "Comparing the outgoing and incoming interaction strength in a 2D space allows ready identification of the cell populations with significant changes in sending or receiving signals between different datasets."
+
+```{r compare send/receive changes, eval = cellchat_rejection_ran, fig.width = 10, fig.height = 6}
+
+num.link <- sapply(object.list, function(x) {rowSums(x@net$count) + colSums(x@net$count)-diag(x@net$count)})
+weight.MinMax <- c(min(num.link), max(num.link)) # control the dot size in the different datasets
+gg <- list()
+for (i in 1:length(object.list)) {
+  gg[[i]] <- netAnalysis_signalingRole_scatter(object.list[[i]], title = names(object.list)[i], weight.MinMax = weight.MinMax)
+}
+patchwork::wrap_plots(plots = gg)
+```
+
+
+```{r identify signaling changes, eval = cellchat_rejection_ran, fig.width = 12, fig.height = 12}
+gg1 <- netAnalysis_signalingChanges_scatter(cellchat_merged, idents.use = "Vascular_EC")
+gg2 <- netAnalysis_signalingChanges_scatter(cellchat_merged, idents.use = "Lymphatic_EC")
+gg3 <- netAnalysis_signalingChanges_scatter(cellchat_merged, idents.use = "Pericyte")
+patchwork::wrap_plots(plots = list(gg1,gg2,gg3), nrow = 3, ncol = 1)
+
+```
+
+## Cluster Altered Signaling Interactions
+
+From the CellChat documentation: "CellChat performs joint manifold learning and classification of the inferred communication networks based on their functional and topological similarity across different conditions. 
+
+By quantifying the similarity between the cellular communication networks of signaling pathways across conditions, this analysis highlights the potentially altered signaling pathways. CellChat adopts the concept of network rewiring from network biology and hypothesized that the difference between different communication networks may affect biological processes across conditions. UMAP is used for visualizing signaling relationship and interpreting our signaling outputs in an intuitive way without involving the classification of conditions.
+
+Functional similarity: High degree of functional similarity indicates major senders and receivers are similar, and it can be interpreted as the two signaling pathways or two ligand-receptor pairs exhibit similar and/or redundant roles. 
+
+Structural similarity: A structural similarity was used to compare their signaling network structure, without considering the similarity of senders and receivers."
+
+
+### Based on Functional Similarity
+
+```{r identify signaling groups functional, eval = cellchat_rejection_ran}
+
+cellchat_merged <- computeNetSimilarityPairwise(cellchat_merged, type = "functional")
+cellchat_merged <- netEmbedding(cellchat_merged, type = "functional")
+cellchat_merged <- netClustering(cellchat_merged, type = "functional")
+netVisual_embeddingPairwise(cellchat_merged, type = "functional", label.size = 3.5)
+
+```
+
+### Based on Structural Similarity
+
+```{r identify signaling groups structural, eval = cellchat_rejection_ran}
+cellchat_merged <- computeNetSimilarityPairwise(cellchat_merged, type = "structural")
+cellchat_merged <- netEmbedding(cellchat_merged, type = "structural")
+cellchat_merged <- netClustering(cellchat_merged, type = "structural")
+netVisual_embeddingPairwise(cellchat_merged, type = "structural", label.size = 3.5)
+```
+
+## Compare Overall Signaling Information Flow
+
+"CellChat can identify the conserved and context-specific signaling pathways by simply comparing the information flow for each signaling pathway, which is defined by the sum of communication probability among all pairs of cell groups in the inferred network (i.e., the total weights in the network)."
+
+```{r info flow, fig.height = 9, eval = cellchat_rejection_ran}
+
+rankNet(cellchat_merged, mode = "comparison", measure = "weight", sources.use = NULL, targets.use = NULL, stacked = F, do.stat = TRUE)
+
+```
+
+## Compare Signaling Patterns Across Cell Populations
+
+"In this heatmap, colobar represents the relative signaling strength of a signaling pathway across cell groups (Note that values are row-scaled). The top colored bar plot shows the total signaling strength of a cell group by summarizing all signaling pathways displayed in the heatmap. The right grey bar plot shows the total signaling strength of a signaling pathway by summarizing all cell groups displayed in the heatmap."
+
+
+```{r outgoing signaling, fig.height = 9, eval = cellchat_rejection_ran}
+
+i = 1
+pathway.union <- union(object.list[[i]]@netP$pathways, object.list[[i+1]]@netP$pathways)
+ht1 = netAnalysis_signalingRole_heatmap(object.list[[i]], pattern = "outgoing", signaling = pathway.union, title = names(object.list)[i], width = 5, height = 16, cluster.cols = T)
+ht2 = netAnalysis_signalingRole_heatmap(object.list[[i+1]], pattern = "outgoing", signaling = pathway.union, title = names(object.list)[i+1], width = 5, height = 16, cluster.cols = T)
+draw(ht1 + ht2, ht_gap = unit(0.5, "cm"))
+```
+
+```{r incoming signaling, fig.height = 9, eval = cellchat_rejection_ran}
+ht1 = netAnalysis_signalingRole_heatmap(object.list[[i]], pattern = "incoming", signaling = pathway.union, title = names(object.list)[i], width = 5, height = 16, cluster.cols = T)
+ht2 = netAnalysis_signalingRole_heatmap(object.list[[i+1]], pattern = "incoming", signaling = pathway.union, title = names(object.list)[i+1], width = 5, height = 16, cluster.cols = T)
+draw(ht1 + ht2, ht_gap = unit(0.5, "cm"))
+```
+
+## Identify Dysfunctional Interaction Signaling Using Communication Probabilities
+
+"CellChat can identify the up-regulated (increased) and down-regulated (decreased) signaling ligand-receptor pairs in one dataset compared to the other dataset by comparing the communication probability between two datasets for each L-R pair and each pair of cell groups"
+
+```{r compare signaling, fig.height = 12, fig.width = 8, eval = cellchat_rejection_ran}
+
+gg1 <- netVisual_bubble(cellchat_merged, 
+                        # sources.use = c('Vascular_EC', 'Lymphatic_EC', 'Pericyte'),
+                        # targets.use = c('Vascular_EC', 'Lymphatic_EC', 'Pericyte'),
+                        comparison = c(1, 2), 
+                        max.dataset = 2, 
+                        title.name = "Increased signaling in Grade 2",
+                        angle.x = 45, 
+                        remove.isolate = T)
+gg1
+signaling.grade2_increased = gg1$data
