@@ -31,8 +31,8 @@ setwd(fs::path_dir(getSourceEditorContext()$path))
 #.      other versions
 stopifnot(R.version$major>= 4) # requires R4
 stopifnot(compareVersion(R.version$minor,"3.3")==0) # requires >=4.3.3
-stopifnot(compareVersion(BiocManager::version(), "3.18")>=0)
-stopifnot(compareVersion(package.version("Seurat"), "5.0.0")>=0)
+stopifnot(compareVersion(as.character(BiocManager::version()), "3.18")>=0)
+stopifnot(compareVersion(as.character(packageVersion("Seurat")), "5.0.0")>=0)
 ```
 
 This code is in this ![](https://img.shields.io/badge/status-alpha-yellow) revision.
@@ -43,16 +43,11 @@ This code is in this ![](https://img.shields.io/badge/status-alpha-yellow) revis
 ## This files needs gene_name and phase columns to work with this template
 
 cell_cycle_file="https://github.com/bcbio/resources/raw/refs/heads/main/singlecell/human_cell_cycle.csv"
-# Source cell cycle markers
-cc_markers = read_csv(cell_cycle_file)
-stopifnot(c("gene_name", "phase") %in% colnames(cc_markers))
-
 seurat_obj="https://github.com/bcbio/bcbioR-test-data/raw/refs/heads/main/singlecell/tiny.rds"
 seurat_output="/tmp/seurat_clust.rds"
 
 source(params$project_file)
 ```
-
 
 ```{r setup, cache=FALSE, message=FALSE, warning=FALSE, echo=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -65,7 +60,19 @@ library(data.table)
 library(DT)
 library(patchwork)
 library(clustree)
+library(ggprism)
+library(grafify)
+library(R.utils)
 #library(future)
+
+ggplot2::theme_set(theme_prism(base_size = 12))
+# https://grafify-vignettes.netlify.app/colour_palettes.html
+# NOTE change colors here if you wish
+scale_colour_discrete <- function(...)
+  scale_colour_manual(..., values = as.vector(grafify:::graf_palettes[["kelly"]]))
+
+#options(ggplot2.discrete.colour= )
+
 # Set seed for reproducibility
 set.seed(1454944673L)
 opts_chunk[["set"]](
@@ -73,7 +80,7 @@ opts_chunk[["set"]](
     cache = FALSE,
     cache.lazy = FALSE,
     error = TRUE,
-    echo = FALSE,
+    echo = TRUE,
     fig.height = 5L,
     fig.retina = 2L,
     fig.width = 9.6,
@@ -91,7 +98,6 @@ opts_chunk[["set"]](
 -   Experiment: `r experiment`
 -   Aim: `r aim`
 
-
 ## Dataset
 
 The Seurat object used as input for this report was prepared with the thresholds detailed below applied. 
@@ -103,6 +109,10 @@ The Seurat object used as input for this report was prepared with the thresholds
 
 
 ```{r load_data, cache = TRUE}
+# Source cell cycle markers
+cc_markers = read_csv(cell_cycle_file)
+stopifnot(c("gene_name", "phase") %in% colnames(cc_markers))
+
 # Loading QC'd object
 if (isUrl(seurat_obj)){
   seurat_qc <- readRDS(url(seurat_obj))  
@@ -146,13 +156,12 @@ seurat_lognorm <- NormalizeData(seurat_qc,
 # Find variable genes (largest dispersion in expression across cells)
 seurat_lognorm <- FindVariableFeatures(seurat_lognorm, nfeatures = 2000)
 
-
 # Scale and center data
 seurat_lognorm <- ScaleData(seurat_lognorm, model.use = "linear")
 
 # Calculate PCs and UMAP
 seurat_lognorm <- RunPCA(seurat_lognorm)
-seurat_lognorm <- RunUMAP(seurat_lognorm, 1:50)
+seurat_lognorm <- RunUMAP(seurat_lognorm, 1:40)
 ```
 
 ## Examine highly variable genes
@@ -290,45 +299,28 @@ We searched for the top 3000 genes with the largest variability in expression le
 
 **We keep each sample separate for SCT normalization.**
 
-
-```{r, eval=file.exists("seurat_sct.rds")}
+```{r, eval=file.exists("seurat_sctnorm.rds")}
 #NOTE run the chunck below to create this object, and loading will be used while
 #     knitting to speed up the rendering
-seurat_sctnorm = readRDS("seurat_sct.rds")
+seurat_sctnorm = readRDS("seurat_sctnorm.rds")
 ```
 
-```{r rna_norm1, warning=FALSE, message=FALSE, eval=!exists("seurat_sctnorm")}
+```{r eval=!exists("seurat_sctnorm"), warning=FALSE, message=FALSE}
 #NOTE: this should be ran previous rendering to prepare the object
 ## Note that this single command replaces NormalizeData(), ScaleData(), and FindVariableFeatures()
 
 ## SCT can be run with and without regressing out variables. Generally we do not regress out covariates. However, we provide both options below.
+seurat_lognorm[["RNA"]] <- split(seurat_lognorm[["RNA"]],
+                                 f = seurat_lognorm$orig.ident)
 
-## To properly integrate with harmony we split our object by sample first.
-
-# split_sctnorm <- SplitObject(seurat_lognorm, split.by = "orig.ident")
-# 
-# for (i in 1:length(split_sctnorm)) {
-#     split_sctnorm[[i]] <- SCTransform(split_sctnorm[[i]],
-#                                       vst.flavor = "v2",
-#                                       variable.features.n = 3000)
-# }
-# 
-# integ_features <- SelectIntegrationFeatures(object.list = split_seurat, 
-#                                             nfeatures = 3000) 
-# split_seurat <- PrepSCTIntegration(object.list = split_seurat, 
-#                                    anchor.features = integ_features)
-#for (i in 1:length(split_seurat)) {
-#    split_seurat[[i]] <- SCTransform(split_seurat[[i]], vars.to.regress = c("mitoRatio"), vst.flavor = "v2", variable.features.n = 3000)
-# }
-
-seurat_lognorm[["RNA"]] <- split(seurat_lognorm[["RNA"]], f= seurat_lognorm$orig.ident)
 seurat_sctnorm <- SCTransform(seurat_lognorm,
-                                      vst.flavor = "v2",
-                                      variable.features.n = 3000)
-saveRDS(seurat_sctnorm, file="seurat_sct.rds")
+                              vst.flavor = "v2",
+                              # vars.to.regress = c("mitoRatio")
+                              variable.features.n = 3000)
+saveRDS(seurat_sctnorm, file="seurat_sctnorm.rds")
 ```
 
-## Look at UMAPs post SCT
+### Look at UMAPs post SCT
 
 The plots below show the same variables as before, this time **displayed on the UMAP calculated after applying SCT-normalization**.
 
@@ -438,7 +430,75 @@ g <- signaturePlot(seurat_sctnorm,
 g[[1]] + ggtitle("S1") | g[[2]] + ggtitle("S2")
 ```
 
-# Run harmony and umaps again
+
+# Integration
+
+## CCA integration
+
+```{r, eval=file.exists("seurat_cca.rds")}
+#NOTE run the chunck below to create this object, and loading will be used while
+#     knitting to speed up the rendering
+seurat_cca= readRDS("seurat_cca.rds")
+```
+
+```{r rna_cca, warning=FALSE, message=FALSE, eval=!exists("seurat_cca")}
+#NOTE: this should be ran previous rendering to prepare the object
+## Note that this single command replaces NormalizeData(), ScaleData(), and FindVariableFeatures()
+
+## SCT can be run with and without regressing out variables. Generally we do not regress out covariates. However, we provide both options below.
+
+## To properly integrate with harmony we split our object by sample first.
+split_sctnorm <- SplitObject(seurat_lognorm, split.by = "orig.ident")
+# NOTE If we have a large dataset, then we might need to adjust the limit for allowable object sizes within R
+# options(future.globals.maxSize = 4000 * 1024^2)
+for (i in 1:length(split_sctnorm)) {
+    split_sctnorm[[i]] <- SCTransform(split_sctnorm[[i]],
+                                      vst.flavor = "v2",
+                                      # vars.to.regress = c("mitoRatio")
+                                      variable.features.n = 3000)
+}
+
+integ_features <- SelectIntegrationFeatures(object.list = split_sctnorm,
+                                            nfeatures = 3000)
+split_sctnorm <- PrepSCTIntegration(object.list = split_sctnorm,
+                                   anchor.features = integ_features)
+
+# Find best buddies - can take a while to run
+integ_anchors <- FindIntegrationAnchors(object.list = split_sctnorm, 
+                                        normalization.method = "SCT", 
+                                        anchor.features = integ_features)
+# Integrate across conditions
+seurat_cca <- IntegrateData(anchorset = integ_anchors, 
+                            normalization.method = "SCT")
+
+# Rejoin the layers in the RNA assay that we split earlier
+seurat_cca[["RNA"]] <- JoinLayers(seurat_cca[["RNA"]])
+
+# Run PCA
+seurat_cca <- RunPCA(object = seurat_cca)
+
+# Run UMAP
+seurat_cca <- RunUMAP(seurat_cca, 
+                      reduction.name = "umap.cca",
+                      dims = 1:40)
+
+saveRDS(seurat_cca, file="seurat_cca.rds")
+```
+
+```{r}
+p1 <- DimPlot(seurat_lognorm, group.by = "orig.ident", 
+              reduction = "umap") + 
+  theme(legend.position = "bottom") +
+  ggtitle("pre-integration")
+p2 <- DimPlot(seurat_cca, group.by = "orig.ident", 
+              reduction = "umap.cca") + 
+  theme(legend.position = "bottom") +
+  ggtitle("post-integration")
+
+p1 | p2
+```
+
+## Harmony
 
 If cells cluster by sample, condition, batch, dataset, modality, this integration step can greatly improve the clustering and the downstream analyses.
 
@@ -446,23 +506,26 @@ To integrate, we will use the shared highly variable genes (identified using SCT
 
 We use [`Harmony`](https://portals.broadinstitute.org/harmony/articles/quickstart.html), which is based on a transformation of principal components (PCs) to find similarities across datasets. Here we group samples by the original sample id.
 
-```{r, eval=file.exists("seurat_sct.rds")}
+```{r rna_hrmny, eval=file.exists("seurat_harmony.rds")}
 #NOTE run the chunck below to create this object, and loading will be used while
 #     knitting to speed up the rendering
-seurat_harmony = readRDS("seurat_sct.rds")
+seurat_harmony = readRDS("seurat_harmony.rds")
 ```
 
-```{r, eval=exists("seurat_harmony"), warning=FALSE, message=FALSE}
+```{r, eval=!exists("seurat_harmony"), warning=FALSE, message=FALSE}
 ## Here seurat will integrate on the level of sample id. If you want to integrate on other aspects the SCT normalization will need to be done with all of the data together.  
+# seurat_sctnorm[["RNA"]] <- split(seurat_sctnorm[["RNA"]], f = seurat_sctnorm$orig.ident)
 seurat_harmony <- IntegrateLayers(object = seurat_sctnorm,
                                   method = HarmonyIntegration,
-  orig.reduction = "pca", new.reduction = 'harmony',
-  assay = "SCT", verbose = FALSE)
-seurat_sctnorm <- RunPCA(seurat_sctnorm)
-seurat_harmony <- RunUMAP(seurat_harmony, reduction = "harmony", dims = 1:40, reduction.name = "umap.harmony")
+                                  orig.reduction = "pca",
+                                  new.reduction = 'harmony',
+                                  assay = "SCT", verbose = FALSE)
+seurat_harmony <- RunPCA(seurat_harmony)
+seurat_harmony <- RunUMAP(seurat_harmony, reduction = "harmony",
+                          dims = 1:40,
+                          reduction.name = "umap.harmony")
 saveRDS(seurat_harmony, file="seurat_harmony.rds")
 ```
-
 
 ## Pre vs. Post integration 
 
@@ -471,12 +534,16 @@ p1 <- DimPlot(seurat_sctnorm, group.by = "orig.ident",
               reduction = "umap") + 
   theme(legend.position = "bottom") +
   ggtitle("pre-integration")
-p2 <- DimPlot(seurat_harmony, group.by = "orig.ident", 
+p2 <- DimPlot(seurat_cca, group.by = "orig.ident", 
+              reduction = "umap.cca") + 
+  theme(legend.position = "bottom") +
+  ggtitle("post-integration CCA")
+p3 <- DimPlot(seurat_harmony, group.by = "orig.ident", 
               reduction = "umap.harmony") + 
   theme(legend.position = "bottom") +
-  ggtitle("post-integration")
+  ggtitle("post-integration Harmony")
 
-p1 | p2
+p1 | p2 | p3
 ```
 
 ## Clustering 
@@ -486,11 +553,13 @@ For single-modality scRNA-seq analysis, `Seurat` clusters the cells using a Louv
 A limitation of this approach is that the number of identified clusters depends on the chosen resolution, a parameter that must be set by the user and does not necessarily reflect the underlying biology of the dataset. For most single-cell datasets, a resolution of 0.1 to 1 will provide a reasonable number of clusters. Complex datasets with multiple cell types may require a larger resolution, and vice versa.
 
 ```{r find_neighbors all,  echo=TRUE}
-seurat_harmony <- FindNeighbors(seurat_harmony, assay = "SCT",
-                                reduction = "harmony", dims = 1:40)
+# NOTE use seurat_harmony or seurat_cca
+# seurat_clust <- FindNeighbors(seurat_harmony, assay = "SCT",
+#                                 reduction = "harmony", dims = 1:40)
+seurat_clust <- FindNeighbors(seurat_cca, assay = "SCT", dims = 1:40)
 # check graph names names(seurat_harmony@graphs)
 # DefaultAssay(object = seurat_harmony[["pca"]])
-seurat_clust <- FindClusters(object = seurat_harmony,
+seurat_clust <- FindClusters(object = seurat_clust,
                              resolution = c(0.1, 0.2, 0.4, 0.6, 0.8, 1.0),
                              verbose = FALSE)
 ```
@@ -506,7 +575,13 @@ meta = seurat_clust@meta.data
 meta = na.omit(meta)
 
 ## Change the prefix to match your clusters
-clustree(meta, prefix = "SCT_snn_res.")
+# NOTE: this if you have run HARMONY
+# prefix_clu <- "SNN_res."
+# show_this <- "umap.harmony"
+# NOTE: this if you have run CCA
+prefix_clu <- "integrated_snn_res."
+show_this <- "umap.cca"
+clustree(meta, prefix = prefix_clu)
 ```
 
 ## Visualize clusters {.tabset}
@@ -517,9 +592,9 @@ We take a look at how the clusters look at resolutions 0.1, 0.2,0.4, and 0.6
 
 ```{r umap_0.1}
 cluster_res <- 0.2
-Idents(object = seurat_clust) <- paste0("SCT_snn_res.", cluster_res)
+Idents(object = seurat_clust) <- paste0(prefix_clu, cluster_res)
 DimPlot(seurat_clust,
-        reduction = "umap.harmony",
+        reduction = show_this,
         split.by = "orig.ident",
         label = TRUE)
 ```
@@ -530,9 +605,9 @@ DimPlot(seurat_clust,
 
 ```{r umap_0.2}
 cluster_res <- 0.2
-Idents(object = seurat_clust) <- paste0("SCT_snn_res.", cluster_res)
+Idents(object = seurat_clust) <- paste0(prefix_clu, cluster_res)
 DimPlot(seurat_clust,
-        reduction = "umap.harmony",
+        reduction = show_this,
         split.by = "orig.ident",
         label = TRUE)
 ```
@@ -543,9 +618,9 @@ DimPlot(seurat_clust,
 
 ```{r umap_0.4}
 cluster_res <- 0.4
-Idents(object = seurat_clust) <- paste0("SCT_snn_res.", cluster_res)
+Idents(object = seurat_clust) <- paste0(prefix_clu, cluster_res)
 DimPlot(seurat_clust,
-        reduction = "umap.harmony",
+        reduction = show_this,
         split.by = "orig.ident",
         label = TRUE)
 ```
@@ -555,9 +630,9 @@ DimPlot(seurat_clust,
 
 ```{r umap_0.6}
 cluster_res <- 0.6
-Idents(object = seurat_clust) <- paste0("SCT_snn_res.", cluster_res)
+Idents(object = seurat_clust) <- paste0(prefix_clu, cluster_res)
 DimPlot(seurat_clust,
-        reduction = "umap.harmony",
+        reduction = show_this,
         split.by = "orig.ident",
         label = TRUE)
 ```
