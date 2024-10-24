@@ -49,12 +49,13 @@ cb_friendly_palettes <- list(
   `cool`  = cb_friendly_cols("blue", "dark_purple", "purple", "sky_blue"),
   `hot`   = cb_friendly_cols("yellow", "light_orange", "dark_orange"),
   `grey`  = cb_friendly_cols("black", "dark_grey", "blue_grey"),
-  `heatmap` = cb_friendly_cols("blue", "white", "brown")
+  `heatmap` = cb_friendly_cols("blue", "white", "brown"),
+  `white_to_blue` = cb_friendly_cols('white', 'blue')
 )
 
 #' access cb friendly palette by name, reversing if necessary
 #'
-#' @param palette name of the palette to be returned
+#' @param palette name of the palette to be returned (main, cool, hot, grey, white_to_blue, or heatmap)
 #' @param reverse boolean, reverse order of colors in palette
 #' @param ... pass to ggplot
 #' @export
@@ -66,7 +67,7 @@ cb_friendly_pal <-function(palette = 'main', reverse = F, ...){
 
 #' use cb friendly colors as color aesthetic with ggplot
 #'
-#' @param palette name of the palette to be returned
+#' @param palette name of the palette to be returned (main, cool, hot, grey, white_to_blue, or heatmap)
 #' @param discrete boolean, whether to make palette discretely divided into colors or continuous
 #' @param reverse boolean, reverse order of colors in palette
 #' @param ... pass to ggplot
@@ -83,7 +84,7 @@ scale_color_cb_friendly <- function(palette = "main", discrete = TRUE, reverse =
 
 #' use cb friendly colors as fill aesthetic with ggplot
 #'
-#' @param palette name of the palette to be returned
+#' @param palette name of the palette to be returned (main, cool, hot, grey, white_to_blue, or heatmap)
 #' @param discrete boolean, whether to make palette discretely divided into colors or continuous
 #' @param reverse boolean, reverse order of colors in palette
 #' @param ... pass to ggplot
