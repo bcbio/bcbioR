@@ -23,12 +23,11 @@ params:
   params_file: params_diffbind-example.R
   project_file: ../information.R
   functions_file: ../libs/load_data.R
-  diffbind_counts_file: diffbind_counts.qs 
   condition_of_interest: genotype
   numerator: cKO
   denominator: WT
   species: mouse
-  counts_fn: diffbind_counts.csv
+  counts_csv_fn: diffbind_counts.csv
   results_sig_anno_fn: diffbind_results_anno.csv
 ---
 Template developed with materials from https://hbctraining.github.io/main/.
@@ -40,9 +39,9 @@ setwd(fs::path_dir(getSourceEditorContext()$path))
 
 # NOTE: This code will check version, this is our recommendation, it may work
 #.      other versions
-# stopifnot(R.version$major>= 4) # requires R4
-# stopifnot(compareVersion(R.version$minor,"3.3")==0) # requires >=4.3.3
-# stopifnot(compareVersion(BiocManager::version(), "3.18")>=0)
+stopifnot(R.version$major>= 4) # requires R4
+stopifnot(compareVersion(R.version$minor,"3.3")>=0) # requires >=4.3.3
+stopifnot(compareVersion(as.character(BiocManager::version()), "3.18")>=0)
 ```
 
 This code is in this ![](https://img.shields.io/badge/status-alpha-yellow) revision.
@@ -147,10 +146,26 @@ sanitize_datatable = function(df, ...) {
 }
 ```
 
-# Samples and metadata
+```{r download example data, eval = params$params_file == 'params_diffbind-example.R'}
 
-```{r load_data, message=F, warning=F}
+# if using example data, download it from github
+new_samplesheet_fn <- paste('download', basename(diffbind_samplesheet_fn), sep = '_')
+download.file(diffbind_samplesheet_fn, destfile = new_samplesheet_fn, mode = "wb")
+diffbind_samplesheet_fn <- new_samplesheet_fn
+
+new_counts_fn <- paste('download', basename(diffbind_counts_fn), sep = '_')
+download.file(diffbind_counts_fn, destfile = new_counts_fn, mode = "wb")
+diffbind_counts_fn <- new_counts_fn
+    
+```
+
+# Samples and metadata
+```{r load_coldata, message=F, warning=F}
+
 coldata <- load_coldata(coldata_fn)
+```
+
+```{r make samplesheet, message = F, warning =F, eval = !file.exists(diffbind_samplesheet_fn)}
 
 # DiffBind requires a very specific samplesheet in order to create the peak counts object, see https://www.rdocumentation.org/packages/DiffBind/versions/2.0.2/topics/dba for further details
 
@@ -159,12 +174,14 @@ coldata <- load_coldata(coldata_fn)
 # encodes your condition of interest as "Condition" and the antibody as "Factor"
 
 samplesheet <- make_diffbind_samplesheet(coldata, bam_dir, peaks_dir, params$condition_of_interest)
+write_csv(samplesheet, diffbind_samplesheet_fn)
 
 # if necessary, one additional covariate of interest can be encoded as "Tissue" 
 
 ```
 
 ```{r show_metadata}
+samplesheet <- read_csv(diffbind_samplesheet_fn)
 samplesheet %>% dplyr::select(SampleID, Replicate, Condition, Factor, ControlID) %>% sanitize_datatable()
 ```
 
@@ -189,7 +206,7 @@ order to provide more standardized peak intervals.
 We then normalize the count matrix to adjust for varying 
 library size, and we use the normalized counts for further analysis including PCA. 
 
-```{r create diffbind counts object, eval = !file.exists(params$diffbind_counts_file)}
+```{r create diffbind counts object, eval = !file.exists(diffbind_counts_fn)}
 
 diffbind_obj <- dba(sampleSheet = samplesheet, scoreCol = 5)
 
@@ -197,7 +214,7 @@ diffbind_obj <- dba(sampleSheet = samplesheet, scoreCol = 5)
 diffbind_counts <- dba.count(diffbind_obj, bUseSummarizeOverlaps = TRUE, bParallel = T)
 
 # save object when time-intensive command is finished, so that this cell only need run once
-qsave(diffbind_counts, params$diffbind_counts_file)
+qsave(diffbind_counts, diffbind_counts_fn)
 
 ```
 
@@ -210,7 +227,7 @@ about thousands of binding locations across different samples (e.g., tissues, ce
 
 ```{r PCA}
 
-diffbind_counts <- qread(params$diffbind_counts_file)
+diffbind_counts <- qread(diffbind_counts_fn)
 
 diffbind_norm <- dba.normalize(diffbind_counts)
 
@@ -223,7 +240,7 @@ norm_counts_log <- log2(norm_counts + 1)
 norm_counts_log_df <- norm_counts_log %>% as.data.frame() %>%
   rownames_to_column('peak')
 
-write_csv(norm_counts_log_df, params$counts_fn)
+write_csv(norm_counts_log_df, params$counts_csv_fn)
 
 coldata_for_pca <- coldata[colnames(norm_counts), ]
 
