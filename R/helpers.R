@@ -83,12 +83,18 @@ bcbio_templates <- function(type="rnaseq", outpath=NULL, org=NULL){
            #file.copy(fpath, outpath, recursive = T)
            copy_templates(outpath, "spatial", org)
          },
+         chipseq={
+           #file.copy(fpath, outpath, recursive = T)
+           copy_templates(outpath, "chipseq", org)
+         },
          multiomics={
            #file.copy(fpath, outpath, recursive = T)
            copy_templates(outpath, "multiomics", org)
          },
          {
-           stop('project type not recognize, please choose: ', 'rnaseq', 'singlecell','singlecell_delux','spatial')
+           stop(paste('project type not recognize, please choose: ',
+                      'rnaseq', 'chipseq',
+                      'singlecell','singlecell_delux','spatial'))
          }
   )
 }
@@ -191,6 +197,8 @@ copy_templates <- function(path, pipeline, org=NULL){
     parts = c("templates/multiomics")
   }else if(pipeline=="spatial"){
     parts = c("templates/spatial")
+  }else if(pipeline=="chipseq"){
+    parts = c("templates/chipseq")
   }
   analysis_template <- fs::path_package(base, parts)
 
