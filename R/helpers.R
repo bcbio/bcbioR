@@ -201,8 +201,10 @@ copy_templates <- function(path, pipeline, org=NULL){
   copy_files_in_folder(analysis_template, path)
   if (!is.null(org)){
     org_template <- fs::path_package(base, parts, "org", org)
-    ui_info("Getting templates from {ui_value(org_template)}")
-    copy_files_in_folder(org_template, path, is_org=TRUE)
+    if (fs::dir_exists(org_template)){
+      ui_info("Getting templates from {ui_value(org_template)}")
+      copy_files_in_folder(org_template, path, is_org=TRUE)
+    }
   }
 
   # check org folder is in there

@@ -644,3 +644,11 @@ DimPlot(seurat_clust,
 saveRDS(seurat_clust, file=seurat_output)
 ```
 
+# R session
+
+List and version of tools used for the QC report generation.
+
+```{r}
+sessionInfo()
+```
+

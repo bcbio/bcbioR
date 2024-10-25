@@ -238,8 +238,6 @@ metrics %>%
 
 ```
 
-
-
 ## Gene detection saturation
 
 This plot shows how complex the samples are. We expect samples with more reads to detect more genes. 
