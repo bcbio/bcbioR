@@ -193,15 +193,17 @@ copy_templates <- function(path, pipeline, org=NULL){
     parts = c("templates/spatial")
   }
   analysis_template <- fs::path_package(base, parts)
-  org_template <- fs::path_package(base, parts, "org", org)
 
   ui_info("Getting templates from {ui_value(analysis_template)}")
   # ls_files <- grep("org", list.files(analysis_template, full.names = TRUE),
   #                  value = TRUE, invert = TRUE)
   # ui_info("{ui_value(length(ls_files))} amount of files to copy")
   copy_files_in_folder(analysis_template, path)
-  ui_info("Getting templates from {ui_value(org_template)}")
-  copy_files_in_folder(org_template, path, is_org=TRUE)
+  if (!is.null(org)){
+    org_template <- fs::path_package(base, parts, "org", org)
+    ui_info("Getting templates from {ui_value(org_template)}")
+    copy_files_in_folder(org_template, path, is_org=TRUE)
+  }
 
   # check org folder is in there
   # search for param + _README.md

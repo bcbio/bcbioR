@@ -22,7 +22,8 @@ Imports:
     yaml,
     whisker,
     rlang,
-    stringr
+    stringr,
+    utils
 Suggests: 
     hues,
     ggprism,

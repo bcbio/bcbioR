@@ -64,8 +64,7 @@ We support multiple analyses type:
 
 - RNAseq
 - scRNAseq
-- TEAseq
-- COSMX
+- ChipPseq
 
 To get the example code for any of them you can use a similar command:
 

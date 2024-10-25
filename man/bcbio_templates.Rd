@@ -4,12 +4,14 @@
 \alias{bcbio_templates}
 \title{Function to help deploy analysis folder inside a project folder}
 \usage{
-bcbio_templates(type = "rnaseq", outpath)
+bcbio_templates(type = "rnaseq", outpath = NULL, org = NULL)
 }
 \arguments{
 \item{type}{string indicating the type of analysis, supported: rnaseq.}
 
 \item{outpath}{string path indicating where to copy all the files to}
+
+\item{org}{string with the organization name. To deploy specific files.}
 }
 \description{
 This function contains Rmd, R, md, files that help to structure
