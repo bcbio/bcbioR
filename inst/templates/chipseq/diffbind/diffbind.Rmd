@@ -147,7 +147,6 @@ sanitize_datatable = function(df, ...) {
 ```
 
 ```{r download example data, eval = params$params_file == 'params_diffbind-example.R'}
-
 # if using example data, download it from github
 new_samplesheet_fn <- paste('download', basename(diffbind_samplesheet_fn), sep = '_')
 download.file(diffbind_samplesheet_fn, destfile = new_samplesheet_fn, mode = "wb")
@@ -156,17 +155,14 @@ diffbind_samplesheet_fn <- new_samplesheet_fn
 new_counts_fn <- paste('download', basename(diffbind_counts_fn), sep = '_')
 download.file(diffbind_counts_fn, destfile = new_counts_fn, mode = "wb")
 diffbind_counts_fn <- new_counts_fn
-    
 ```
 
 # Samples and metadata
 ```{r load_coldata, message=F, warning=F}
-
 coldata <- load_coldata(coldata_fn)
 ```
 
 ```{r make samplesheet, message = F, warning =F, eval = !file.exists(diffbind_samplesheet_fn)}
-
 # DiffBind requires a very specific samplesheet in order to create the peak counts object, see https://www.rdocumentation.org/packages/DiffBind/versions/2.0.2/topics/dba for further details
 
 # make_diffbind_samplesheet is a function provided by bcbioR to help assemble DiffBind's samplesheet 
@@ -177,7 +173,6 @@ samplesheet <- make_diffbind_samplesheet(coldata, bam_dir, peaks_dir, params$con
 write_csv(samplesheet, diffbind_samplesheet_fn)
 
 # if necessary, one additional covariate of interest can be encoded as "Tissue" 
-
 ```
 
 ```{r show_metadata}
@@ -207,7 +202,6 @@ We then normalize the count matrix to adjust for varying
 library size, and we use the normalized counts for further analysis including PCA. 
 
 ```{r create diffbind counts object, eval = !file.exists(diffbind_counts_fn)}
-
 diffbind_obj <- dba(sampleSheet = samplesheet, scoreCol = 5)
 
 # This command may take several minutes. Recommend using multiple cores and lots of memory
@@ -215,7 +209,6 @@ diffbind_counts <- dba.count(diffbind_obj, bUseSummarizeOverlaps = TRUE, bParall
 
 # save object when time-intensive command is finished, so that this cell only need run once
 qsave(diffbind_counts, diffbind_counts_fn)
-
 ```
 
 # PCA 
@@ -226,7 +219,6 @@ In the context of ChIPseq, PCA helps analyze large datasets containing informati
 about thousands of binding locations across different samples (e.g., tissues, cells).
 
 ```{r PCA}
-
 diffbind_counts <- qread(diffbind_counts_fn)
 
 diffbind_norm <- dba.normalize(diffbind_counts)
@@ -248,7 +240,6 @@ stopifnot(all(colnames(norm_counts) == rownames(coldata_for_pca)))
 
 degPCA(norm_counts_log, coldata_for_pca, condition = params$condition_of_interest) +
   scale_color_cb_friendly()
-
 ```
 
 
@@ -265,7 +256,9 @@ to identify any gene features within 1000 bp of a differentially bound site.
 
 ```{r DB analysis}
 diffbind_norm <- dba.contrast(diffbind_norm, contrast = c('Condition', params$numerator, params$denominator))
-results_obj <- dba.analyze(diffbind_norm, bGreylist = F)
+results_obj <- dba.analyze(diffbind_norm, 
+                           bBlacklist = F, # Use TRUE with your data
+                           bGreylist = F)
 
 results_report <- dba.report(results_obj, th = 1) 
 results_report_sig <- dba.report(results_obj)

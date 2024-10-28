@@ -104,34 +104,7 @@ sanitize_datatable = function(df, ...) {
 # Samples and metadata
 
 ```{r example_data, message=F, warning=F, eval = params$params_file == 'params_qc-example.R'}
-
-# if using example data to render report, download peaks from github
-api_url <- peaks_dir
-response <- GET(api_url)
-
-if (status_code(response) == 200) {
-  content <- content(response, as = "text")
-  files_info <- fromJSON(content) %>% filter(name != 'consensus')
-  
-  # Filter out file paths and construct raw URLs
-  file_paths <- files_info$path
-  raw_base_url <- "https://raw.githubusercontent.com/bcbio/bcbioR-test-data/main/"
-  
-  raw_file_urls <- paste0(raw_base_url, file_paths)
-  
-  # Function to download a file from a URL
-  download_file <- function(url) {
-    file_name <- basename(url)
-    download.file(url, destfile = file_name, mode = "wb")
-  }
-  
-  # Download all files using the constructed raw URLs
-  for (url in raw_file_urls) {
-    download_file(url)
-  }
-  peaks_dir = '.'
-}
-
+bcbio_qc_chipseq_testdata()
 ```
 
 ```{r load_data, message=F, warning=F}
