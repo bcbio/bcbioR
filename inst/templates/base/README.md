@@ -1,7 +1,5 @@
 # Guidelines
 
-Full checklist at DataManagement-Checklist.pdf
-
 ## Set Repository
 
 - Start a git repository: `usethis::use_git()`
@@ -31,6 +29,17 @@ Full checklist at DataManagement-Checklist.pdf
 -   `final` contains the output of *nextflow*
 -   `code` contains any other files that support custom analysis and don't generate a report
 -   For any relevant client files or papers use the `docs` folder
+
+## Guidelines for file naming
+
+[AnalysisType]_[BiologicalQuestion]_[YYYYMMDD].[extension]
+
+Some examples:
+
+- `TwoGroupsDE_ADrelated_20241011.html`
+- `singlecellClustering_SkinTissue_20242011.html`
+- `singlecellClustering_SkinTissue-GenePositiveOnly_20242011.html`
+- `DiffBind-TreatedvsHealthy_20242011.html`
 
 ## GitHub
 
