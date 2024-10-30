@@ -54,7 +54,7 @@ source(params$params_file)
 # 2. Set up project file (already done from QC probably)
 source(params$project_file)
 # 3. Load custom functions to load data from coldata/metrics/counts
-map(list.files(params$functions_file,pattern = "*.R$",full.names = T),source) %>% invisible()
+map(list.files(params$functions_file,pattern = "*.R$",full.names = T), source) %>% invisible()
 # IMPORTANT set these values if you are not using the parameters in the header (lines 22-31)
 genome=params$genome
 column=params$column
@@ -538,6 +538,7 @@ From the set of differentially expressed genes and using publicly available info
 
 ```{r}
 all_in_life=get_databases()
+all_in_life=get_databases_v2()
 ```
 
 # Pathway Analysis- GSEA
@@ -559,7 +560,7 @@ fa_gsea_list=lapply(de_list,function(contrast){
     filter(!is.na(ENTREZID)) %>% 
     distinct(ENTREZID, .keep_all=TRUE)
   
-  tb = run_fgsea(input_entrezid, all_in_life)
+  tb = run_fgsea_v2(input_entrezid, all_in_life)
   tb %>%  filter(padj<0.05)
  }) 
 ```
@@ -594,20 +595,20 @@ fa_list=lapply(de_list,function(contrast){
     filter(!is.na(padj)) %>% pull(gene_id)
   universe_mapping = AnnotationDbi::select(org.Hs.eg.db, universe, 'ENSEMBL', columns=c('ENTREZID', 'SYMBOL'))
   
-  ora_input = res %>% filter(!is.na(padj), padj<0.01, abs(lfc)>0.3) %>% pull(gene_id)
+  ora_input = res %>% filter(!is.na(padj), padj<0.01, abs(lfc)> 0.3) %>% pull(gene_id)
   #change to the right species
   input_entrezid <- AnnotationDbi::select(org.Hs.eg.db, ora_input, 'ENSEMBL', columns = c('ENTREZID', 'SYMBOL'))
-  all=run_fora(input_entrezid, universe_mapping,all_in_life)
+  all=run_fora_v2(input_entrezid, universe_mapping,all_in_life)
   
-  ora_input = res %>% filter(!is.na(padj), padj<0.01, lfc>0.3) %>% pull(gene_id)
+  ora_input = res %>% filter(!is.na(padj), padj<0.01, lfc> 0.3) %>% pull(gene_id)
   #change to the right species
   input_entrezid <- AnnotationDbi::select(org.Hs.eg.db, ora_input, 'ENSEMBL', columns = c('ENTREZID', 'SYMBOL'))
-  up=run_fora(input_entrezid, universe_mapping,all_in_life)
+  up=run_fora_v2(input_entrezid, universe_mapping,all_in_life)
 
-  ora_input = res %>% filter(!is.na(padj), padj<0.01, lfc<-0.3) %>% pull(gene_id)
+  ora_input = res %>% filter(!is.na(padj), padj<0.01, lfc< -0.3) %>% pull(gene_id)
   #change to the right species
   input_entrezid <- AnnotationDbi::select(org.Hs.eg.db, ora_input, 'ENSEMBL', columns = c('ENTREZID', 'SYMBOL'))
-  down=run_fora(input_entrezid, universe_mapping,all_in_life)
+  down=run_fora_v2(input_entrezid, universe_mapping,all_in_life)
 
   list(all=all,up=up,down=down)
 })
@@ -664,7 +665,7 @@ tagList(dt_list)
 if (!is.null(subset_value) & !is.null(subset_value)){
   filenames = str_interp("${subset_value}")
 } else {
-  filenames = ""
+  filenames = "full"
 }
 for (contrast in names(contrasts)){
   filenames = paste0(filenames, "_", contrast)

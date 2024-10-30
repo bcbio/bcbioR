@@ -1,7 +1,7 @@
 library(msigdbr)
 library(clusterProfiler)
-
-get_databases_v2=function(sps=human){
+source <- "https://github.com/bcbio/resources/raw/refs/heads/main/gene_sets/gene_sets/20240904"
+get_databases_v2=function(sps="human"){
   gmt.files=list(human=c("h.all.v2024.1.Hs.entrez.gmt",
                          "c5.go.v2024.1.Hs.entrez.gmt",
                          "c5.go.mf.v2024.1.Hs.entrez.gmt",
@@ -17,7 +17,7 @@ get_databases_v2=function(sps=human){
                          "m2.cp.reactome.v2024.1.Mm.entrez.gmt",
                          "m2.cp.kegg_legacy.v2024.1.Mm.entrez.gmt"))
   all_in_life=lapply(gmt.files[[sps]], function(gmt){
-    df=read.gmt(file.path(source,gmt))
+    df=read.gmt(file.path(source,sps,gmt))
     names(df)=c("gs_name", "entrez_gene")
     df
   })
@@ -41,31 +41,57 @@ get_databases=function(sps="human"){
 }
 
 run_fora_v2=function(input, uni, all_in_life){
-  # browser()
-  total_deg=length(unique(input$SYMBOL))/length(unique(uni$SYMBOL))
+  total_deg=length(unique(input$ENTREZID))/length(unique(uni$ENTREZID))
   pathways_ora_all = lapply(names(all_in_life), function(database){
-    pathway = all_in_life[[database]]
-    #pathway = split(x = p$entrez_gene, f = p$gs_name)
-    #db_name = paste(p$gs_cat[1], p$gs_subcat[1],sep=":")
+    p = all_in_life[[database]]
+    #browser()
+    pathway = split(x = p$entrez_gene, f = p$gs_name)
+    db_name = database
     respath <- fora(pathways = pathway,
-                    genes = unique(input$SYMBOL),
-                    universe = unique(uni$SYMBOL),
+                    genes = unique(input$ENTREZID),
+                    universe = unique(uni$ENTREZID),
                     minSize  = 15,
                     maxSize  = 500)
-    coll_respath = collapsePathwaysORA(respath[order(pval)][padj < 0.1],
-                                       pathway, unique(input$SYMBOL), unique(uni$SYMBOL))
-    as_tibble(respath[pathway %in% coll_respath$mainPathways])  %>%
+    respath  %>%
       mutate(database=db_name, NES=(overlap/size)/(total_deg))
   }) %>% bind_rows() %>%
     mutate(analysis="ORA")
   ora_tb = pathways_ora_all %>% unnest(overlapGenes) %>%
     group_by(pathway) %>%
-    left_join(uni, by =c("overlapGenes"="SYMBOL")) %>%
+    left_join(uni, by =c("overlapGenes"="ENTREZID")) %>%
     dplyr::select(pathway, padj, NES, SYMBOL, analysis,
                   database) %>%
     group_by(pathway,padj,NES,database,analysis) %>%
     summarise(genes=paste(SYMBOL,collapse = ","))
   ora_tb
+
+}
+
+run_fgsea_v2=function(input, all_in_life){
+  # browser()
+  input_gsea <- input$lfc
+  names(input_gsea) <- input$ENTREZID
+  pathways_all = lapply(names(all_in_life), function(database){
+    p = all_in_life[[database]]
+    pathway = split(x = p$entrez_gene, f = p$gs_name)
+    db_name = database
+    respath <- fgsea(pathways = pathway,
+                     stats = input_gsea,
+                     minSize  = 15,
+                     maxSize  = 500)
+
+    as_tibble(respath)  %>%
+      mutate(database=db_name)
+  }) %>% bind_rows() %>%
+    mutate(analysis="GSEA")
+  tb = pathways_all %>% unnest(leadingEdge) %>%
+    group_by(pathway) %>%
+    left_join(input, by =c("leadingEdge"="ENTREZID")) %>%
+    dplyr::select(pathway, padj, size, NES, SYMBOL, analysis,
+                  database) %>%
+    group_by(pathway, padj, size, NES, database, analysis) %>%
+    summarise(genes=paste(SYMBOL,collapse = ","))
+  tb
 
 }
 
