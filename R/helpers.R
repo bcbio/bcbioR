@@ -154,6 +154,10 @@ copy_files_in_folder<- function(origin, remote, is_org=FALSE){
   if (!is_org) {
     to_copy <- grep("org", to_copy,
                     value = TRUE, invert = TRUE)
+  }else{
+    # don't allow doc files
+    to_copy <- grep(".doc.*$", to_copy,
+                    value = TRUE, invert = TRUE)
   }
   for (element in to_copy){
     full_new_path <- fs::path_join(c(remote, fs::path_file(element)))

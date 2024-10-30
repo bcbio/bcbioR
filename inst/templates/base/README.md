@@ -1,5 +1,7 @@
 # Guidelines
 
+Full checklist at DataManagement-Checklist.pdf
+
 ## Set Repository
 
 - Start a git repository: `usethis::use_git()`
@@ -8,7 +10,7 @@
 * Only once every 30 days, set up your github credentials: `usethis::gh_token_help()`
   * **NOTE** You may want to run this first (one time) to keep this token working in future sessions: `git config --global credential.helper store`
   
-- Push repository to HBC github as private: `usethis::use_github(org="hbc",private=TRUE)`
+- Push repository to HBC github as private: `usethis::use_github(org="hcbc",private=TRUE)`
 
 ## Set up work-space
 
