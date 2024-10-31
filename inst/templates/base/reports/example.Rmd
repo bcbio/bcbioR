@@ -1,0 +1,78 @@
+---
+title: "Example"
+author: "Harvard Chan Bioinformatics Core"
+date: "`r Sys.Date()`"
+output:
+   html_document:
+      code_folding: hide
+      df_print: paged
+      highlights: pygments
+      number_sections: true
+      self_contained: true
+      theme: default
+      toc: true
+      toc_float:
+         collapsed: true
+         smooth_scroll: true
+editor_options: 
+  chunk_output_type: console
+params:
+  project_file: ../information.R
+---
+
+```{r, cache = FALSE, message = FALSE, warning=FALSE}
+# This set up the working directory to this file so all files can be found
+library(rstudioapi)
+setwd(fs::path_dir(getSourceEditorContext()$path))
+# NOTE: This code will check version, this is our recommendation, it may work
+#.      other versions
+stopifnot(R.version$major>= 4) # requires R4
+stopifnot(compareVersion(R.version$minor,"3.3")==0) # requires >=4.3.3
+stopifnot(compareVersion(as.character(BiocManager::version()), "3.18")>=0)
+```
+
+This code is in this ![](https://img.shields.io/badge/status-stable-green) revision.
+
+```{r source_params, cache = FALSE, message = FALSE, warning=FALSE}
+source(params$project_file)
+```
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE)
+# Load libraries
+library(knitr)
+library(rmarkdown)
+library(DT)
+library(ggprism)
+library(grafify)
+
+ggplot2::theme_set(theme_prism(base_size = 12))
+# https://grafify-vignettes.netlify.app/colour_palettes.html
+# NOTE change colors here if you wish
+scale_colour_discrete <- function(...)
+  scale_colour_manual(..., values = as.vector(grafify:::graf_palettes[["kelly"]]))
+
+#options(ggplot2.discrete.colour= )
+
+# Set seed for reproducibility
+set.seed(1454944673L)
+opts_chunk[["set"]](
+    audodep = TRUE,
+    cache = FALSE,
+    cache.lazy = FALSE,
+    error = TRUE,
+    echo = TRUE,
+    fig.height = 5L,
+    fig.retina = 2L,
+    fig.width = 9.6,
+    message = FALSE,
+    tidy = TRUE,
+    warning = TRUE)
+```
+
+# Overview
+
+-   Project: `r project`
+-   PI: `r PI`
+-   Analyst: `r analyst`
+-   Experiment: `r experiment`

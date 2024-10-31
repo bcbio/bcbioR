@@ -6,10 +6,12 @@
 #' @importFrom magrittr %>%
 #' @importFrom readr read_csv
 #' @importFrom stringr str_replace_all
+#' @importFrom utils download.file
+#' @importFrom utils unzip
 ## usethis namespace: end
-#' @import DESeq2
-#' @import ggplot2
-#' @import hues
-#' @import ggprism
+#' @import usethis
+#' @import fs
 #' @import R.utils
+#' @import withr
+#' @import whisker
 NULL

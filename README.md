@@ -20,15 +20,6 @@ devtools::install_github("bcbio/bcbioR",ref = "devel")
 
 ## Quick start
 
-Use this code to generate a standard project name for all of your folders. **This code will not create any folders or files.**
-
-```
-library(bcbioR)
-## basic example code
-# will help you to build a folder name following HCBC naming rules
-bcbio_set_project()
-```
-
 ### Set base project
 
 use `setwd()` to set your current directory to the place where you want to work. The bcbioR functions will automatically write to whatever directory you have set.
@@ -40,7 +31,10 @@ setwd("/path/to/analysis/folder")
 The following code will pop up a Rmd template will populate that folder with HCBC data structure guidelines
 
 ```
-bcbio_templates(type="base", outpath="/path/to/analysis/folder")
+path="/path/to/analysis/folder"
+bcbio_templates(type="base", outpath=path)
+bcbio_templates(type="rnaseq", outpath=path)
+bcbio_templates(type="singlecell", outpath=path)
 ```
 
 ### Set RNAseq report folder
@@ -53,7 +47,7 @@ bcbio_templates(type="rnaseq", outpath="/path/to/analysis/folder/reports")
 
 ### Discover more…
 
-Go to the vignette to know more `vignette("bcbioR_quick_start",package="bcbioR")`
+Go to the vignette to know more `vignette("bcbioR_quick_start", package="bcbioR")`
 
 ## How to Contribute
 
@@ -87,3 +81,8 @@ Some best practices when developing:
 -   James Billingsley
 -   Zhu Zhuo
 -   Elizabeth Partan
+-   Noor Sohail
+-   Meeta Mistry
+-   Will Gammerdinger
+-   Upen Bhattarai
+-   Shannan Ho Sui

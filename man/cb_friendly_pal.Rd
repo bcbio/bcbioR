@@ -7,7 +7,7 @@
 cb_friendly_pal(palette = "main", reverse = F, ...)
 }
 \arguments{
-\item{palette}{name of the palette to be returned}
+\item{palette}{name of the palette to be returned (main, cool, hot, grey, white_to_blue, or heatmap)}
 
 \item{reverse}{boolean, reverse order of colors in palette}
 

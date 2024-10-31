@@ -1,0 +1,613 @@
+---
+title: "Quality Control"
+author: "Harvard Chan Bioinformatics Core"
+date: "`r Sys.Date()`"
+output:
+   html_document:
+      code_folding: hide
+      df_print: paged
+      highlights: pygments
+      number_sections: true
+      self_contained: true
+      theme: default
+      toc: true
+      toc_float:
+         collapsed: true
+         smooth_scroll: true
+editor_options: 
+  chunk_output_type: console
+params:
+  params_file: ../information.R
+  meta_fn: ../meta/methylation_mucci_hbc04926.csv
+---
+
+```{r, cache = FALSE, message = FALSE, warning=FALSE}
+# This set up the working directory to this file so all files can be found
+library(rstudioapi)
+setwd(fs::path_dir(getSourceEditorContext()$path))
+# NOTE: This code will check version, this is our recommendation, it may work
+#.      other versions
+stopifnot(R.version$major>= 4) # requires R4
+stopifnot(compareVersion(R.version$minor,"3.3")==0) # requires >=4.3.3
+stopifnot(compareVersion(BiocManager::version(), "3.18")>=0)
+```
+
+This code is in this ![](https://img.shields.io/badge/status-draft-grey) revision.
+
+```{r echo = F}
+source(params$params_file)
+```
+
+```{r load_libraries, cache = FALSE, message = FALSE, warning=FALSE, echo=FALSE,}
+
+library(tidyverse)
+library(bcbioR)
+library(ggprism)
+library(knitr)
+library(tools)
+library(qs)
+library(janitor)
+library(DEGreport)
+library(ggrepel)
+library(pheatmap)
+library(minfi)
+library(IlluminaHumanMethylationEPICv2manifest)
+library(IlluminaHumanMethylationEPICv2anno.20a1.hg38)
+library(methylclock)
+options(stringsAsFactors = FALSE)
+options(future.globals.maxSize= 891289600)
+
+colors=cb_friendly_cols(1:15)
+ggplot2::theme_set(theme_prism(base_size = 14))
+opts_chunk[["set"]](
+    cache = F,
+    cache.lazy = FALSE,
+    dev = c("png", "pdf"),
+    error = TRUE,
+    highlight = TRUE,
+    message = FALSE,
+    prompt = FALSE,
+    tidy = FALSE,
+    warning = FALSE,
+    echo = T, 
+    fig.height = 4)
+
+# set seed for reproducibility
+set.seed(1234567890L)
+
+```
+
+```{r sanitize_datatable}
+sanitize_datatable = function(df, ...) {
+ # remove dashes which cause wrapping
+ DT::datatable(df, ..., rownames=gsub("-", "_", rownames(df)),
+                   colnames=gsub("-", "_", colnames(df)),
+               filter = 'top')
+}
+```
+
+# Overview
+
+-   Project: `r project`
+-   PI: `r PI`
+-   Analyst: `r analyst`
+-   Experiment: `r experiment`
+-   Aim: `r aim`
+
+The workflow followed in this report is descriped in the documentation [here](https://nbis-workshop-epigenomics.readthedocs.io/en/latest/content/tutorials/methylationArray/Array_Tutorial.html)
+
+# Stratify samples by DNA quantity
+
+
+```{r examine_sample_quant}
+
+metadata <- read.csv(params$meta_fn, row.names = 1) %>% clean_names()
+
+# TODO remove from HERE to next TODO if quantile classification not relevant
+thirds_blood <- quantile(
+  metadata %>% filter(tissue == 'blood') %>% pull(total_ng),
+  c(0.33, 0.67)
+)
+
+thirds_tissue <- quantile(
+  metadata %>% filter(tissue != 'blood') %>% pull(ng_dna),
+  c(0.33, 0.67)
+)
+
+```
+
+For blood samples, input DNA quantity was considered low if <= `r round(thirds_blood[1], 2)` ng, high if it was >=  `r round(thirds_blood[2], 2)` ng, and medium if in between.
+
+For tissue samples, input DNA quantity was considered low if <= `r round(thirds_tissue[1], 2)` ng, high if it was >=  `r round(thirds_tissue[2], 2)` ng, and medium if in between.
+
+```{r plot_sample_quant}
+
+ggplot(metadata, aes(x = ng_dna, fill = tissue)) + 
+  geom_histogram() + 
+  geom_vline(aes(xintercept = thirds_tissue[1])) + 
+    geom_vline(aes(xintercept = thirds_tissue[2])) + 
+  scale_fill_cb_friendly()
+
+ggplot(metadata, aes(x = total_ng, fill = tissue)) + 
+  geom_histogram() + 
+  geom_vline(aes(xintercept = thirds_blood[1])) + 
+    geom_vline(aes(xintercept = thirds_blood[2])) + 
+  scale_fill_cb_friendly()
+
+
+```
+
+
+## Metadata by quantity classification
+
+```{r stratify_samples}
+
+metadata <- metadata %>% 
+  mutate(dna_quant_level = case_when(
+    tissue == 'blood' ~ case_when(
+      total_ng <= thirds_blood[1] ~ 'Low',
+      total_ng >= thirds_blood[2] ~ 'High',
+      TRUE ~ 'Medium'
+    ),
+    TRUE ~ case_when(
+      ng_dna <= thirds_tissue[1] ~ 'Low',
+      ng_dna >= thirds_tissue[2] ~ 'High',
+      TRUE ~ 'Medium'
+    )
+  )) %>%
+  mutate(subject_id = ifelse(is.na(subject_id), id, subject_id))
+
+# TODO
+
+metadata <- metadata %>% group_by(dna_quant_level, subject_id) %>% 
+  mutate(sample_name = paste('ID', subject_id, dna_quant_level, row_number(), sep = '_')) 
+names_vec <- metadata %>%
+  pull(sample_name)
+names(names_vec) <- metadata$ch_ip_id
+
+metadata %>% sanitize_datatable()
+```
+
+# Minfi QC {.tabset}
+
+```{r load methyl data}
+
+rgSet <- read.metharray.exp(base = "../data/", recursive = TRUE)
+colnames(rgSet) <- names_vec[colnames(rgSet)]
+rgSet@annotation <- c(array = "IlluminaHumanMethylationEPICv2", annotation = "20a1.hg38")
+rownames(metadata) <- metadata$sample_name
+rgSet@colData <- DataFrame(metadata)
+
+MSet <- preprocessRaw(rgSet)
+ratioSet <- ratioConvert(MSet, what = "both", keepCN = TRUE)
+gset <- mapToGenome(ratioSet)
+
+beta <- getBeta(gset)
+m <- getM(gset)
+
+```
+
+## Intensity
+
+From the documentation: "minfi provides a simple quality control plot that uses the log median intensity in both the methylated (M) and unmethylated (U) channels. When plotting these two medians against each other, good samples tend to cluster together, while failed samples tend to separate and have lower median intensities"
+
+```{r intensity}
+qc <- getQC(MSet)
+# plotQC(qc)
+badSampleCutoff <- 10.5
+qc_df <- as.data.frame(qc) %>% rownames_to_column('sample_name') %>% 
+  mutate(sample_qual = ifelse((mMed + uMed) / 2 < badSampleCutoff, 'bad', 'good'))
+  
+
+ggplot(qc_df, aes(x = mMed, y = uMed, color = sample_qual)) + 
+  geom_point() +
+  geom_text_repel(data = qc_df %>% filter(sample_qual == 'bad'),
+    aes(x = mMed, y = uMed, color = sample_qual, label = sample_name)) +
+  xlab('Meth median intensity (log2)') + ylab('Unmeth median intensity (log2)') + 
+  xlim(c(8,14)) + ylim(c(8,14)) + scale_color_cb_friendly() 
+```
+
+## Detection
+
+From the documentation: "We can additionally look at the detection p-values for every CpG in every sample, which is indicative of the quality of the signal. The method used by minfi to calculate detection p-values compares the total signal (M+U) for each probe to the background signal level, which is estimated from the negative control probes. Very small p-values are indicative of a reliable signal whilst large p-values generally indicate a poor quality signal."
+
+
+```{r detection, fig.width=10, fig.height = 6}
+
+detP <- detectionP(rgSet)
+# barplot(colMeans(detP), las=2, cex.names=0.8, ylab="Mean detection p-values")
+# abline(h=0.05,col="red")
+
+det_df <- data.frame(sample_name = colnames(detP), detection_p_val = colMeans(detP)) %>%
+  left_join(metadata)
+ggplot(det_df, aes(x = sample_name, y = detection_p_val, fill = tissue)) + geom_col() + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + 
+  geom_hline(yintercept = 0.01) + scale_fill_cb_friendly()
+
+det_frac_df <- data.frame(sample_name = colnames(detP), frac_probes_detected = 1 - colSums(detP > 0.05) / nrow(detP)) %>%
+  left_join(metadata)
+ggplot(det_frac_df, aes(x = sample_name, y = frac_probes_detected, fill = tissue)) + geom_col() + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + scale_fill_cb_friendly()
+
+```
+
+## Control Probes {.tabset}
+
+From the documentation: "The array contains several internal control probes that can be used to assess the quality control of different sample preparation steps (bisulfite conversion, hybridization, etc.)"
+
+
+```{r control probes, results = 'asis', fig.height = 8}
+
+control_probes <- c("BISULFITE CONVERSION I", "BISULFITE CONVERSION II", "HYBRIDIZATION", "NON-POLYMORPHIC", "SPECIFICITY I", "SPECIFICITY II", "TARGET REMOVAL", "NEGATIVE")
+
+for (probe in control_probes){
+  cat('\n')
+  cat('### ', probe, '\n')
+  controlStripPlot(rgSet, controls=probe)
+  cat('\n')
+}
+```
+
+# Minfi Normalization (Funnorm) {.tabset}
+
+From the documentation: "If there exist global biological methylation differences between your samples, as for instance a dataset with cancer and normal samples, or a dataset with different tissues/cell types, use the preprocessFunnorm function as it is aimed for such datasets"
+
+## Between Arrays
+
+From the documentation: "The overall density distribution of Beta values for each sample is another useful metric to determine sample quality. Usually, one would expect to see most Beta values to be either close to 0 or 1, indicating most of the CpG sites in the sample are unmethylated or methylated"
+
+
+```{r funnorm between}
+
+ggdat=as.data.frame(getBeta(MSet)) %>% rownames_to_column("cpgs") %>%
+  pivot_longer(cols = !matches("cpgs")) %>%
+  inner_join(metadata[,c("sample_name","tissue")], by=c("name"="sample_name"))
+
+MSet_funnorm <- preprocessFunnorm(rgSet)
+
+ggdat_funnorm=as.data.frame(getBeta(MSet_funnorm)) %>% rownames_to_column("cpgs") %>%
+  pivot_longer(cols = !matches("cpgs")) %>%
+  inner_join(metadata[,c("sample_name","tissue")], by=c("name"="sample_name"))
+
+par(mfrow=c(1,2))
+ggplot(ggdat,aes(value, group=name,color=tissue))+
+  geom_density(alpha=0.6, size=1) +
+  scale_color_cb_friendly() + ggtitle('Raw')
+ggplot(ggdat_funnorm, aes(value, group=name,color=tissue))+
+  geom_density(alpha=0.6, size=1) +
+  scale_color_cb_friendly() + ggtitle('Funnorm')
+
+```
+
+## Within Arrays
+
+From the documentation: "A comparison of the Beta distributions for the different probe designs. This will give an indication of the effectiveness of the within-array normalization."
+
+
+```{r funnorm within, message = F, echo = F, results = 'hide'}
+
+typeI <- getProbeInfo(MSet, type = "I")[, c("Name","nCpG")]
+typeII <- getProbeInfo(MSet, type = "II")[, c("Name","nCpG")]
+probeTypes <- rbind(typeI, typeII)
+probeTypes$Type <- rep(x = c("I", "II"), times = c(nrow(typeI), nrow(typeII)))
+
+lapply(colnames(MSet), function(sample){
+    par(mfrow=c(1,2))
+    plotBetasByType(MSet[, sample], main = paste('Raw', sample))
+    plotBetasByType(getBeta(MSet_funnorm)[, sample], probeTypes = probeTypes, 
+                    main = paste('Funnorm', sample))
+})
+
+```
+
+# Sample Clustering {.tabset}
+
+Post-normalization, we are interested to look at the similarities or differences between various samples. One way to do this is by creating PCA plots, which graphically represent the relationships between objects in multidimensional space into 2 dimensional space, where the two dimensions are chosen so that they capture the greatest sources of variation in the data. 
+
+Another way to do this is by calculating the correlation between beta values for samples, clustering the samples based on these correlations, and visualizing the information in a heatmap. 
+
+
+## All samples
+
+```{r pca_all_samples}
+beta_funnorm <- getBeta(MSet_funnorm)
+metadata <- as.data.frame(metadata)
+rownames(metadata) <- metadata$sample_name
+degPCA(beta_funnorm, metadata, condition = 'tissue', shape = 'dna_quant_level') + 
+  scale_color_cb_friendly()
+
+```
+
+```{r heatmap_all_samples, fig.width = 12, fig.height = 10}
+beta_funnorm_cor <- cor(beta_funnorm)
+
+colma <- metadata %>% select(dna_quant_level, tissue)
+
+anno_colors=lapply(colnames(colma), function(c){
+  l.col=c(cb_friendly_pal('grey')(length(unique(colma[[c]])) - 1), 'white')
+  names(l.col)=unique(colma[[c]])
+  l.col
+})
+names(anno_colors)=colnames(colma)
+p <- pheatmap(beta_funnorm_cor,
+              annotation = colma,
+              annotation_colors = anno_colors,
+              # show_rownames = F,
+              # show_colnames = F,
+              color = cb_friendly_pal('heatmap')(15)
+)
+p
+```
+
+## Blood
+```{r pca_blood_samples, fig.height = 7}
+
+# TODO remove from here to next TODO if PCA per tissue type is not needed
+metadata_blood <- metadata %>% filter(tissue == 'blood')
+beta_funnorm_blood <- beta_funnorm[, colnames(beta_funnorm) %in% rownames(metadata_blood)]
+
+degPCA(beta_funnorm_blood, metadata_blood, condition = 'subject_id', shape = 'dna_quant_level') + 
+  scale_color_cb_friendly()
+
+
+```
+
+```{r heatmap_blood_samples, fig.width = 10, fig.height = 8}
+beta_funnorm_cor_blood <- cor(beta_funnorm_blood)
+
+colma_blood <- metadata_blood %>% select(dna_quant_level)
+
+anno_colors_blood=lapply(colnames(colma_blood), function(c){
+  l.col=c(cb_friendly_pal('grey')(length(unique(colma_blood[[c]])) - 1), 'white')
+  names(l.col)=unique(colma_blood[[c]])
+  l.col
+})
+names(anno_colors_blood)=colnames(colma_blood)
+p <- pheatmap(beta_funnorm_cor_blood,
+              annotation = colma_blood,
+              annotation_colors = anno_colors_blood,
+              # show_rownames = F,
+              # show_colnames = F,
+              color = cb_friendly_pal('heatmap')(15)
+)
+p
+
+```
+
+## Prostate
+```{r pca_prostate_samples}
+metadata_prostate <- metadata %>% filter(tissue != 'blood')
+beta_funnorm_prostate <- beta_funnorm[, colnames(beta_funnorm) %in% rownames(metadata_prostate)]
+
+degPCA(beta_funnorm_prostate, metadata_prostate, condition = 'subject_id', shape = 'dna_quant_level') + 
+  scale_color_cb_friendly()
+
+```
+
+```{r heatmap_prostate_samples, fig.width = 10, fig.height = 8}
+beta_funnorm_cor_prostate <- cor(beta_funnorm_prostate)
+
+colma_prostate <- metadata_prostate %>% select(dna_quant_level) 
+
+anno_colors_prostate=lapply(colnames(colma_prostate), function(c){
+  l.col=c(cb_friendly_pal('grey')(length(unique(colma_prostate[[c]])) - 1), 'white')
+  names(l.col)=unique(colma_prostate[[c]])
+  l.col
+})
+names(anno_colors_prostate)=colnames(colma_prostate)
+p <- pheatmap(beta_funnorm_cor_prostate,
+              annotation = colma_prostate,
+              annotation_colors = anno_colors_prostate,
+              # show_rownames = F,
+              # show_colnames = F,
+              color = cb_friendly_pal('heatmap')(15)
+)
+p
+
+# TODO
+```
+
+
+# Filtered Sample Clustering {.tabset}
+
+Poor performing probes as well as probes with SNPs were filtered from the data.
+
+```{r filter probes}
+
+detP <- detectionP(rgSet)
+detP <- detP[match(featureNames(MSet_funnorm), rownames(detP)),]
+keep <- rowSums(detP < 0.01) == ncol(MSet_funnorm)
+MSet_funnorm_filt <- MSet_funnorm[keep,]
+MSet_funnorm_filt <- dropLociWithSnps(MSet_funnorm_filt)
+
+```
+
+## All samples
+
+```{r pca_all_samples_filt}
+beta_funnorm_filt <- getBeta(MSet_funnorm_filt)
+metadata <- as.data.frame(metadata)
+rownames(metadata) <- metadata$sample_name
+degPCA(beta_funnorm_filt, metadata, condition = 'tissue', shape = 'dna_quant_level') + 
+  scale_color_cb_friendly()
+
+```
+
+```{r heatmap_all_samples_filt, fig.width = 12, fig.height = 10}
+beta_funnorm_filt_cor <- cor(beta_funnorm_filt)
+
+colma <- metadata %>% select(dna_quant_level, tissue)
+
+anno_colors=lapply(colnames(colma), function(c){
+  l.col=c(cb_friendly_pal('grey')(length(unique(colma[[c]])) - 1), 'white')
+  names(l.col)=unique(colma[[c]])
+  l.col
+})
+names(anno_colors)=colnames(colma)
+p <- pheatmap(beta_funnorm_filt_cor,
+              annotation = colma,
+              annotation_colors = anno_colors,
+              # show_rownames = F,
+              # show_colnames = F,
+              color = cb_friendly_pal('heatmap')(15)
+)
+p
+```
+
+## Blood
+```{r pca_blood_samples_filt, fig.height = 7}
+
+# TODO remove from here to next TODO if PCA per tissue type is not relevant
+
+metadata_blood <- metadata %>% filter(tissue == 'blood')
+beta_funnorm_filt_blood <- beta_funnorm_filt[, colnames(beta_funnorm_filt) %in% rownames(metadata_blood)]
+
+degPCA(beta_funnorm_filt_blood, metadata_blood, condition = 'subject_id', shape = 'dna_quant_level') + 
+  scale_color_cb_friendly()
+
+
+```
+
+```{r heatmap_blood_samples_filt, fig.width = 10, fig.height = 8}
+beta_funnorm_filt_cor_blood <- cor(beta_funnorm_filt_blood)
+
+colma_blood <- metadata_blood %>% select(dna_quant_level)
+
+anno_colors_blood=lapply(colnames(colma_blood), function(c){
+  l.col=c(cb_friendly_pal('grey')(length(unique(colma_blood[[c]])) - 1), 'white')
+  names(l.col)=unique(colma_blood[[c]])
+  l.col
+})
+names(anno_colors_blood)=colnames(colma_blood)
+p <- pheatmap(beta_funnorm_filt_cor_blood,
+              annotation = colma_blood,
+              annotation_colors = anno_colors_blood,
+              # show_rownames = F,
+              # show_colnames = F,
+              color = cb_friendly_pal('heatmap')(15)
+)
+p
+
+```
+
+## Prostate
+```{r pca_prostate_samples_filt}
+metadata_prostate <- metadata %>% filter(tissue != 'blood')
+beta_funnorm_filt_prostate <- beta_funnorm_filt[, colnames(beta_funnorm_filt) %in% rownames(metadata_prostate)]
+
+degPCA(beta_funnorm_filt_prostate, metadata_prostate, condition = 'subject_id', shape = 'dna_quant_level') + 
+  scale_color_cb_friendly()
+
+```
+
+```{r heatmap_prostate_samples_filt, fig.width = 10, fig.height = 8}
+beta_funnorm_filt_cor_prostate <- cor(beta_funnorm_filt_prostate)
+
+colma_prostate <- metadata_prostate %>% select(dna_quant_level) 
+
+anno_colors_prostate=lapply(colnames(colma_prostate), function(c){
+  l.col=c(cb_friendly_pal('grey')(length(unique(colma_prostate[[c]])) - 1), 'white')
+  names(l.col)=unique(colma_prostate[[c]])
+  l.col
+})
+names(anno_colors_prostate)=colnames(colma_prostate)
+p <- pheatmap(beta_funnorm_filt_cor_prostate,
+              annotation = colma_prostate,
+              annotation_colors = anno_colors_prostate,
+              # show_rownames = F,
+              # show_colnames = F,
+              color = cb_friendly_pal('heatmap')(15)
+)
+p
+
+# TODO
+
+```
+
+# Epigenetic Clocks {.tabset}
+
+
+```{r calculate epi age}
+clock_rownames <- gsub('_[TB]+C[12]+1$', '', rownames(MSet_funnorm_filt))
+dups <- clock_rownames[duplicated(clock_rownames)]
+keep <- !(clock_rownames %in% dups)
+
+MSet_funnorm_clock <- MSet_funnorm_filt[keep, ]
+rownames(MSet_funnorm_clock) <- gsub('_[TB]+C[12]+1$', '', rownames(MSet_funnorm_clock))
+# cpgs.missing <- checkClocks(MSet_funnorm_clock)
+
+
+age <- DNAmAge(MSet_funnorm_clock)
+age_merged <- age %>% left_join(metadata, by = c('id' = 'sample_name')) %>%
+  mutate(age = ifelse(is.na(age), agedx, age))
+
+# plotDNAmAge(age_merged$Horvath, age_merged$age)
+```
+
+## Horvath
+```{r horvath}
+ggplot(age_merged, aes(x = age, y = Horvath, color = tissue, shape = dna_quant_level)) + 
+  geom_point() + 
+  geom_text_repel(data = age_merged %>% filter(Horvath < 50), 
+                  aes(x = age, y = Horvath, color = tissue, label = id)) + 
+  scale_color_cb_friendly()
+
+```
+
+## Levine
+```{r levine}
+ggplot(age_merged, aes(x = age, y = Levine, color = tissue, shape = dna_quant_level)) + 
+  geom_point() + 
+  geom_text_repel(data = age_merged %>% filter(Levine < 40), 
+                  aes(x = age, y = Levine, color = tissue, label = id)) + 
+  scale_color_cb_friendly()
+
+```
+
+# Markers
+
+We observe that the CpG sites closest to the canonical TSS of GSTP1 are more methylated in malignant samples than other samples, although we see the opposite effect or little difference for sites farther from the TSS. 
+
+```{r markers, fig.width = 12}
+
+# TODO replace with markers of interest, or remove this chunk if not relevant
+annotation <- getAnnotation(MSet_funnorm_filt)
+
+gstp1 <- annotation %>% as.data.frame() %>% 
+  filter(chr == 'chr11', pos < 67590000, pos > 67580000, strand == '+')
+
+gstp1_beta <- beta_funnorm_filt %>% as.data.frame() %>% rownames_to_column('Name') %>% 
+  filter(Name %in% gstp1$Name) %>%
+  pivot_longer(!Name, names_to = 'sample_name', values_to = 'beta') %>%
+  left_join(metadata) %>%
+  left_join(gstp1) %>%
+  mutate(dist_from_TSS = pos - 67583812)
+
+ggplot(gstp1_beta, aes(x = as.factor(dist_from_TSS), y = beta, fill = tissue)) + geom_boxplot() +
+  facet_wrap(~tissue) + scale_fill_cb_friendly() + xlab('distance from TSS') + ggtitle('GSTP1 probes')
+
+```
+
+
+```{r, eval = F}
+cn <- getCN(MSet_funnorm_filt)
+
+cn_sample <- cn %>% as.data.frame() %>% rownames_to_column('Name') %>% 
+  select(Name, `ID_170-11-002_Medium_1`) %>%
+  left_join(annotation %>% as.data.frame() %>% select(Name, chr, strand, pos)) %>% 
+  arrange(chr, pos) %>% mutate(xpos = row_number())
+
+ggplot(cn_sample, aes(x = pos, y = `ID_170-11-002_Medium_1`)) + geom_point() + facet_wrap(~chr)
+```
+
+# Conclusions
+
+TODO write here
+
+# R session
+
+List and version of tools used for the report generation.
+
+```{r}
+sessionInfo()
+```

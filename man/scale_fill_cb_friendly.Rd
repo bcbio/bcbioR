@@ -7,7 +7,7 @@
 scale_fill_cb_friendly(palette = "main", discrete = TRUE, reverse = FALSE, ...)
 }
 \arguments{
-\item{palette}{name of the palette to be returned}
+\item{palette}{name of the palette to be returned (main, cool, hot, grey, white_to_blue, or heatmap)}
 
 \item{discrete}{boolean, whether to make palette discretely divided into colors or continuous}
 
