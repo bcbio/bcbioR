@@ -197,7 +197,7 @@ pca <- degPCA(norm_matrix, metrics,
 
 pca$plot + ggtitle(paste0("All samples", "\nPCA using ", nrow(vsd_before), " genes")) +
   theme(plot.title=element_text(hjust=0.5)) +
-  geom_mark_ellipse(aes(color = sample_type)) +  scale_color_cb_friendly()
+  geom_mark_ellipse(aes(color = .data[[column]])) +  scale_color_cb_friendly()
 ```
 
 ## Analysis of the variance by group
