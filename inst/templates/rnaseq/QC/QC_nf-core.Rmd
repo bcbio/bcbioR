@@ -36,7 +36,7 @@ setwd(fs::path_dir(getSourceEditorContext()$path))
 # NOTE: This code will check version, this is our recommendation, it may work
 #.      other versions
 stopifnot(R.version$major>= 4) # requires R4
-stopifnot(compareVersion(R.version$minor,"3.3")==0) # requires >=4.3.3
+if (compareVersion(R.version$minor,"3.1")<0) warning("We recommend >= R4.3.1") 
 stopifnot(compareVersion(as.character(BiocManager::version()), "3.18")>=0)
 ```
 
