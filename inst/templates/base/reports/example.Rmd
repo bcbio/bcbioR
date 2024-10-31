@@ -37,6 +37,39 @@ This code is in this ![](https://img.shields.io/badge/status-stable-green) revis
 source(params$project_file)
 ```
 
+```{r}
+knitr::opts_chunk$set(echo = TRUE)
+# Load libraries
+library(knitr)
+library(rmarkdown)
+library(DT)
+library(ggprism)
+library(grafify)
+
+ggplot2::theme_set(theme_prism(base_size = 12))
+# https://grafify-vignettes.netlify.app/colour_palettes.html
+# NOTE change colors here if you wish
+scale_colour_discrete <- function(...)
+  scale_colour_manual(..., values = as.vector(grafify:::graf_palettes[["kelly"]]))
+
+#options(ggplot2.discrete.colour= )
+
+# Set seed for reproducibility
+set.seed(1454944673L)
+opts_chunk[["set"]](
+    audodep = TRUE,
+    cache = FALSE,
+    cache.lazy = FALSE,
+    error = TRUE,
+    echo = TRUE,
+    fig.height = 5L,
+    fig.retina = 2L,
+    fig.width = 9.6,
+    message = FALSE,
+    tidy = TRUE,
+    warning = TRUE)
+```
+
 # Overview
 
 -   Project: `r project`

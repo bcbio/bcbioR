@@ -1,6 +1,6 @@
 # Guideline for RNAseq downstream analysis
 
-Make sure there is a project name for this.
+Make sure there is a valid project name, and modify `information.R` with the right information for your project. You can use this file with any other Rmd to include the project/analysis information.
 
 ## Run data with nf-core rnaseq
 

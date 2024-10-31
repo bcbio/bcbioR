@@ -1,6 +1,8 @@
-# Project name
+# Guideline for scRNAseq analysis
 
-# Start with cell-ranger
+Make sure there is a valid project name, and modify `information.R` with the right information for your project. You can use this file with any other Rmd to include the project/analysis information.
+
+# cell-ranger
 
 `pre-process-w-cellranger.md` contains step by step guidelines on how to run cellranger and load data into R. This `scripts/seurat_init.R` script contains all the pieces to go from cellranger output to Seurat obj. It is assuming a mouse genome.
 
@@ -10,5 +12,5 @@ Currently we are working on deploying a shiny app to inspect the single cell obj
 
 # Integration
 
-Currently we are working on guidelines and templates for this step. There is some draft under *Integration** folder.
+`Integration/norm_integration.rmd` is a template with guidelines on how to work with multiple samples. It compares log2norm vs SCT, work with SCT by samples to remove batch biases better, provide options for integration between CCA and Harmony. As last step, it contains cell type clustering and visualization to help decide the best parameters.
 

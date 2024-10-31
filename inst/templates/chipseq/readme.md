@@ -1,4 +1,4 @@
-# Guidelines for analysis
+# Guidelines for ChIPSeq analysis
 
 Make sure there is a valid project name, and modify `information.R` with the right information for your project. You can use this file with any other Rmd to include the project/analysis information.
 
