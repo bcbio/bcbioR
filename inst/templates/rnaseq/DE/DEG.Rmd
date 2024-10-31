@@ -537,7 +537,6 @@ for (contrast in names(de_list)){
 From the set of differentially expressed genes and using publicly available information about gene sets involved in biological processes and functions, we can calculate which biological processes and functions are significantly perturbed as a result of the treatment. 
 
 ```{r}
-all_in_life=get_databases()
 all_in_life=get_databases_v2()
 ```
 
