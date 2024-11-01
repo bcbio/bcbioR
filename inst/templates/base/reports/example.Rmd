@@ -76,3 +76,11 @@ opts_chunk[["set"]](
 -   PI: `r PI`
 -   Analyst: `r analyst`
 -   Experiment: `r experiment`
+
+# R session
+
+List and version of tools used for the QC report generation.
+
+```{r}
+sessionInfo()
+```
