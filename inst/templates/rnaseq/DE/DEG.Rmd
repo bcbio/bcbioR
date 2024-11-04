@@ -417,6 +417,7 @@ de_list=lapply(contrasts, function(contrast){
 ## MA plot {.tabset}
 
 This plot can help to:
+
 - Identify Differential Expression: Genes that show a significant log-fold change (M value away from 0) indicate changes in expression between conditions.
 - Assess Data Quality: The plot can help in identifying biases or systematic errors in the data. Ideally, most points should scatter around the M=0 line, indicating that there is no significant systematic difference between the conditions.
 - Visualize data dispersion: The distribution of points along the A-axis gives a sense of the spread of expression levels and any patterns or anomalies in the dataset.
