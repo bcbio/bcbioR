@@ -178,7 +178,7 @@ ggplot(lfc, aes(x=comp1, y=comp2, color=col)) + geom_point() +
 ```
 
 
-## Compare ajusted P-values
+## Compare adjusted P-values
 
 We plot adjusted P-values for our contrasts and color points by whether or not they are significant in our contrasts. The black line is 1:1.
 
