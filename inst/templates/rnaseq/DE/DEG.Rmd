@@ -417,6 +417,7 @@ de_list=lapply(contrasts, function(contrast){
 ## MA plot {.tabset}
 
 This plot can help to:
+
 - Identify Differential Expression: Genes that show a significant log-fold change (M value away from 0) indicate changes in expression between conditions.
 - Assess Data Quality: The plot can help in identifying biases or systematic errors in the data. Ideally, most points should scatter around the M=0 line, indicating that there is no significant systematic difference between the conditions.
 - Visualize data dispersion: The distribution of points along the A-axis gives a sense of the spread of expression levels and any patterns or anomalies in the dataset.
@@ -570,7 +571,7 @@ fa_gsea_list=lapply(de_list,function(contrast){
 # multiple times
 dt_list=list()
 for (contrast in names(de_list)){
-  res_sig=fa_gsea_list[[contrast]]
+  res_sig=fa_gsea_list[[contrast]] %>% filter(padj < 0.05)
   dt_list=c(dt_list, 
             list(h3(contrast)), 
             list(sanitize_datatable(res_sig)))
@@ -621,7 +622,7 @@ fa_list=lapply(de_list,function(contrast){
 # multiple times
 dt_list=list()
 for (contrast in names(de_list)){
-  res_sig=fa_list[[contrast]][["all"]]
+  res_sig=fa_list[[contrast]][["all"]] %>% filter(padj < 0.05)
   dt_list=c(dt_list, 
             list(h3(contrast)), 
             list(sanitize_datatable(res_sig)))
@@ -635,7 +636,7 @@ tagList(dt_list)
 ```{r, results='asis'}
 dt_list=list()
 for (contrast in names(de_list)){
-  res_sig=fa_list[[contrast]][["down"]]
+  res_sig=fa_list[[contrast]][["down"]] %>% filter(padj < 0.05)
   dt_list=c(dt_list, 
             list(h3(contrast)), 
             list(sanitize_datatable(res_sig)))
@@ -649,7 +650,7 @@ tagList(dt_list)
 ```{r, results='asis'}
 dt_list=list()
 for (contrast in names(de_list)){
-  res_sig=fa_list[[contrast]][["up"]]
+  res_sig=fa_list[[contrast]][["up"]] %>% filter(padj < 0.05)
   dt_list=c(dt_list, 
             list(h3(contrast)), 
             list(sanitize_datatable(res_sig)))
@@ -667,18 +668,18 @@ if (!is.null(subset_value) & !is.null(subset_value)){
   filenames = "full"
 }
 for (contrast in names(contrasts)){
-  filenames = paste0(filenames, "_", contrast)
+  filename = paste0(filenames, "_", contrast)
   name_expression_fn=file.path(
     basedir,
-    str_interp("${filenames}_expression.csv"))
+    str_interp("${filename}_expression.csv"))
   
   name_deg_fn=file.path(
     basedir,
-    str_interp("${filenames}_deg.csv"))
+    str_interp("${filename}_deg.csv"))
   
   name_pathways_fn=file.path(
     basedir,
-    str_interp("${filenames}_pathways.csv"))
+    str_interp("${filename}_pathways.csv"))
 
   counts_norm=norm_matrix %>% as.data.frame() %>% 
     rownames_to_column("gene_id") %>% 
