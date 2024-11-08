@@ -251,6 +251,29 @@ bcbio_render <- function(path, pipeline, data){
   }
 }
 
+
+#' Set custom library to your project
+#'
+#' This function will create the .Rprofile file in a project path
+#' to use a custom library path for future session
+#' @param custom_lib_path path with a R library folder
+#' @param project_path project path
+#' @examples
+#' path <- withr::local_tempdir()
+#' use_library(.libPaths(), path)
+#' @export
+use_library <- function(custom_lib_path, project_path="."){
+  # Path to your project's .Rprofile file
+  project_path <- fs::path_abs(project_path)
+  ui_info("Using this project path: {project_path}")
+  rprofile_path <- file.path(project_path, ".Rprofile")
+  # Command to set the library path
+  lib_path_command <- sprintf('.libPaths("%s")\n', custom_lib_path)
+  # Write the command to .Rprofile
+  writeLines(lib_path_command, con = rprofile_path)
+  source(rprofile_path)
+}
+
 # help with bcbio analysis setup
 use_bcbio_analysis <- function(path, pipeline, copy=TRUE, metadata=NULL){
 
