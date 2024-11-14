@@ -205,7 +205,7 @@ pca$plot + ggtitle(paste0("All samples", "\nPCA using ", nrow(vsd_before), " gen
 
 Groups in a univariate analysis can also differ with regard to their mean values, variation around those means, or both. In univariate analyses, dispersion can be examined using Levene’s test.  PERMDISP is a multivariate extension of Levene’s test to examine whether groups differ in variability. In essence, PERMDISP involves calculating the distance from each data point to its group centroid and then testing whether those distances differ among the groups. [Source](https://uw.pressbooks.pub/appliedmultivariatestatistics/chapter/permdisp/)
 
-Here we apply this test to our variance stabilized data. We calculate distances between samples and then use the `betadisper()` function from the popular vegan package. We get two overall p-values where significant means that the dispersions are different between groups. The first p-value comes from the `anova()` function and the second from the `permutest()` function. We also get pairwise p-values for every group-group comparison.
+We apply this test to our variance stabilized data. We calculate distances between samples and then use the `betadisper()` function from the popular vegan package. We get two overall p-values where significant means that the dispersions are different between groups. The first p-value comes from the `anova()` function and the second from the `permutest()` function. We also get pairwise p-values for every group-group comparison.
 
 ```{r PERMDISP}
 vare.disa <- vegdist(t(assay(vsd_before)))
