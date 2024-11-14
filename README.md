@@ -1,10 +1,6 @@
 # bcbioR
 
-<!-- badges: start -->
-
 [![R-CMD-check](https://github.com/bcbio/bcbioR/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/bcbio/bcbioR/actions/workflows/R-CMD-check.yaml)
-
-<!-- badges: end -->
 
 The goal of `bcbioR` is to create guidelines for NGS data interpretation based on the experience of the Harvard Chan Bioinformatics Core and everybody who contributes to this package.
 
@@ -24,13 +20,13 @@ devtools::install_github("bcbio/bcbioR",ref = "devel")
 
 use `setwd()` to set your current directory to the place where you want to work. The bcbioR functions will automatically write to whatever directory you have set.
 
-```
+```         
 setwd("/path/to/analysis/folder")
 ```
 
 The following code will pop up a Rmd template will populate that folder with HCBC data structure guidelines
 
-```
+```         
 path="/path/to/analysis/folder"
 bcbio_templates(type="base", outpath=path)
 bcbio_templates(type="rnaseq", outpath=path)
@@ -41,9 +37,26 @@ bcbio_templates(type="singlecell", outpath=path)
 
 This code will populate the folder with HCBC data structure guidelines and Rmd code: **You do not need to create a reports folder prior to running this code. This will create and populate the reports folder.**
 
-``` 
+```         
 bcbio_templates(type="rnaseq", outpath="/path/to/analysis/folder/reports")
 ```
+
+## Supported analyses
+
+-   base/reports/example.Rmd: ![](https://img.shields.io/badge/status-stable-green)
+-   rnaseq/DE/Intersections.Rmd: ![](https://img.shields.io/badge/status-alpha-yellow)
+-   rnaseq/DE/GSVA.Rmd: ![](https://img.shields.io/badge/status-alpha-yellow)
+-   rnaseq/DE/DEG.Rmd: ![](https://img.shields.io/badge/status-stable-green)
+-   rnaseq/DE/Cross-comparison-analysis.Rmd: ![](https://img.shields.io/badge/status-alpha-yellow)
+-   rnaseq/QC/QC_nf-core.Rmd: ![](https://img.shields.io/badge/status-stable-green)
+-   singlecell/Integration/norm_integration.rmd: ![](https://img.shields.io/badge/status-alpha-yellow)
+-   singlecell/QC/QC.rmd: ![](https://img.shields.io/badge/status-alpha-yellow)
+-   singlecell_delux/CellToCell/cellchat.Rmd: ![](https://img.shields.io/badge/status-draft-grey)
+-   chipseq/diffbind/diffbind.Rmd: ![](https://img.shields.io/badge/status-alpha-yellow)
+-   chipseq/QC/QC.Rmd: ![](https://img.shields.io/badge/status-alpha-yellow)
+-   spatial/cosmx/QC/QC.Rmd: ![](https://img.shields.io/badge/status-draft-grey)
+-   methylation/QC/QC.Rmd: ![](https://img.shields.io/badge/status-draft-grey)
+-   multiomics/teaseq/QC/QC.Rmd: ![](https://img.shields.io/badge/status-draft-grey)
 
 ### Discover more…
 

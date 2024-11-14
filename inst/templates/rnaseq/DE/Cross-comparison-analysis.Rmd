@@ -27,7 +27,7 @@ setwd(fs::path_dir(getSourceEditorContext()$path))
 # NOTE: This code will check version, this is our recommendation, it may work
 #.      other versions
 stopifnot(R.version$major>= 4) # requires R4
-stopifnot(compareVersion(R.version$minor,"3.3")==0) # requires >=4.3.3
+if (compareVersion(R.version$minor,"3.1")<0) warning("We recommend >= R4.3.1") 
 stopifnot(compareVersion(as.character(BiocManager::version()), "3.18")>=0)
 ```
 
@@ -178,7 +178,7 @@ ggplot(lfc, aes(x=comp1, y=comp2, color=col)) + geom_point() +
 ```
 
 
-## Compare ajusted P-values
+## Compare adjusted P-values
 
 We plot adjusted P-values for our contrasts and color points by whether or not they are significant in our contrasts. The black line is 1:1.
 

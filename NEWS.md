@@ -1,3 +1,8 @@
+# bcbioR 0.3.1
+
+- Fix bugs in RNAseq
+- Add function to set up library
+
 # bcbioR 0.3.0
 
 * re-structure templates

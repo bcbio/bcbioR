@@ -21,11 +21,11 @@ params:
   # numerator: tumor
   # denominator: normal
   column: "sample_type"
-  contrasts: !r list(c("sample_type", "tumor", "normal"))
+  contrasts: !r list(c("sample_type", "tumor", "normal"),c("sample_type", "normal", "tumor"))
   subset_column: null
   subset_value: null
   genome: hg38
-  ruv: true
+  ruv: false
   combatseq: false
   params_file: params_de-example.R
   project_file: ../information.R
@@ -41,7 +41,7 @@ setwd(fs::path_dir(getSourceEditorContext()$path))
 # NOTE: This code will check version, this is our recommendation, it may work
 #.      other versions
 stopifnot(R.version$major>= 4) # requires R4
-stopifnot(compareVersion(R.version$minor,"3.3")==0) # requires >=4.3.3
+if (compareVersion(R.version$minor,"3.1")<0) warning("We recommend >= R4.3.1") 
 stopifnot(compareVersion(as.character(BiocManager::version()), "3.18")>=0)
 ```
 
@@ -58,9 +58,10 @@ map(list.files(params$functions_file,pattern = "*.R$",full.names = T), source) %
 # IMPORTANT set these values if you are not using the parameters in the header (lines 22-31)
 genome=params$genome
 column=params$column
+# use contrast to set up multiple comparisons
+# this is set up in the top as well, but you can change it here:
+# example would be: list(c("sample_type", "tumor", "normal"))
 contrasts=params$contrasts
-# numerator=params$numerator
-# denominator=params$denominator
 subset_column=params$subset_column
 subset_value=params$subset_value
 run_ruv=params$ruv
@@ -197,7 +198,7 @@ pca <- degPCA(norm_matrix, metrics,
 
 pca$plot + ggtitle(paste0("All samples", "\nPCA using ", nrow(vsd_before), " genes")) +
   theme(plot.title=element_text(hjust=0.5)) +
-  geom_mark_ellipse(aes(color = sample_type)) +  scale_color_cb_friendly()
+  geom_mark_ellipse(aes(color = .data[[column]])) +  scale_color_cb_friendly()
 ```
 
 ## Analysis of the variance by group
@@ -417,6 +418,7 @@ de_list=lapply(contrasts, function(contrast){
 ## MA plot {.tabset}
 
 This plot can help to:
+
 - Identify Differential Expression: Genes that show a significant log-fold change (M value away from 0) indicate changes in expression between conditions.
 - Assess Data Quality: The plot can help in identifying biases or systematic errors in the data. Ideally, most points should scatter around the M=0 line, indicating that there is no significant systematic difference between the conditions.
 - Visualize data dispersion: The distribution of points along the A-axis gives a sense of the spread of expression levels and any patterns or anomalies in the dataset.
@@ -537,7 +539,6 @@ for (contrast in names(de_list)){
 From the set of differentially expressed genes and using publicly available information about gene sets involved in biological processes and functions, we can calculate which biological processes and functions are significantly perturbed as a result of the treatment. 
 
 ```{r}
-all_in_life=get_databases()
 all_in_life=get_databases_v2()
 ```
 
@@ -571,7 +572,7 @@ fa_gsea_list=lapply(de_list,function(contrast){
 # multiple times
 dt_list=list()
 for (contrast in names(de_list)){
-  res_sig=fa_gsea_list[[contrast]]
+  res_sig=fa_gsea_list[[contrast]] %>% filter(padj < 0.05)
   dt_list=c(dt_list, 
             list(h3(contrast)), 
             list(sanitize_datatable(res_sig)))
@@ -622,7 +623,7 @@ fa_list=lapply(de_list,function(contrast){
 # multiple times
 dt_list=list()
 for (contrast in names(de_list)){
-  res_sig=fa_list[[contrast]][["all"]]
+  res_sig=fa_list[[contrast]][["all"]] %>% filter(padj < 0.05)
   dt_list=c(dt_list, 
             list(h3(contrast)), 
             list(sanitize_datatable(res_sig)))
@@ -636,7 +637,7 @@ tagList(dt_list)
 ```{r, results='asis'}
 dt_list=list()
 for (contrast in names(de_list)){
-  res_sig=fa_list[[contrast]][["down"]]
+  res_sig=fa_list[[contrast]][["down"]] %>% filter(padj < 0.05)
   dt_list=c(dt_list, 
             list(h3(contrast)), 
             list(sanitize_datatable(res_sig)))
@@ -650,7 +651,7 @@ tagList(dt_list)
 ```{r, results='asis'}
 dt_list=list()
 for (contrast in names(de_list)){
-  res_sig=fa_list[[contrast]][["up"]]
+  res_sig=fa_list[[contrast]][["up"]] %>% filter(padj < 0.05)
   dt_list=c(dt_list, 
             list(h3(contrast)), 
             list(sanitize_datatable(res_sig)))
@@ -668,18 +669,18 @@ if (!is.null(subset_value) & !is.null(subset_value)){
   filenames = "full"
 }
 for (contrast in names(contrasts)){
-  filenames = paste0(filenames, "_", contrast)
+  filename = paste0(filenames, "_", contrast)
   name_expression_fn=file.path(
     basedir,
-    str_interp("${filenames}_expression.csv"))
+    str_interp("${filename}_expression.csv"))
   
   name_deg_fn=file.path(
     basedir,
-    str_interp("${filenames}_deg.csv"))
+    str_interp("${filename}_deg.csv"))
   
   name_pathways_fn=file.path(
     basedir,
-    str_interp("${filenames}_pathways.csv"))
+    str_interp("${filename}_pathways.csv"))
 
   counts_norm=norm_matrix %>% as.data.frame() %>% 
     rownames_to_column("gene_id") %>% 
