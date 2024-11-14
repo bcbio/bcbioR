@@ -393,7 +393,7 @@ names(contrasts)=names_to_use
 de_list=lapply(contrasts, function(contrast){
   resLFC = results(de, contrast=contrast)
   coef = paste0(contrast[1], "_", contrast[2], "_vs_", contrast[3])
-  #resLFCS <- lfcShrink(de, coef=coef, type="apeglm")
+  # resLFCS <- lfcShrink(de, coef=coef, type="apeglm")
   resLFCS <- lfcShrink(de, contrast=contrast, type="ash")
   
   res <- as.data.frame(resLFCS) %>%
