@@ -186,7 +186,7 @@ Dispersion estimates are a key part of the DESEQ2 analysis. DESEQ2 uses data fro
 ```{r set group, eval=FALSE, echo=FALSE}
 ## Example of creating a group covariate
 
-meta$group <- paste0(meta$sex,"_", meta$age,"_",meta$treatment)
+## meta$group <- paste0(meta$sex,"_", meta$age,"_",meta$treatment)
 
 factor_of_interest <- "insert column name for covariate of interest"
 ```
