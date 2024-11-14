@@ -21,7 +21,7 @@ params:
   # numerator: tumor
   # denominator: normal
   column: "sample_type"
-  contrasts: !r list(c("sample_type", "tumor", "normal"))
+  contrasts: !r list(c("sample_type", "tumor", "normal"),c("sample_type", "normal", "tumor"))
   subset_column: null
   subset_value: null
   genome: hg38
@@ -58,9 +58,10 @@ map(list.files(params$functions_file,pattern = "*.R$",full.names = T), source) %
 # IMPORTANT set these values if you are not using the parameters in the header (lines 22-31)
 genome=params$genome
 column=params$column
+# use contrast to set up multiple comparisons
+# this is set up in the top as well, but you can change it here:
+# example would be: list(c("sample_type", "tumor", "normal"))
 contrasts=params$contrasts
-# numerator=params$numerator
-# denominator=params$denominator
 subset_column=params$subset_column
 subset_value=params$subset_value
 run_ruv=params$ruv
