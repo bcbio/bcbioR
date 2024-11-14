@@ -22,7 +22,7 @@
 
     <a class="navbar-brand me-2" href="index.html">bcbioR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -54,9 +54,7 @@
   <main id="main" class="col-md-9"><div class="section level1">
 <div class="page-header"><h1 id="bcbior">bcbioR<a class="anchor" aria-label="anchor" href="#bcbior"></a>
 </h1></div>
-<!-- badges: start -->
-
-<!-- badges: end -->
+<p><a href="https://github.com/bcbio/bcbioR/actions/workflows/R-CMD-check.yaml" class="external-link"><img src="https://github.com/bcbio/bcbioR/actions/workflows/R-CMD-check.yaml/badge.svg" alt="R-CMD-check"></a></p>
 <p>The goal of <code>bcbioR</code> is to create guidelines for NGS data interpretation based on the experience of the Harvard Chan Bioinformatics Core and everybody who contributes to this package.</p>
 <div class="section level2">
 <h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
@@ -86,6 +84,40 @@
 <p>This code will populate the folder with HCBC data structure guidelines and Rmd code: <strong>You do not need to create a reports folder prior to running this code. This will create and populate the reports folder.</strong></p>
 <pre><code><span><span class="fu"><a href="reference/bcbio_templates.html">bcbio_templates</a></span><span class="op">(</span>type<span class="op">=</span><span class="st">"rnaseq"</span>, outpath<span class="op">=</span><span class="st">"/path/to/analysis/folder/reports"</span><span class="op">)</span></span></code></pre>
 </div>
+</div>
+<div class="section level2">
+<h2 id="supported-analyses">Supported analyses<a class="anchor" aria-label="anchor" href="#supported-analyses"></a>
+</h2>
+<ul>
+<li>base/reports/example.Rmd: <img src="https://img.shields.io/badge/status-stable-green">
+</li>
+<li>rnaseq/DE/Intersections.Rmd: <img src="https://img.shields.io/badge/status-alpha-yellow">
+</li>
+<li>rnaseq/DE/GSVA.Rmd: <img src="https://img.shields.io/badge/status-alpha-yellow">
+</li>
+<li>rnaseq/DE/DEG.Rmd: <img src="https://img.shields.io/badge/status-stable-green">
+</li>
+<li>rnaseq/DE/Cross-comparison-analysis.Rmd: <img src="https://img.shields.io/badge/status-alpha-yellow">
+</li>
+<li>rnaseq/QC/QC_nf-core.Rmd: <img src="https://img.shields.io/badge/status-stable-green">
+</li>
+<li>singlecell/Integration/norm_integration.rmd: <img src="https://img.shields.io/badge/status-alpha-yellow">
+</li>
+<li>singlecell/QC/QC.rmd: <img src="https://img.shields.io/badge/status-alpha-yellow">
+</li>
+<li>singlecell_delux/CellToCell/cellchat.Rmd: <img src="https://img.shields.io/badge/status-draft-grey">
+</li>
+<li>chipseq/diffbind/diffbind.Rmd: <img src="https://img.shields.io/badge/status-alpha-yellow">
+</li>
+<li>chipseq/QC/QC.Rmd: <img src="https://img.shields.io/badge/status-alpha-yellow">
+</li>
+<li>spatial/cosmx/QC/QC.Rmd: <img src="https://img.shields.io/badge/status-draft-grey">
+</li>
+<li>methylation/QC/QC.Rmd: <img src="https://img.shields.io/badge/status-draft-grey">
+</li>
+<li>multiomics/teaseq/QC/QC.Rmd: <img src="https://img.shields.io/badge/status-draft-grey">
+</li>
+</ul>
 <div class="section level3">
 <h3 id="discover-more">Discover more…<a class="anchor" aria-label="anchor" href="#discover-more"></a>
 </h3>
@@ -168,12 +200,7 @@
 </ul>
 </div>
 
-<div class="dev-status">
-<h2 data-toc-skip>Dev status</h2>
-<ul class="list-unstyled">
-<li><a href="https://github.com/bcbio/bcbioR/actions/workflows/R-CMD-check.yaml" class="external-link"><img src="https://github.com/bcbio/bcbioR/actions/workflows/R-CMD-check.yaml/badge.svg" alt="R-CMD-check"></a></li>
-</ul>
-</div>
+
 
   </aside>
 </div>
