@@ -2,12 +2,6 @@
 date = "YYYYMMDD"
 basedir <- './' # where to write down output files
 
-# params for bcbio
-# coldata_fn = "https://raw.githubusercontent.com/bcbio/bcbioR-test-data/main/rnaseq/bcbio/coldata.csv"
-# counts_fn = 'https://raw.githubusercontent.com/bcbio/bcbioR-test-data/main/rnaseq/bcbio/tximport-counts.csv'
-# se_object=url("https://raw.githubusercontent.com/bcbio/bcbioR-test-data/main/rnaseq/bcbio/bcbio-se.rds")
-#
-
 # params for nfcore
 # Your data
 # This is the file used to run nf-core or compatible to that
