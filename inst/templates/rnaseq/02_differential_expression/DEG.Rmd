@@ -29,7 +29,7 @@ params:
   combatseq: false
   params_file: params_de-example.R
   project_file: ../information.R
-  functions_file: ../libs
+  functions_file: ../00_libs
 ---
 
 Template developed with materials from https://hbctraining.github.io/main/.
@@ -57,6 +57,9 @@ source(params$project_file)
 map(list.files(params$functions_file,pattern = "*.R$",full.names = T), source) %>% invisible()
 # IMPORTANT set these values if you are not using the parameters in the header (lines 22-31)
 genome=params$genome
+library(org.Hs.eg.db)
+ann.org=org.Hs.eg.db
+
 column=params$column
 # use contrast to set up multiple comparisons
 # this is set up in the top as well, but you can change it here:
@@ -80,10 +83,8 @@ library(DEGreport)
 library(ggpubr)
 library(msigdbr)
 library(fgsea)
-library(org.Hs.eg.db)
 library(knitr)
 library(EnhancedVolcano)
-library(bcbioR)
 library(ggprism)
 library(viridis)
 library(pheatmap)
@@ -91,9 +92,20 @@ library(janitor)
 library(ggforce)
 library(vegan)
 library(htmltools)
+library(RColorBrewer)
+library(ggprism)
+library(grafify)
+ggplot2::theme_set(theme_prism(base_size = 12))
+# https://grafify-vignettes.netlify.app/colour_palettes.html
+# NOTE change colors here if you wish
+scale_colour_discrete <- function(...)
+  scale_colour_manual(..., 
+                      values = as.vector(grafify:::graf_palettes[["kelly"]]))
+scale_fill_discrete <- function(...)
+  scale_fill_manual(..., 
+                      values = as.vector(grafify:::graf_palettes[["kelly"]]))
+colors <- as.vector(grafify:::graf_palettes[["kelly"]])
 
-colors=cb_friendly_cols(1:15)
-ggplot2::theme_set(theme_prism(base_size = 14))
 opts_chunk[["set"]](
     cache = F,
     cache.lazy = FALSE,
@@ -120,7 +132,7 @@ sanitize_datatable = function(df, ...) {
 ```
 
 ```{r load_data, message=F, warning=F}
-# This code will load from bcbio or nf-core folder
+# This code will load from nf-core folder
 # NOTE make sure to set numerator and denominator
 coldata <- load_coldata(coldata_fn, column,
                         subset_column, subset_value)
@@ -149,8 +161,7 @@ stopifnot(all(names(counts) == rownames(metrics)))
 -   Aim: `r aim`
 
 ```{r load_counts_data}
-
-rdata = AnnotationDbi::select(org.Hs.eg.db, rownames(counts), 'SYMBOL', 'ENSEMBL') %>%
+rdata = AnnotationDbi::select(ann.org, rownames(counts), 'SYMBOL', 'ENSEMBL') %>%
   dplyr::select(gene_id = ENSEMBL, gene_name = SYMBOL) %>% 
   distinct(gene_id, .keep_all = TRUE)
 
@@ -198,7 +209,7 @@ pca <- degPCA(norm_matrix, metrics,
 
 pca$plot + ggtitle(paste0("All samples", "\nPCA using ", nrow(vsd_before), " genes")) +
   theme(plot.title=element_text(hjust=0.5)) +
-  geom_mark_ellipse(aes(color = .data[[column]])) +  scale_color_cb_friendly()
+  geom_mark_ellipse(aes(color = .data[[column]])) +  scale_color_grafify("kelly")
 ```
 
 ## Analysis of the variance by group
@@ -279,9 +290,7 @@ dat <- norm_matrix
 # change K parameter to other number to find more unknown covariates
 ruvset <- RUVs(dat, cIdx=rownames(dat), k=1, diffs, isLog = T, round = F)
 vars <- ruvset$W
-
 new_cdata <- cbind(coldata, vars)
-
 formula <- as.formula(paste0("~ ", 
                           paste0(
                             colnames(new_cdata)[grepl("W", colnames(new_cdata))], 
@@ -291,8 +300,7 @@ formula <- as.formula(paste0("~ ",
 norm_matrix=ruvset$normalizedCounts # NOTE use this for visualization
 pca2 <- degPCA(norm_matrix, new_cdata, 
        condition = column) + ggtitle('After RUV')
-pca2 + scale_color_cb_friendly()
-
+pca2 + scale_color_grafify("kelly")
 ```
 
 ```{r after_RUV, eval=run_ruv}
@@ -324,7 +332,6 @@ cat("There is no need to remove known factors like batch effect in this study.")
 to_remove = "batch"
 
 ## Column name of of your variable(s) of interest
-
 to_keep = "sample_type"
 
 coldata[[to_remove]] <- as.factor(coldata[[to_remove]])
@@ -345,8 +352,7 @@ treatment = coldata[[to_keep]]
 ```{r do_combatseq, eval=run_combatseq}
 adjusted_counts <- ComBat_seq(as.matrix(counts), batch=batch, group = treatment)
 
-#NOTE For multiple variables of interest
-
+# NOTE For multiple variables of interest
 # adjusted_counts <- ComBat_seq(as.matrix(counts2), batch=batch, covar_mod = imp)
 ```
 
@@ -359,7 +365,7 @@ norm_matrix = assay(vsd_combat)
 
 pca_combat <- degPCA(norm_matrix, coldata, 
        condition = column) + ggtitle('After Combatseq')
-pca_combat + scale_color_cb_friendly()
+pca_combat + scale_color_grafify("kelly")
 ```
 
 # Differential Expression
@@ -386,7 +392,6 @@ The LRT is useful for testing multiple terms at once, for example testing 3 or m
 # NOTE As a note: Use `ashr` for comparisons with many groups to be able to pull out all the contrasts; otherwise `apeglm` is fine. It shrinks less.
 
 # NOTE We recommend LRT for time series
-
 # resultsNames(de) # check the order is right
 names_to_use=lapply(contrasts, function(contrast){coef = paste0(contrast[1], "_", contrast[2], "_vs_", contrast[3])})
 names(contrasts)=names_to_use
@@ -397,16 +402,23 @@ de_list=lapply(contrasts, function(contrast){
   resLFCS <- lfcShrink(de, contrast=contrast, type="ash")
   
   res <- as.data.frame(resLFCS) %>%
-    rownames_to_column('gene_id') %>% left_join(rdata, by = 'gene_id') %>% 
-    relocate(gene_name) %>% dplyr::rename(lfc = log2FoldChange) %>%
-    mutate(pi = abs(lfc) * -log10(padj)) %>% arrange(-pi)
+    rownames_to_column('gene_id') %>%
+    left_join(rdata, by = 'gene_id') %>% 
+    relocate(gene_name) %>%
+    dplyr::rename(lfc = log2FoldChange) %>%
+    mutate(pi = abs(lfc) * -log10(padj)) %>%
+    arrange(-pi)
   
   ## Filter out genes that have no expression or were filtered out by DESEQ2
-  res <- res[res$baseMean>0,] %>% drop_na(padj) %>% drop_na(pvalue)
+  res <- res[res$baseMean>0,] %>%
+    drop_na(padj) %>% drop_na(pvalue)
   
-  res_sig <- res %>% filter(padj < 0.05) %>% arrange(padj) %>%
-    mutate(gene_name = ifelse(is.na(gene_name), gene_id, gene_name))
-  results=list(lfc=resLFC, lfcs=resLFCS, all=res, sig=res_sig)
+  res_sig <- res %>% filter(padj < 0.05) %>%
+    arrange(padj) %>%
+    mutate(gene_name = ifelse(is.na(gene_name),
+                              gene_id, gene_name))
+  results=list(lfc=resLFC, lfcs=resLFCS,
+               all=res, sig=res_sig)
   return(results)
 })
 
@@ -453,8 +465,10 @@ for (contrast in names(de_list)){
                   x = 'lfc',
                   y = 'padj', 
                   title=contrast,
-                  col=as.vector(colors[c("dark_grey", "light_blue",
-                                         "purple", "purple")]),
+                  col=as.vector(colors[c("darkgrey",
+                                         "lightblue",
+                                         "purple",
+                                         "purple")]),
                   subtitle = "", drawConnectors = T,  max.overlaps = Inf) 
   print(p1)
   cat("\n\n")
@@ -539,7 +553,7 @@ for (contrast in names(de_list)){
 From the set of differentially expressed genes and using publicly available information about gene sets involved in biological processes and functions, we can calculate which biological processes and functions are significantly perturbed as a result of the treatment. 
 
 ```{r}
-all_in_life=get_databases_v2()
+all_in_life=get_databases_v2(sps="human")
 ```
 
 # Pathway Analysis- GSEA
@@ -556,7 +570,7 @@ fa_gsea_list=lapply(de_list,function(contrast){
   res=contrast[["all"]]
   gsea_input = res %>% filter(!is.na(padj)) %>% dplyr::select(gene_id, lfc)
   #change to the right species
-  input_entrezid <- AnnotationDbi::select(org.Hs.eg.db, gsea_input$gene_id, 'ENSEMBL', columns = c('ENTREZID', 'SYMBOL'))
+  input_entrezid <- AnnotationDbi::select(ann.org, gsea_input$gene_id, 'ENSEMBL', columns = c('ENTREZID', 'SYMBOL'))
   input_entrezid <- inner_join(gsea_input, input_entrezid, by=c("gene_id"="ENSEMBL")) %>%
     filter(!is.na(ENTREZID)) %>% 
     distinct(ENTREZID, .keep_all=TRUE)
@@ -594,21 +608,21 @@ fa_list=lapply(de_list,function(contrast){
   res=contrast[["all"]]
   universe=res %>% 
     filter(!is.na(padj)) %>% pull(gene_id)
-  universe_mapping = AnnotationDbi::select(org.Hs.eg.db, universe, 'ENSEMBL', columns=c('ENTREZID', 'SYMBOL'))
+  universe_mapping = AnnotationDbi::select(ann.org, universe, 'ENSEMBL', columns=c('ENTREZID', 'SYMBOL'))
   
   ora_input = res %>% filter(!is.na(padj), padj<0.01, abs(lfc)> 0.3) %>% pull(gene_id)
   #change to the right species
-  input_entrezid <- AnnotationDbi::select(org.Hs.eg.db, ora_input, 'ENSEMBL', columns = c('ENTREZID', 'SYMBOL'))
+  input_entrezid <- AnnotationDbi::select(ann.org, ora_input, 'ENSEMBL', columns = c('ENTREZID', 'SYMBOL'))
   all=run_fora_v2(input_entrezid, universe_mapping,all_in_life)
   
   ora_input = res %>% filter(!is.na(padj), padj<0.01, lfc> 0.3) %>% pull(gene_id)
   #change to the right species
-  input_entrezid <- AnnotationDbi::select(org.Hs.eg.db, ora_input, 'ENSEMBL', columns = c('ENTREZID', 'SYMBOL'))
+  input_entrezid <- AnnotationDbi::select(ann.org, ora_input, 'ENSEMBL', columns = c('ENTREZID', 'SYMBOL'))
   up=run_fora_v2(input_entrezid, universe_mapping,all_in_life)
 
   ora_input = res %>% filter(!is.na(padj), padj<0.01, lfc< -0.3) %>% pull(gene_id)
   #change to the right species
-  input_entrezid <- AnnotationDbi::select(org.Hs.eg.db, ora_input, 'ENSEMBL', columns = c('ENTREZID', 'SYMBOL'))
+  input_entrezid <- AnnotationDbi::select(ann.org, ora_input, 'ENSEMBL', columns = c('ENTREZID', 'SYMBOL'))
   down=run_fora_v2(input_entrezid, universe_mapping,all_in_life)
 
   list(all=all,up=up,down=down)
