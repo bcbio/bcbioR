@@ -75,7 +75,7 @@ load_metrics <- function(se_object, multiqc_data_dir, gtf_fn, counts){
     }else{
       warning("No gene biotype founded")
     }
-
+    metrics$sample <- make.names(metrics$sample)
     if (!is.null(biotype)){
       annotation=as.data.frame(gtf) %>% .[,c("gene_id", biotype)]
       rRNA=grepl("rRNA|tRNA",annotation[[biotype]])
@@ -96,7 +96,6 @@ load_metrics <- function(se_object, multiqc_data_dir, gtf_fn, counts){
                        "total_reads",
                        "x5_3_bias", "r_and_t_rna_rate","intergenic_rate")]
   }
-  metrics$sample <- make.names(metrics$sample)
   rownames(metrics) <- metrics$sample
   return(metrics)
 }
