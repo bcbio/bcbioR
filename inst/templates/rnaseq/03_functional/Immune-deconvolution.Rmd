@@ -17,17 +17,17 @@ output:
 editor_options: 
   chunk_output_type: inline
 params:
-  # paths to raw counts and TPM gene expression matrices and metadata table
-  # metadata to separate by on plot
-  # which organism are your expression matrices from?
-  # can be human or mouse
   # information about project: project name, PI, analyst, experiment, aim
   project_file: ../information.R
+  # paths to raw counts and TPM gene expression matrices and metadata table
   params_file: params_immune_deconv.R
+  # metadata to separate by on plot
   factor_of_interest_1: tissue
   factor_of_interest_1_levels: c("Duo", "Ile")
   factor_of_interest_2: timepoint
   factor_of_interest_2_levels: c("0d", "2d", "4d", "6d", "8d", "2w", "3w", "4w")
+  # which organism are your expression matrices from?
+  # can be human or mouse
   organism: mouse
   # for TIMER method: which cancer type?
   # run `immunedeconv::timer_available_cancers` to see options
