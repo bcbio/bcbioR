@@ -1,0 +1,398 @@
+---
+title: "Non Model Organism Pathway Analysis"
+author: "Harvard Chan Bioinformatics Core"
+date: "`r Sys.Date()`"
+output:
+   html_document:
+      code_folding: hide
+      df_print: paged
+      highlights: pygments
+      number_sections: true
+      self_contained: true
+      theme: default
+      toc: true
+      toc_float:
+         collapsed: true
+         smooth_scroll: true
+editor_options: 
+  chunk_output_type: inline
+params:
+  # provide path to metadata file with species information, input and reference file locations, column names
+  params_file: params_nonmodel_org_pathways.R
+  # set cutoffs for calling differential expression
+  pCutoffDE:  0.05 # adjusted p-value, e.g. 0.05
+  fcCutoffDE: NA   # fold change, e.g. NA or 1.1
+  # set adjusted p-value cutoff for displaying pathway results in tables
+  pCutoffGO:   1   # for GO terms, anything with p-adj != 1
+  pCutoffKEGG: 0.2 # for KEGG terms
+---
+
+```{r check_wd_and_version}
+# this sets up the working directory to this file so all files can be found
+library(rstudioapi)
+setwd(fs::path_dir(getSourceEditorContext()$path))
+# NOTE: this code will check version, this is our recommendation, it may work with other versions
+stopifnot(R.version$major >= 4) # requires R4
+if (compareVersion(R.version$minor, "3.1") < 0) warning("We recommend >= R4.3.1") 
+stopifnot(compareVersion(as.character(BiocManager::version()), "3.18") >= 0)
+```
+
+This code is in this ![](https://img.shields.io/badge/status-draft-grey) revision.
+
+```{r load_params, cache = FALSE}
+# set up this R file (line 21: params_nonmodel_org_pathways.R)
+source(params$params_file)
+# IMPORTANT: set these values if you are not using the parameters in the header (lines 22-27)
+pCutoffDE   <- params$pCutoffDE
+fcCutoffDE  <- params$fcCutoffDE
+pCutoffGO   <- params$pCutoffGO
+pCutoffKEGG <- params$pCutoffKEGG
+```
+
+```{r load_libraries, cache = FALSE, message = FALSE, warning = FALSE}
+library(tidyverse)
+library(readxl) # load Excel file reference
+library(topGO) # GO ORA
+library(clusterProfiler) # KEGG ORA and GSEA
+
+knitr::opts_chunk$set(
+    cache = FALSE,
+    cache.lazy = FALSE,
+    dev = c("png", "pdf"),
+    error = TRUE,
+    highlight = TRUE,
+    message = FALSE,
+    prompt = FALSE,
+    tidy = FALSE,
+    warning = FALSE,
+    echo = TRUE, 
+    fig.height = 4)
+
+# set seed for reproducibility
+set.seed(1234567890L)
+```
+
+```{r sanitize_datatable}
+sanitize_datatable = function(df, ...) {
+ # remove dashes which cause wrapping
+  DT::datatable(df, ...,
+                rownames = gsub("-", "_", rownames(df)),
+                colnames = gsub("-", "_", colnames(df)))
+}
+```
+
+# Overview
+
+This template takes as input the output of a differential expression analysis, with 1 row per gene or protein, and columns including log2 fold change (LFC), adjusted p-value, and UniProt (or other mappable) ID. The names of these columns are defined at the top of the template.
+
+This template also requires as input a Uniprot reference file for the same species; the steps for creating this file can be found in params_nonmodel_org_pathways.R.
+
+The template will perform gene ontology (GO) overrepresentation analysis (ORA), KEGG ORA, and KEGG gene set enrichment analysis (GSEA) for the differentially expressed genes based on the annotations in the Uniprot reference file.
+
+# Load differential expression data
+
+```{r load_data}
+# load data from client (defined in params_nonmodel_org_pathways.R)
+input_data <- read.csv(input_file)
+
+# assign up- vs down-regulated
+if(!is.na(fcCutoffDE)) {
+  input_data <- input_data %>%
+    dplyr::mutate(up = .data[[colname_padj]] < pCutoffDE & .data[[colname_lfc]] > 0,
+                  dn = .data[[colname_padj]] < pCutoffDE & .data[[colname_lfc]] < 0)
+} else {
+  input_data <- input_data %>%
+    dplyr::mutate(up = .data[[colname_padj]] < pCutoffDE & .data[[colname_lfc]] > log2(fcCutoffDE),
+                  dn = .data[[colname_padj]] < pCutoffDE & .data[[colname_lfc]] < -log2(fcCutoffDE))
+}
+```
+
+# Pathway analysis
+
+From the set of differentially inserted genes and using publicly available information about gene sets involved in biological processes and functions, we can calculate which biological processes and functions are significantly perturbed in each comparison.
+
+We are using GO and KEGG terms annotated from Uniprot, which we are mapping to the differential expression data based on mapping `r colname_uniprot` in the DE data to `r colname_ref` in the Uniprot reference.
+
+We are using here genes called as significant based on adjusted p-value and optional fold change cutoffs as defined at the top of the template for input into the 2 overrepresentation analyses; the GSEA will use all genes as input.
+
+```{r pathway_reference_manual}
+# load UniProt data
+uniprot_ref <- readxl::read_excel(uniprot_ref_file)
+
+# remove PATRIC and UniParc IDs (can contain confusing duplicates)
+uniprot_ref$PATRIC  <- NULL
+uniprot_ref$UniParc <- NULL
+
+# split duplicate KEGG IDs
+uniprot_ref <- uniprot_ref %>% tidyr::separate_rows(KEGG, sep = ";") %>%
+  # and remove any rows that now have a blank KEGG (did not have >1 KEGG ID to begin with)
+  subset(KEGG != "")
+# and remove species ID from beginning of KEGG column
+uniprot_ref$KEGG   <- gsub(paste0("^", species_id, ":"), "", uniprot_ref$KEGG)
+
+# remove ; at end of some columns
+# uniprot_ref$GeneID <- gsub(";$", "", uniprot_ref$GeneID)
+# uniprot_ref$RefSeq <- gsub(";$", "", uniprot_ref$RefSeq)
+# uniprot_ref$EMBL   <- gsub(";$", "", uniprot_ref$EMBL)
+```
+
+```{r add_Uniprot_data}
+# add additional gene IDs to data
+input_data <- input_data %>% left_join(uniprot_ref,
+                                       by = join_by(!!sym(colname_uniprot) == !!sym(colname_ref)))
+```
+
+## Overrepresentation Analysis (ORA): Gene Ontology (GO)
+
+```{r topGO_setup}
+# pull uniprot ID and GO terms from the uniprot reference
+uniprot2GO <- uniprot_ref[, c(colname_ref, "Gene Ontology IDs")]
+uniprot2GO$`Gene Ontology IDs` <- gsub("; ", ",", uniprot2GO$`Gene Ontology IDs`)
+# remove rows with no GO IDs
+uniprot2GO <- subset(uniprot2GO, !is.na(`Gene Ontology IDs`))
+# save
+write.table(uniprot2GO, "./uniprot_to_GO.txt",
+            row.names = FALSE, sep = "\t", col.names = FALSE, quote = FALSE)
+
+# read that back in
+uniprot2GO <- topGO::readMappings("./uniprot_to_GO.txt")
+
+# save all uniprot IDs
+proteinNames <- names(uniprot2GO)
+```
+
+```{r topGO_functions}
+# create function to run and report topGO
+run_topGO <- function(exp_matrix, dir_value, ontology = c("BP", "MF")) {
+  # create vector of protein names
+  proteinSubset <- exp_matrix %>% subset(eval(as.name(dir_value)) == TRUE) %>%
+    dplyr::select(!!sym(colname_uniprot)) %>% deframe()
+  
+  # create factor by whether or not this protein subset is found in universe (proteinNames)
+  proteinList = factor(as.integer(proteinNames %in% proteinSubset))
+  names(proteinList) <- proteinNames
+  
+  # run topGO
+  # feasible proteins are those that can be annotated to GO:BP
+  GOdata <- new("topGOdata", description = dir_value,
+                ontology = ontology, allGenes = proteinList,
+                annot = annFUN.gene2GO, gene2GO = uniprot2GO)
+  res_elim <- runTest(GOdata, algorithm = "elim", statistic = "fisher")
+  
+  # run enrichment
+  res_enrich <- GenTable(GOdata, raw.p.value = res_elim, orderBy = "raw.p.value",
+                         topNodes = length(res_elim@score),
+                         numChar = 120)
+  res_enrich$raw.p.value <- res_enrich$raw.p.value %>% as.numeric() %>% round(digits = 5)
+  res_enrich$padjust <- p.adjust(res_enrich$raw.p.value, method = "BH") %>% round(digits = 5)
+  
+  # add list of proteins in term
+  # res_enrich$Proteins <- genesInTerm(GOdata, res_enrich$GO.ID)
+  
+  # report results with p-adj < cutoff
+  subset(res_enrich, padjust < pCutoffGO)
+}
+```
+
+### GO: Biological Process
+
+```{r topGO_BP}
+GOBP_up <- run_topGO(input_data, "up", ontology = "BP")
+cat(paste("Upregulated:",
+          nrow(subset(GOBP_up, padjust < 0.05)), "significantly enriched pathway(s)"))
+GOBP_up %>% sanitize_datatable()
+
+if(nrow(subset(GOBP_up, padjust < 0.05)) > 0) {
+  cat(paste("Proteins associated with upregulated pathways:"),
+      paste(GOBP_up[GOBP_up$padjust < 0.05, "Term"], collapse = "; "))
+  sigpath <- GOBP_up[GOBP_up$padjust < 0.05, "GO.ID"]
+  sigpath_genes <- uniprot_ref[grepl(paste0(sigpath, collapse = "|"), uniprot_ref$`Gene Ontology IDs`),
+                               c(colname_ref, "Gene Names (primary)", "Protein names",
+                                 "Gene Ontology (biological process)")]
+  sigpath_siggenes <- subset(input_data, eval(as.name(colname_uniprot)) %in% sigpath_genes[[colname_ref]] & up) %>%
+    dplyr::select(c(`Gene Ontology (biological process)`,
+                    !!sym(colname_gene), `Protein names`, !!sym(colname_lfc)))
+  sigpath_siggenes %>% sanitize_datatable()
+}
+
+GOBP_dn <- run_topGO(input_data, "dn", ontology = "BP")
+cat(paste("Downregulated:",
+          nrow(subset(GOBP_dn, padjust < 0.05)), "significantly enriched pathway(s)"))
+GOBP_dn %>% sanitize_datatable()
+
+if(nrow(subset(GOBP_dn, padjust < 0.05)) > 0) {
+  cat(paste("Proteins associated with downregulated pathways:"),
+      paste(GOBP_dn[GOBP_dn$padjust < 0.05, "Term"], collapse = "; "))
+  sigpath <- GOBP_dn[GOBP_dn$padjust < 0.05, "GO.ID"]
+  sigpath_genes <- uniprot_ref[grepl(paste0(sigpath, collapse = "|"), uniprot_ref$`Gene Ontology IDs`),
+                               c(colname_ref, "Gene Names (primary)", "Protein names",
+                                 "Gene Ontology (biological process)")]
+  sigpath_siggenes <- subset(input_data, eval(as.name(colname_uniprot)) %in% sigpath_genes[[colname_ref]] & dn) %>%
+    dplyr::select(c(`Gene Ontology (biological process)`,
+                    !!sym(colname_gene), `Protein names`, !!sym(colname_lfc)))
+  sigpath_siggenes %>% sanitize_datatable()
+}
+```
+
+### GO: Molecular Function
+
+```{r topGO_MF}
+GOMF_up <- run_topGO(input_data, "up", ontology = "MF")
+cat(paste("Upregulated:",
+          nrow(subset(GOMF_up, padjust < 0.05)), "significantly enriched pathway(s)"))
+GOMF_up %>% sanitize_datatable()
+
+if(nrow(subset(GOMF_up, padjust < 0.05)) > 0) {
+  cat(paste("Proteins associated with upregulated pathways:"),
+      paste(GOMF_up[GOMF_up$padjust < 0.05, "Term"], collapse = "; "))
+  sigpath <- GOMF_up[GOMF_up$padjust < 0.05, "GO.ID"]
+  sigpath_genes <- uniprot_ref[grepl(paste0(sigpath, collapse = "|"), uniprot_ref$`Gene Ontology IDs`),
+                               c(colname_ref, "Gene Names (primary)", "Protein names",
+                                 "Gene Ontology (molecular function)")]
+  sigpath_siggenes <- subset(input_data, eval(as.name(colname_uniprot)) %in% sigpath_genes[[colname_ref]] & up) %>%
+    dplyr::select(c(`Gene Ontology (molecular function)`,
+                    !!sym(colname_gene), `Protein names`, , !!sym(colname_lfc)))
+  sigpath_siggenes %>% sanitize_datatable()
+}
+
+GOMF_dn <- run_topGO(input_data, "dn", ontology = "MF")
+cat(paste("Downregulated:",
+          nrow(subset(GOMF_dn, padjust < 0.05)), "significantly enriched pathway(s)"))
+GOMF_dn %>% sanitize_datatable()
+
+if(nrow(subset(GOMF_dn, padjust < 0.05)) > 0) {
+  cat(paste("Proteins associated with downregulated pathways:"),
+      paste(GOMF_dn[GOMF_dn$padjust < 0.05, "Term"], collapse = "; "))
+  sigpath <- GOMF_dn[GOMF_dn$padjust < 0.05, "GO.ID"]
+  sigpath_genes <- uniprot_ref[grepl(paste0(sigpath, collapse = "|"), uniprot_ref$`Gene Ontology IDs`),
+                               c(colname_ref, "Gene Names (primary)", "Protein names",
+                                 "Gene Ontology (molecular function)")]
+  sigpath_siggenes <- subset(input_data, eval(as.name(colname_uniprot)) %in% sigpath_genes[[colname_ref]] & dn) %>%
+    dplyr::select(c(`Gene Ontology (molecular function)`,
+                    !!sym(colname_gene), `Protein names`, , !!sym(colname_lfc)))
+  sigpath_siggenes %>% sanitize_datatable()
+}
+```
+
+## Overrepresentation Analysis (ORA): KEGG
+
+**In this case we are using a multiple-testing adjusted p-value cutoff of `r pCutoffKEGG` for significance.** Again, all pathways with a multiple-testing adjusted p-value less than 1 will be shown regardless of significance, which gives us a better idea of pathways that may be perturbed in each experiment.
+
+```{r KEGG_functions}
+# run KEGG
+run_KEGG <- function(geneList, keyType = "kegg", universe) {
+  res <- enrichKEGG(geneList, organism = species_id,
+                    keyType = keyType, universe = universe,
+                    pvalueCutoff = pCutoffKEGG)
+  # clean results
+  res <- res@result # %>% subset(p.adjust < pCutoffKEGG)
+  res$pvalue   <- res$pvalue   %>% round(digits = 5)
+  res$p.adjust <- res$p.adjust %>% round(digits = 5)
+  res$qvalue   <- res$qvalue   %>% round(digits = 5)
+  # don't include species name in pathway name
+  res$Description <- gsub(paste0(" - ", species_name), "", res$Description)
+  subset(res, p.adjust < 1)
+}
+
+clean_KEGG <- function(res, de, direction) {
+  res_genes_all <- data.frame(Pathway       = character(),
+                              KEGG          = character(),
+                              Gene_Names    = character(),
+                              Protein_Names = character(),
+                              lfc           = numeric(),
+                              padj          = numeric())
+  colnames(res_genes_all)[3:6] <- c("Gene Names", "Protein names",
+                                    colname_lfc, colname_padj)
+  for(i in 1:nrow(subset(res, p.adjust < pCutoffKEGG))) { # just significantly enriched
+    res_genes <- data.frame(Pathway = res[i, "Description"],
+                            KEGG = str_split(res[i, "geneID"], "/"))
+    colnames(res_genes) <- c("Pathway", "KEGG")
+    res_genes <- left_join(res_genes,
+                           uniprot_ref[, c("KEGG", "Gene Names", "Protein names")],
+                           by = "KEGG")
+    res_genes <- left_join(res_genes,
+                           de[, c("KEGG", colname_lfc, colname_padj)],
+                           by = "KEGG")
+    res_genes_all <- merge(res_genes_all, res_genes, all = T)
+  }
+  cat(paste("Genes associated with", direction, "KEGG pathway(s):"))
+  return(res_genes_all)
+}
+```
+
+```{r KEGG}
+# first check: if we mapped our input data to the Uniprot data based on a KEGG ID
+# make sure we rename that column back to "KEGG"
+if (colname_ref == "KEGG") colnames(input_data)[colnames(input_data) == colname_uniprot] <- "KEGG"
+
+cat("Upregulated")
+geneList_KEGG <- input_data[input_data$up & !is.na(input_data$KEGG), "KEGG"]
+res <- run_KEGG(geneList_KEGG, keyType = "kegg", universe = input_data$KEGG)
+if(nrow(res) > 0) {
+  # display results without endlessly long geneID column that lists genes contributing to terms
+  sanitize_datatable(select(res, -geneID))
+}
+if(nrow(subset(res, p.adjust < pCutoffKEGG)) > 0) {
+  clean_KEGG(res, input_data, "upregulated") %>% sanitize_datatable()
+} else cat("No significant pathways")
+
+cat("Downregulated")
+geneList_KEGG <- input_data[input_data$dn & !is.na(input_data$KEGG), "KEGG"]
+res <- run_KEGG(geneList_KEGG, keyType = "kegg", universe = input_data$KEGG)
+if(nrow(res) > 0) {
+  # display results without endlessly long geneID column that lists genes contributing to terms
+  sanitize_datatable(select(res, -geneID))
+}
+if(nrow(subset(res, p.adjust < pCutoffKEGG)) > 0) {
+  clean_KEGG(res, input_data, "downregulated") %>% sanitize_datatable()
+} else cat("No significant pathways")
+```
+
+## Gene Set Enrichment Analysis (GSEA): KEGG
+
+GSEA differs from the above enrichment analyses in that it uses fold change information in addition to the protein names to perform pathway analysis. Looking at the normalized enrichment score (NES) tells us the direction of effect of each enriched KEGG term in the results.
+
+**In this case we are using a multiple-testing adjusted p-value cutoff of `r pCutoffKEGG` for significance.** Only significant pathways will be shown.
+
+```{r pathway_GSEA, fig.width = 10, fig.height = 5}
+# create named vector: rank log2FC expression values associated with KEGG ID
+# use ALL genes without a fold change cutoff
+lFC_named <- input_data[, c("KEGG", colname_lfc)] %>% deframe() %>% sort(decreasing = TRUE)
+
+# run GSEA using clusterProfiler for KEGG database
+gsea_res <- clusterProfiler::gseKEGG(geneList = lFC_named,
+                                     organism = species_id,
+                                     keyType = "kegg",
+                                     pvalueCutoff = pCutoffKEGG,
+                                     pAdjustMethod = "BH",
+                                     verbose = TRUE,
+                                     seed = TRUE)
+
+# don't include species name in pathway name
+gsea_res@result$Description <- gsub(paste0(" - ", species_name), "", gsea_res@result$Description)
+
+# pull out and print results
+gsea_res_tbl <- gsea_res %>% slot("result") %>% as_tibble()
+gsea_res_tbl <- gsea_res_tbl %>% rename_at("core_enrichment", ~"geneID")
+# display results without endlessly long geneID column that lists genes contributing to terms
+sanitize_datatable(select(gsea_res_tbl, -geneID))
+gsea_res_genes <- clean_KEGG(gsea_res_tbl, input_data, "enriched")
+gsea_res_genes %>% sanitize_datatable()
+
+# plot
+dotplot(gsea_res,  title="GSEA KEGG",
+  # split by up- vs down-regulated
+  split = ".sign") +
+  facet_grid(.~.sign, labeller = as_labeller(c(`activated`  = "Upregulated",
+                                               `suppressed` = "Downregulated"))) +
+  # make font labels for facets bigger
+  theme(strip.text.x = element_text(size = rel(1.5)))
+```
+
+# R session
+
+List and version of tools used for the FA report generation.
+
+```{r session_info}
+sessionInfo()
+```
