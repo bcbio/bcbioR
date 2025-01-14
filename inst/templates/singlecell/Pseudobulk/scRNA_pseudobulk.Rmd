@@ -31,7 +31,6 @@ Template developed with materials from https://hbctraining.github.io/main/.
 
 ```{r, message=FALSE, warning=FALSE}
 # This set up the working directory to this file so all files can be found
-.libPaths('/n/app/bcbio/R4.3.1_singlecell/')
 
 library(rstudioapi)
 library(tidyverse)
