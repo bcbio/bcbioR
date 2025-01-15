@@ -161,9 +161,9 @@ stopifnot(all(names(counts) == rownames(metrics)))
 -   Aim: `r aim`
 
 ```{r load_counts_data}
-rdata = AnnotationDbi::select(ann.org, rownames(counts), 'SYMBOL', 'ENSEMBL') %>%
-  dplyr::select(gene_id = ENSEMBL, gene_name = SYMBOL) %>% 
-  distinct(gene_id, .keep_all = TRUE)
+rdata = AnnotationDbi::select(ann.org, rownames(counts), columns=c('SYMBOL', 'ENTREZID'), keytype = 'ENSEMBL') %>%
+dplyr::select(gene_id = ENSEMBL, gene_name = SYMBOL, entrez= ENTREZID) %>%
+distinct(gene_id, .keep_all = TRUE)
 
 ```
 
