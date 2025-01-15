@@ -132,6 +132,7 @@ counts <- counts[,colnames(counts) %in% coldata$sample]
 metrics <- load_metrics(se_object, multiqc_data_dir, gtf_fn, counts) %>% 
   left_join(coldata, by = c('sample')) %>% 
   as.data.frame()
+metrics <- subset(metrics, metrics$sample %in% coldata$sample)
 rownames(metrics) <- metrics$sample
 # if the names don't match in order or string check files names and coldata information
 counts = counts[,rownames(metrics)]
