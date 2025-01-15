@@ -75,6 +75,8 @@ ggplot2::theme_set(theme_prism(base_size = 12))
 # NOTE change colors here if you wish
 scale_colour_discrete <- function(...)
   scale_colour_manual(..., values = as.vector(grafify:::graf_palettes[["kelly"]]))
+scale_fill_discrete <- function(...)
+  scale_fill_manual(..., values = as.vector(grafify:::graf_palettes[["kelly"]]))
 
 #options(ggplot2.discrete.colour= )
 
@@ -232,8 +234,8 @@ bulk_touse <- subset(x = bulk, idents = cluster_name)
 Before moving on to a pseudobulk DGE analysis, it is important to identify how many cells we aggregated for each sample. We need to make sure that we have enough cells per sample after subsetting to one celltype. We recommend 50 cells per sample to move forward with confidence.
 
 ```{r}
-ggplot(bulk_touse@meta.data, aes(x=orig.ident, y=n_cells, fill=column)) +
-    geom_bar(stat="identity", color="black") +
+ggplot(bulk_touse@meta.data, aes(x=orig.ident, y=n_cells)) +
+    geom_bar(stat="identity", color="black", aes_string(fill=column)) +
     theme_classic() +
     theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
     labs(x="Sample name", y="Number of cells") +
@@ -268,8 +270,6 @@ In cases there are multiple groups and conditions across groups is recommended t
 The LRT is useful for testing multiple terms at once, for example testing 3 or more levels of a factor at once, or all interactions between two variables. The LRT for count data is conceptually similar to an analysis of variance (ANOVA) calculation in linear regression, except that in the case of the Negative Binomial GLM, we use an analysis of deviance (ANODEV), where the deviance captures the difference in likelihood between a full and a reduced model.
 
 ```{r lfc_shrink}
-
-
 # NOTE As a note: Use `ashr` for comparisons with many groups to be able to pull out all the contrasts; otherwise `apeglm` is fine. It shrinks less.
 
 # NOTE We recommend LRT for time series
