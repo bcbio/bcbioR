@@ -344,7 +344,7 @@ metrics %>%
 
 There should be little bias, i.e. the values should be close to 1, or at least consistent among samples
 
-```{r plot_53_bias}
+```{r plot_53_bias, eval=!all(is.na((metrics['r_and_t_rna_rate'])))}
 metrics %>%
   ggplot(aes(x = factor(sample, level = order),
              y = x5_3_bias, 

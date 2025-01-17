@@ -44,6 +44,8 @@ load_metrics <- function(se_object, multiqc_data_dir, gtf_fn, counts){
 
     # Sometimes we don't have rRNA due to mismatch annotation, We skip this if is the case
     gtf <- NULL
+    biotype <- NULL
+
     if (genome =="other"){
       gtf <- gtf_fn
     }else{
@@ -59,22 +61,21 @@ load_metrics <- function(se_object, multiqc_data_dir, gtf_fn, counts){
                          package="bcbioR")
     }
     if (is.null(gtf)) {
-      print("No genome provided! Please add it at the top of this Rmd")
-    }
-
-    gtf=rtracklayer::import(gtf)
-
-
-    one=grep("gene_type", colnames(as.data.frame(gtf)), value = TRUE)
-    another=grep("gene_biotype", colnames(as.data.frame(gtf)), value = TRUE)
-    biotype=NULL
-    if(length(one)==1){
-      biotype=one
-    }else if(length(another)==1){
-      biotype=another
+      warning("No genome provided! Please add it at the top of this Rmd")
     }else{
-      warning("No gene biotype founded")
+      gtf=rtracklayer::import(gtf)
+
+      one=grep("gene_type", colnames(as.data.frame(gtf)), value = TRUE)
+      another=grep("gene_biotype", colnames(as.data.frame(gtf)), value = TRUE)
+      if(length(one)==1){
+        biotype=one
+      }else if(length(another)==1){
+        biotype=another
+      }else{
+        warning("No gene biotype founded")
+      }
     }
+
     metrics$sample <- make.names(metrics$sample)
     if (!is.null(biotype)){
       annotation=as.data.frame(gtf) %>% .[,c("gene_id", biotype)]

@@ -682,12 +682,15 @@ if (!is.null(subset_value) & !is.null(subset_value)){
 } else {
   filenames = "full"
 }
+
+filename = paste0(filenames)
+name_expression_fn=file.path(
+  basedir,
+  str_interp("${filename}_expression.csv"))
+write_csv(counts_norm, name_expression_fn)
+
 for (contrast in names(contrasts)){
-  filename = paste0(filenames, "_", contrast)
-  name_expression_fn=file.path(
-    basedir,
-    str_interp("${filename}_expression.csv"))
-  
+
   name_deg_fn=file.path(
     basedir,
     str_interp("${filename}_deg.csv"))
@@ -708,7 +711,6 @@ for (contrast in names(contrasts)){
   pathways_for_writing <- fa_list[[contrast]][["all"]] %>% 
     mutate(comparison = contrast)
   
-  write_csv(counts_norm, name_expression_fn)
   write_csv(res_for_writing, name_deg_fn)
   write_csv(pathways_for_writing, name_pathways_fn)
 }
