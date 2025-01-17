@@ -15,15 +15,15 @@ output:
          collapsed: true
          smooth_scroll: true
 editor_options: 
-  chunk_output_type: inline
+  chunk_output_type: console
 params:
+   
    project_file: ../information.R
    seurat_obj: "https://github.com/bcbio/bcbioR-test-data/raw/refs/heads/main/singlecell/tiny.rds"
    column: "age"
    contrasts: !r list(c("age", "YOUNG", "OLD"))
    cluster_name: "2"
    resolution_column: "integrated_snn_res.0.4"
-   
 ---
 
 Template developed with materials from https://hbctraining.github.io/main/.
@@ -95,6 +95,8 @@ opts_chunk[["set"]](
     tidy = TRUE,
     warning = TRUE
 )
+
+source(params$project_file)
 
 seurat_obj <- params$seurat_obj
 column <- params$column
@@ -383,9 +385,9 @@ for (contrast in names(de_list)){
 tagList(dt_list)
 ```
 
-## Plot top 16 genes {.tabset}
+## Plot top 16 genes - pseudobulk {.tabset}
 
-```{r top n DEGs, fig.height = 6, fig.width = 8, results='asis'}
+```{r top n DEGs pseudobulk, fig.height = 6, fig.width = 8, results='asis'}
 n = 16
 
 for (contrast in names(de_list)){
@@ -396,19 +398,52 @@ for (contrast in names(de_list)){
   top_n_exp <- norm_matrix %>% as.data.frame() %>% 
     rownames_to_column('gene_id') %>%
     # dplyr::select(-group, -group_name) %>% 
-    pivot_longer(!gene_id, names_to = 'sample', values_to = 'log2_expression') %>%
+    pivot_longer(!gene_id, names_to = 'sample', values_to = 'normalized_counts') %>%
     right_join(top_n, relationship = "many-to-many") %>%
-    left_join(meta, by = c("sample"="orig.ident"))
+    left_join(meta_bulk, by = c("sample"="orig.ident"))
   
-  p1=ggplot(top_n_exp, aes_string(x = column, y = 'log2_expression')) +
+  p1=ggplot(top_n_exp, aes_string(x = column, y = 'normalized_counts')) +
     geom_boxplot(outlier.shape = NA, linewidth=0.5, color="grey") + 
     geom_point() +
-    facet_wrap(~gene_id) + 
-    ggtitle(str_interp('Expression of Top ${n} DEGs')) +
+    facet_wrap(~gene_id, scales = 'free_y') + 
+    ggtitle(str_interp('Expression of Top ${n} DEGs - Pseudobulk')) +
     theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
   print(p1)
   cat("\n\n")
 }
+```
+
+## Plot top 16 genes - single cell {.tabset}
+
+```{r top n DEGs single cell, fig.height = 6, fig.width = 8, results='asis'}
+
+n = 16
+
+for (contrast in names(de_list)){
+  cat("### ", contrast, "\n\n")
+  res_sig = de_list[[contrast]][["sig"]]
+  top_n <- res_sig %>% slice_min(order_by = padj, n = n, with_ties = F) %>% 
+    dplyr::select(gene_id)
+
+  seurat_topn <- subset(seurat, features = top_n$gene_id)
+  seurat_topn_meta <- seurat_topn@meta.data %>% as.data.frame() %>% rownames_to_column('barcode')
+  
+  topn_counts_df <- LayerData(object = seurat_topn, assay = "RNA", layer = "counts") %>% 
+    as.data.frame() %>% rownames_to_column('gene_id') %>% 
+    pivot_longer(!gene_id, names_to = 'barcode', values_to = 'counts') %>%
+      left_join(seurat_topn_meta)
+  
+  p2 <- ggplot(topn_counts_df, aes_string(x = column, y = 'counts')) +
+      geom_boxplot(outlier.shape = NA, linewidth=0.5, color="grey") + 
+      geom_point() +
+      facet_wrap(~gene_id, scales = 'free_y') + 
+      ggtitle(str_interp('Expression of Top ${n} DEGs - Single Cell')) +
+      theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+  
+  print(p2)
+  cat("\n\n")
+}
+
 ```
 
 
