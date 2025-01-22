@@ -14,8 +14,7 @@ get_databases_v2=function(sps="human"){
                          "m5.go.mf.v2024.1.Mm.entrez.gmt",
                          "m5.go.cc.v2024.1.Mm.entrez.gmt",
                          "m5.go.bp.v2024.1.Mm.entrez.gmt",
-                         "m2.cp.reactome.v2024.1.Mm.entrez.gmt",
-                         "m2.cp.kegg_legacy.v2024.1.Mm.entrez.gmt"))
+                         "m2.cp.reactome.v2024.1.Mm.entrez.gmt"))
   all_in_life=lapply(gmt.files[[sps]], function(gmt){
     df=read.gmt(file.path(source,sps,gmt))
     names(df)=c("gs_name", "entrez_gene")
