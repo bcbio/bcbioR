@@ -33,7 +33,7 @@ load_metrics <- function(se_object, multiqc_data_dir, gtf_fn, counts){
 
     # This renames to user-friendly names the metrics columns
     metrics <- metrics %>%
-      dplyr::filter(is.na(fastqc_raw_total_sequences)) %>%
+      dplyr::filter(!is.na(fastqc_raw_total_sequences)) %>%
       remove_empty(which = 'cols') %>%
       full_join(total_reads) %>%
       mutate(mapped_reads = samtools_reads_mapped) %>%
