@@ -456,7 +456,11 @@ This volcano plot shows the genes that are significantly up- and down-regulated 
 for (contrast in names(de_list)){
   cat("### ", contrast, "\n\n")
   res <- de_list[[contrast]][["all"]]
-  res_mod <- res %>% mutate(lfc = replace(lfc, lfc < -5, -5)) %>% mutate(lfc = replace(lfc, lfc > 5, 5))
+res_mod <- res
+
+## The below line of code will change anything with an absolute(lfc) above 5 to a 5. This will help remove outliers to better frame the graph if wanted.  
+# res_mod <- res %>% mutate(lfc = replace(lfc, lfc < -5, -5)) %>% mutate(lfc = replace(lfc, lfc > 5, 5))
+
   show <- as.data.frame(res_mod[1:10, c("lfc", "padj", "gene_name")])
   p1=EnhancedVolcano(res_mod,
                   lab= res_mod$gene_name, 
@@ -466,11 +470,9 @@ for (contrast in names(de_list)){
                   x = 'lfc',
                   y = 'padj', 
                   title=contrast,
-                  col=as.vector(colors[c("darkgrey",
-                                         "lightblue",
-                                         "purple",
-                                         "purple")]),
-                  subtitle = "", drawConnectors = T,  max.overlaps = Inf) 
+                  col=col=c("darkgrey", "lightblue", "plum1", "purple"),
+                # xlim = c(-5,5),  ## set the x-axis to only show some points
+                  subtitle = "", drawConnectors = T,  max.overlaps = Inf ) 
   print(p1)
   cat("\n\n")
 }
