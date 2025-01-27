@@ -14,8 +14,6 @@ output:
       toc_float:
          collapsed: true
          smooth_scroll: true
-editor_options: 
-  chunk_output_type: inline
 params:
   # provide path to metadata file with species information, input and reference file locations, column names
   params_file: params_nonmodel_org_pathways.R

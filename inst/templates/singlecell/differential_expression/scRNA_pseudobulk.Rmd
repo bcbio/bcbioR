@@ -14,8 +14,6 @@ output:
       toc_float:
          collapsed: true
          smooth_scroll: true
-editor_options: 
-  chunk_output_type: inline
 params:
    project_file: ../information.R
    seurat_obj: "https://github.com/bcbio/bcbioR-test-data/raw/refs/heads/main/singlecell/tiny.rds"
