@@ -14,8 +14,6 @@ output:
       toc_float:
          collapsed: true
          smooth_scroll: true
-editor_options: 
-  chunk_output_type: inline
 params:
     ## Combatseq and ruv can both be false or ONLY ONE can be true
   # numerator: tumor
