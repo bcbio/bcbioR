@@ -253,7 +253,7 @@ This plot shows how complex the samples are. We expect samples with more reads t
 
 ```{r plot_gene_saturation}
 metrics %>% 
-  ggplot(aes(x = total_reads, 
+  ggplot(aes(x = total_reads/1000000, 
              y = n_genes,
              color = .data[[factor_of_interest]])) +
   geom_point(alpha = 0.5, size=4) +
