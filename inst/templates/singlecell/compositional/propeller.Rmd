@@ -1,0 +1,158 @@
+---
+title: "Propeller on brown fat scRNAseq data"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    code_folding: hide
+    toc: true
+    toc_float: true
+---
+
+
+
+```{r setup, cache=FALSE, message=FALSE, warning=FALSE, echo=FALSE}
+#knitr::opts_chunk$set(echo = TRUE)
+# Load libraries
+library(Seurat)
+#library(harmony)
+library(knitr)
+library(rmarkdown)
+library(tidyverse)
+library(data.table)
+library(DT)
+library(patchwork)
+#library(clustree)
+library(SummarizedExperiment)
+library(SingleCellExperiment)
+#library(Matrix.utils)
+library(pheatmap)
+library(DEGreport)
+#library(apeglm)
+library(future)
+library(speckle)
+# Set seed for reproducibility
+set.seed(1454944673L)
+opts_chunk[["set"]](
+    audodep = TRUE,
+    cache = FALSE,
+    cache.lazy = FALSE,
+    error = TRUE,
+    echo = FALSE,
+    fig.height = 5L,
+    fig.retina = 2L,
+    fig.width = 11,
+    message = FALSE,
+    tidy = TRUE,
+    warning = FALSE
+)
+
+ 
+ if (future::supportsMulticore()) {
+   future::plan(future::multicore)
+ } else {
+   future::plan(future::multisession)
+ }
+```
+
+```{r sanitize_datatable}
+sanitize_datatable = function(df, ...) {
+ # remove dashes which cause wrapping
+ DT::datatable(df, ..., rownames=gsub("-", "_", rownames(df)),
+                   colnames=gsub("-", "_", colnames(df)),
+                 options = list(scrollX = TRUE,...))
+}
+```
+
+
+## Load object and subset
+Read in the full dataset Seurat object and subset to keep only cells from the conditions of interest (cold7 vs TN).
+
+```{r load-data}
+seurat_noor <- readRDS("BAT_GSE160585.rds")
+
+subset_noor <-  subset(x = seurat_noor, subset= condition %in% c("TN","cold7"))
+
+Idents(object = subset_noor) <- "celltype"
+
+DefaultAssay(subset_noor) <- "RNA"
+
+# Create metadata df and factor celltype
+meta <- subset_noor@meta.data
+meta$celltype <- factor(meta$celltype)
+
+```
+
+## Check count numbers of cells
+
+```{r cellnumbers}
+meta$condition_sample <- paste0(meta$condition, "_", meta$sample)
+table(meta$condition_sample, meta$celltype)
+```
+
+
+## Run propeller
+It appears that there is a signinficant difference in the proportion of cells for:
+
+* Adipocytes
+* Schwann
+* Lymph
+* VSM
+* AP
+* Pericytes*
+
+Non-significant results for ECAP, EC, and VSM-AP
+
+
+```{r run-propeller}
+
+# working code; takes into account cell numbers
+propres <- propeller(subset_noor, sample=subset_noor$sample, clusters = subset_noor$celltype, group = subset_noor$condition)
+
+sanitize_datatable(propres)
+
+```
+
+## Proportions of cells table
+To understand discordance with sccomp results, let's evaluate proportions and variability within group. 
+
+1. Pericytes are non-significant in sccomp
+2. ECAP and VSM-AP identify as significant in sccomp
+
+**Example: Pericytes**
+
+If you look at the proportions within the cold7 samples and compare it to the proportions within the TN samples, there is a difference which can be visualized from the sccomp data (see figure)
+
+
+```{r}
+
+
+props <- getTransformedProps(meta$celltype, 
+                                 meta$condition_sample, 
+                                 transform="logit")
+
+props$Proportions
+```
+
+
+
+```{r extracode, eval=FALSE}
+
+meta_propeller<- meta %>% 
+  group_by(condition, sample) %>%
+  distinct(sample)
+
+
+designAS <- model.matrix(~ meta_propeller$condition) 
+colnames(designAS) <- c("cold7", "TN")
+
+
+fit <- lmFit(props$TransformedProps, designAS)
+fit <- eBayes(fit, robust=TRUE)
+
+
+topTable(fit)
+
+
+
+
+```
