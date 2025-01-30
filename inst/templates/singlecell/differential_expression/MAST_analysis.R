@@ -103,7 +103,7 @@ message("[Main MAST computation done, result outputs]")
 summary_cond_file = paste0(outputDir,"/MAST_RESULTS_",cluster_name,"_", column, ".rds")
 saveRDS(summaryCond_column, file = summary_cond_file)
 
-message("Full MAST object saved to file ", summaryCond_column)
+message("Full MAST object saved to file ", summary_cond_file)
 
 
 summaryDt_column <- summaryCond_column$datatable
@@ -122,7 +122,7 @@ full_res_file = paste0(outputDir,"/FULL_MAST_RESULTS_",cluster_name,"_", column,
 write.table(to_save_column, file=full_res_file, row.names = FALSE, sep=",")
 
 
-Message("MAST summary results output to csv files")
+message("MAST summary results output to csv files")
 
 
 fcHurdleSig_column <- merge(fcHurdle_column[fcHurdle_column$fdr < .05,],
@@ -134,4 +134,4 @@ setorder(fcHurdleSig_column, fdr)
 sig_res_file = paste0(outputDir,"/SIG_MAST_RESULTS_padj<0.05_",cluster_name,"_", column, ".csv")
 write.table(fcHurdleSig_column, file=sig_res_file, row.names = FALSE, sep=",")
 
-Message("Significant MAST summary results output to csv files")
+message("Significant MAST summary results output to csv files")
