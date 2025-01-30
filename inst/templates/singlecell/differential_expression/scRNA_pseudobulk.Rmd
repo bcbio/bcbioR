@@ -26,8 +26,7 @@ params:
    resolution_column: "integrated_snn_res.0.4"
 ---
 
-Template developed with materials from https://hbctraining.github.io/main/.
-
+Template developed with materials from <https://hbctraining.github.io/main/>.
 
 ```{r, message=FALSE, warning=FALSE}
 # This set up the working directory to this file so all files can be found
@@ -42,7 +41,6 @@ if (compareVersion(R.version$minor,"3.1")<0) warning("We recommend >= R4.3.1")
 stopifnot(compareVersion(as.character(BiocManager::version()), "3.18")>=0)
 stopifnot(compareVersion(as.character(packageVersion("Seurat")), "5.0.0")>=0)
 ```
-
 
 ```{r setup, cache=FALSE, message=FALSE, warning=FALSE, echo=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -106,10 +104,7 @@ cluster_name <- params$cluster_name
 resolution_column <- params$resolution_column
 ```
 
-
-
 This code is in this ![](https://img.shields.io/badge/status-alpha-yellow) revision.
-
 
 # Overview
 
@@ -119,15 +114,14 @@ This code is in this ![](https://img.shields.io/badge/status-alpha-yellow) revis
 -   Experiment: `r experiment`
 -   Aim: `r aim`
 
-
 Here we will apply a pseudobulk approach to look for differentially expressed genes in one of our cell types.
 
 Using a pseudobulk approach involves the following steps:
 
-1. Subsetting to the cells for the cell type(s) of interest to perform the DE analysis.
-2. Extracting the raw counts after QC filtering of cells to be used for the DE analysis.
-3. Aggregating the counts and metadata to the sample level.
-4. Performing the DE analysis (you need at least two biological replicates per condition to perform the analysis, but more replicates are recommended).
+1.  Subsetting to the cells for the cell type(s) of interest to perform the DE analysis.
+2.  Extracting the raw counts after QC filtering of cells to be used for the DE analysis.
+3.  Aggregating the counts and metadata to the sample level.
+4.  Performing the DE analysis (you need at least two biological replicates per condition to perform the analysis, but more replicates are recommended).
 
 ## Dataset
 
@@ -150,16 +144,13 @@ cols3 <- unlist(strsplit(paste(colsD, colsM, colsL, sep = "_"), "_"))
 cols2 <- c(unlist(strsplit(paste(colsD, colsM, sep = "_"), "_")), "deepskyblue2")
 ```
 
-
 After filtering, each sample contributed the following number of cells to the analysis:
 
 ```{r meta pre doub}
 table(seurat$orig.ident)
 ```
 
-
-
-# Aggregate counts 
+# Aggregate counts
 
 ## Aggregate metadata at the sample level
 
@@ -173,12 +164,9 @@ meta <- seurat@meta.data %>%
 meta
 ```
 
-
-
 ## Aggregate counts
 
 To aggregate the counts, we will use the AggregateExpression() function from Seurat. It will take as input a Seurat object, and return summed counts ("pseudobulk") for each identity class. The default is to return a matrix with genes as rows, and identity classes as columns. We have set return.seurat to TRUE, which means rather than a matrix we will get an object of class Seurat. We have also specified which factors to aggregate on, using the group.by argument.
-
 
 ```{r}
 seurat$sample <- seurat$orig.ident
@@ -190,7 +178,6 @@ bulk <- AggregateExpression(
             group.by = c("sample",resolution_column,column )
 )
 ```
-
 
 ## Add number of cells per sample per cluster to the metadata
 
@@ -226,11 +213,11 @@ bulk@meta.data %>% head()
 # DE analysis with DESeq2
 
 ## Subset to cell type of interest
+
 ```{r}
 Idents(object = bulk) <- resolution_column
 bulk_touse <- subset(x = bulk, idents = cluster_name)
 ```
-
 
 ## Check that we have enough cells
 
@@ -247,12 +234,11 @@ ggplot(bulk_touse@meta.data, aes(x=orig.ident, y=n_cells)) +
 
 ## Run DE analysis
 
-Differential gene expression analysis of count data was performed using the Bioconductor R package, DESeq2, which fits the count data to a negative binomial model. 
+Differential gene expression analysis of count data was performed using the Bioconductor R package, DESeq2, which fits the count data to a negative binomial model.
 
-Before fitting the model, we often look at a metric called dispersion, which is a measure for variance which also takes into consideration mean expression. A dispersion value is estimated for each individual gene, then 'shrunken' to a more accurate value based on expected variation for a typical gene exhibiting that level of expression. Finally, the shrunken dispersion value is used in the final GLM fit. 
+Before fitting the model, we often look at a metric called dispersion, which is a measure for variance which also takes into consideration mean expression. A dispersion value is estimated for each individual gene, then 'shrunken' to a more accurate value based on expected variation for a typical gene exhibiting that level of expression. Finally, the shrunken dispersion value is used in the final GLM fit.
 
-We use the below dispersion plot, which should show an inverse relationship between dispersion and mean expression, to get an idea of whether our data is a good fit for the model. 
-
+We use the below dispersion plot, which should show an inverse relationship between dispersion and mean expression, to get an idea of whether our data is a good fit for the model.
 
 ```{r}
 cluster_counts <- t(FetchData(bulk_touse, layer="counts", vars=rownames(bulk_touse)))
@@ -268,10 +254,9 @@ vsd <- vst(de)
 vsd_matrix <- assay(vsd)
 ```
 
-
 Because it is difficult to accurately detect and quantify the expression of lowly expressed genes, differences in their expression between treatment conditions can be unduly exaggerated after the model is fit. We correct for this so that gene LFC is not dependent overall on basal gene expression level.
 
-In cases there are multiple groups and conditions across groups is recommended to use dummy variables instead of interaction terms: https://bioconductor.org/packages/devel/bioc/vignettes/DESeq2/inst/doc/DESeq2.html#interactions.
+In cases there are multiple groups and conditions across groups is recommended to use dummy variables instead of interaction terms: <https://bioconductor.org/packages/devel/bioc/vignettes/DESeq2/inst/doc/DESeq2.html#interactions>.
 
 The LRT is useful for testing multiple terms at once, for example testing 3 or more levels of a factor at once, or all interactions between two variables. The LRT for count data is conceptually similar to an analysis of variance (ANOVA) calculation in linear regression, except that in the case of the Negative Binomial GLM, we use an analysis of deviance (ANODEV), where the deviance captures the difference in likelihood between a full and a reduced model.
 
@@ -311,9 +296,9 @@ de_list=lapply(contrasts, function(contrast){
 
 This plot can help to:
 
-- Identify Differential Expression: Genes that show a significant log-fold change (M value away from 0) indicate changes in expression between conditions.
-- Assess Data Quality: The plot can help in identifying biases or systematic errors in the data. Ideally, most points should scatter around the M=0 line, indicating that there is no significant systematic difference between the conditions.
-- Visualize data dispersion: The distribution of points along the A-axis gives a sense of the spread of expression levels and any patterns or anomalies in the dataset.
+-   Identify Differential Expression: Genes that show a significant log-fold change (M value away from 0) indicate changes in expression between conditions.
+-   Assess Data Quality: The plot can help in identifying biases or systematic errors in the data. Ideally, most points should scatter around the M=0 line, indicating that there is no significant systematic difference between the conditions.
+-   Visualize data dispersion: The distribution of points along the A-axis gives a sense of the spread of expression levels and any patterns or anomalies in the dataset.
 
 ```{r after_lfc_shrink, results='asis', message=F, warning=F}
 for (contrast in names(de_list)){
@@ -328,7 +313,7 @@ for (contrast in names(de_list)){
 
 ## Volcano plot {.tabset}
 
-This volcano plot shows the genes that are significantly up- and down-regulated as a result of the analysis comparison. The points highlighted in red are genes that have padj < 0.05 and a log2-fold change > 1. Points in blue have a padj < 0.05 and a log2-fold change < 1 and points in green have a padj > 0.05 and a log2-fold change > 2. Grey points are non-significant. The dashed lines correspond to the cutoff values of log2 foldchance and padj that we have chosen.
+This volcano plot shows the genes that are significantly up- and down-regulated as a result of the analysis comparison. The points highlighted in red are genes that have padj \< 0.05 and a log2-fold change \> 1. Points in blue have a padj \< 0.05 and a log2-fold change \< 1 and points in green have a padj \> 0.05 and a log2-fold change \> 2. Grey points are non-significant. The dashed lines correspond to the cutoff values of log2 foldchance and padj that we have chosen.
 
 ```{r volcano_plot, fig.height=6, results='asis'}
 # degVolcano(res_mod[,c('lfc', 'padj')], plot_text = show) 
@@ -350,7 +335,6 @@ for (contrast in names(de_list)){
   cat("\n\n")
 }
 ```
-
 
 ## Heatmap {.tabset}
 
@@ -374,7 +358,6 @@ for (contrast in names(de_list)){
   cat("\n\n")
 }
 ```
-
 
 ## Differentially Expressed Genes {.tabset}
 
@@ -466,6 +449,9 @@ for (contrast in names(de_list)){
 
 ```
 
+# Methods
+
+Seurat ([package](https://satijalab.org/seurat/), [paper](https://www.nature.com/articles/s41587-023-01767-y)) is used to aggregate the single cell expression data into pseudobulk samples, and DESeq2 ([package](https://bioconductor.org/packages/release/bioc/vignettes/DESeq2/inst/doc/DESeq2.html), [paper](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-014-0550-8)) is used to perform statistical analysis.
 
 # R session
 
@@ -474,4 +460,3 @@ List and version of tools used for the QC report generation.
 ```{r}
 sessionInfo()
 ```
-
