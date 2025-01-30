@@ -4,7 +4,7 @@ library(janitor)
 load_metrics <- function(se=se_object, multiqc=multiqc_data_dir,
                          gtf=gtf_fn,
                          counts=counts,
-                         singlecell=FALSE){
+                         single_end=FALSE){
 
   # bcbio input
   if (!is.na(se_object)){
@@ -24,7 +24,7 @@ load_metrics <- function(se=se_object, multiqc=multiqc_data_dir,
     metrics <- metrics %>%
       clean_names() %>%
       dplyr::rename_with(~gsub('.*mqc_generalstats_', '', .))
-    #browser()
+
     # This uses the fastqc metrics to get total reads
     total_reads <- metrics %>%
       dplyr::filter(!is.na(fastqc_raw_total_sequences)) %>%
@@ -35,7 +35,7 @@ load_metrics <- function(se=se_object, multiqc=multiqc_data_dir,
       summarize(total_reads = sum(fastqc_raw_total_sequences))
 
     # This renames to user-friendly names the metrics columns
-    if (singlecell){
+    if (single_end){
       metrics <- metrics %>%
         dplyr::filter(!is.na(fastqc_raw_total_sequences))
     }else{
