@@ -17,13 +17,13 @@ We recommend to use the `samplesheet.csv` used with nf-core as metadata file, wh
 
 ### Quality assesment
 
-`00_quality_assesment/QC.Rmd` is a template report that needs `params_qc.R` for `nf-core/rnaseq` outputs.
+`01_quality_assesment/QC.Rmd` is a template report that needs `params_qc.R` for `nf-core/rnaseq` outputs.
  
 Follow instruction in the R and Rmd scripts to render it.
 
 ### Differential expression
 
-`01_differential_expression/DEG.Rmd` is a template for comparison between two groups. `params_de.R` has the information for the input files to load. You need to point to `nf-core/rnaseq` output files.
+`02_differential_expression/DEG.Rmd` is a template for comparison between two groups. `params_de.R` has the information for the input files to load. You need to point to `nf-core/rnaseq` output files.
 
 On the `YAML` header file of the `Rmd` you can specify some parameters or just set them up in the first chunk of code of the template. This template has examples of:
 
@@ -37,5 +37,8 @@ On the `YAML` header file of the `Rmd` you can specify some parameters or just s
 ### Complementary template reports
 
 - `03_functional/GSVA.Rmd` shows an example on how to use [GSVA package](https://bioconductor.org/packages/release/bioc/html/GSVA.html) for estimating variation of gene set enrichment through the samples of a expression data set
+- `03_functional/Nonmodel_Organism_Pathway_Analysis.Rmd` shows an example on how to run Gene Ontology over-representation, KEGG over-representation, and KEGG gene set enrichment analysis (GSEA) for non-model organisms using data from Uniprot. `params_nonmodel_org_pathways.R` has the information for the input files to load.
+- `03_functional/Immune-deconvolution.Rmd` shows an example on how to run immune cell type deconvolution. `params_immune_deconv.R` has the information for the input files to load.
 - `03_comparative/Pair-wise-comparison-analysis.Rmd` shows an exmaple on how to compare two differential expression analysis from the `DEG.Rmd` template.
 - `03_comparative/Intersections.Rmd` shows an example on how to compare multiple differential expression analyses from `DEG.Rmd` and find intersections.
+
