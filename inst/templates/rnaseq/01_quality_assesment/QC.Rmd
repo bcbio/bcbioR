@@ -17,12 +17,13 @@ output:
 params:
   # Fill this file with the right paths to nfcore output
   # Put hg38, mm10, mm39, or other
-  # params_file: params_qc_nf-core-example.R # example data
-  params_file: params_qc_nf-core-example.R
+  # params_file: params_qc-example.R # example data
+  params_file: params_qc-example.R
   genome: hg38
+  singlecell: false
+  factor_of_interest: sample_type
   project_file: ../information.R
   functions_file: ../00_libs/load_data.R
-  factor_of_interest: sample_type
 ---
 
 Template developed with materials from https://hbctraining.github.io/main/.
@@ -45,6 +46,7 @@ This code is in this ![](https://img.shields.io/badge/status-stable-green) revis
 #    this is used to color plots, it needs to be part of the metadata
 factor_of_interest=params$factor_of_interest
 genome=params$genome
+singlecell=params$singlecell
 # 2. Set input files in this file
 source(params$params_file)
 # 3. If you set up this file, project information will be printed below and
@@ -120,7 +122,8 @@ coldata$sample=row.names(coldata)
 counts <- load_counts(counts_fn)
 counts <- counts[,colnames(counts) %in% coldata$sample]
 
-metrics <- load_metrics(se_object, multiqc_data_dir, gtf_fn, counts) %>% 
+metrics <- load_metrics(se_object, multiqc_data_dir,
+                        gtf_fn, counts, singlecell) %>% 
   left_join(coldata, by = c('sample')) %>% 
   as.data.frame()
 metrics <- subset(metrics, metrics$sample %in% coldata$sample)
