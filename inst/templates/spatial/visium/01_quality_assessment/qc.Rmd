@@ -295,8 +295,6 @@ Seurat recommends the use of SCTransform for spatial data. SCTransform normalize
 
 Let's look at the UMAP and clustering for each group to see if further integration is necessary.
 
-**We can see in the UMAP visualization that the spots are separated partially by which slide (sample) they belong to. This _could_ indicate that an additional integration step is necessary.**  
-
 ```{r sc_workflow}
 # Making sure that the rownames of metadata are the same as what is stored in Cells()
 rownames(merged@meta.data) <- Cells(merged)
