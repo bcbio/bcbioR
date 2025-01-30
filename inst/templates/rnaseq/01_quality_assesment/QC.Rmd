@@ -159,15 +159,15 @@ Here, we want to see consistency and a minimum of 20 million reads (the grey lin
 ```{r plot_total_reads}
 metrics %>%
   ggplot(aes(x = factor(sample, level = order),
-             y = total_reads, 
+             y = total_reads/1000000, 
              fill = .data[[factor_of_interest]])) +
   geom_bar(stat = "identity") +
   coord_flip() +
-  scale_y_continuous(name = "million reads") +
+  scale_y_continuous(name = "Millions of reads") +
   scale_x_discrete(limits = rev) +
   xlab("") + 
   ggtitle("Total reads") +
-  geom_hline(yintercept=20000000, color = "grey", linewidth=2)
+  geom_hline(yintercept=20, color = "grey", linewidth=2)
 
 metrics %>%
     ggplot(aes(x = .data[[factor_of_interest]],
@@ -197,6 +197,7 @@ metrics %>%
                color = .data[[factor_of_interest]])) +
     geom_point(alpha = 0.5, size=4) +
     coord_flip() +
+    ylab("Mapped Reads %") +
     scale_x_discrete(limits = rev) +
     ylim(0, 100) +
   ggtitle("Mapping rate") + xlab("") +
@@ -252,13 +253,14 @@ This plot shows how complex the samples are. We expect samples with more reads t
 
 ```{r plot_gene_saturation}
 metrics %>% 
-  ggplot(aes(x = total_reads, 
+  ggplot(aes(x = total_reads/1000000, 
              y = n_genes,
              color = .data[[factor_of_interest]])) +
   geom_point(alpha = 0.5, size=4) +
   scale_x_log10() +
   ggtitle("Gene saturation") +
-  ylab("Number of genes")
+  ylab("Number of genes") +
+  xlab("Millions of reads")
 ```
 
 ## Exonic mapping rate
