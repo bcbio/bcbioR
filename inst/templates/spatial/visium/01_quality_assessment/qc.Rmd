@@ -222,8 +222,8 @@ This number is really dependent on tissue type, RNA quality, and sequencing dept
 
 ```{r nUMI}
 merged@meta.data %>%
-    ggplot(aes(x=Sample.ID, y = nCount_Spatial)) + 
-    geom_violin(aes(fill=Sample.ID), alpha = 0.5) +
+    ggplot(aes(x=orig.ident, y = nCount_Spatial)) + 
+    geom_violin(aes(fill=orig.ident), alpha = 0.5) +
     geom_boxplot(width=0.1) +
     geom_hline(yintercept = 10000, linetype = "dashed") +
     scale_y_log10() +
@@ -240,8 +240,8 @@ The number of genes per spot will vary by sample, however in this dataset values
 
 ```{r nGenes, fig.width=9}
 merged@meta.data %>%
-    ggplot(aes(x=Sample.ID, y = nFeature_Spatial)) + 
-    geom_violin(aes(fill=Sample.ID), alpha = 0.5) +
+    ggplot(aes(x=orig.ident, y = nFeature_Spatial)) + 
+    geom_violin(aes(fill=orig.ident), alpha = 0.5) +
     geom_boxplot(width=0.1) +
     geom_hline(yintercept = 4000, linetype = "dashed") +
     scale_y_log10() +
@@ -260,7 +260,7 @@ With scRNA-seq this is more easily interpreted for a single cell, but for spatia
 
 ```{r complexity}
 merged@meta.data %>%
-    ggplot(aes(x=log10GenesPerUMI, color=Sample.ID, fill=Sample.ID)) +
+    ggplot(aes(x=log10GenesPerUMI, color=orig.ident, fill=orig.ident)) +
     geom_density(alpha = 0.2) +
     theme_classic() +
     geom_vline(xintercept = 0.8) +
@@ -317,7 +317,7 @@ merged <- RunUMAP(merged, reduction = "pca", dims = 1:30)
 
 ```{r umap_sample}
 Idents(merged) <- "orig.ident"
-DimPlot(merged, reduction = "umap", cols=meta$color)
+DimPlot(merged, reduction = "umap")
 ```
 
 ### Samples split
@@ -364,6 +364,11 @@ LabelClusters(p, id ="ident",  fontface = "bold", size = 6,
               bg.colour = "white", bg.r = .2, force = 0)
 ```
 
+# Clusters ontop slides
+
+```{r cluster_slides fig.height=15}
+SpatialDimPlot(merged, label = TRUE, ncol=1)
+```
 
 # Save seurat object
 
