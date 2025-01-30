@@ -24,7 +24,7 @@ load_metrics <- function(se=se_object, multiqc=multiqc_data_dir,
     metrics <- metrics %>%
       clean_names() %>%
       dplyr::rename_with(~gsub('.*mqc_generalstats_', '', .))
-    #browser()
+
     # This uses the fastqc metrics to get total reads
     total_reads <- metrics %>%
       dplyr::filter(!is.na(fastqc_raw_total_sequences)) %>%
