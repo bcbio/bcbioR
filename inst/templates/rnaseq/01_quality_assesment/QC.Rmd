@@ -20,7 +20,7 @@ params:
   # params_file: params_qc-example.R # example data
   params_file: params_qc-example.R
   genome: hg38
-  singlecell: false
+  singleend: false
   factor_of_interest: sample_type
   project_file: ../information.R
   functions_file: ../00_libs/load_data.R
@@ -46,7 +46,7 @@ This code is in this ![](https://img.shields.io/badge/status-stable-green) revis
 #    this is used to color plots, it needs to be part of the metadata
 factor_of_interest=params$factor_of_interest
 genome=params$genome
-singlecell=params$singlecell
+singleend=params$singleend
 # 2. Set input files in this file
 source(params$params_file)
 # 3. If you set up this file, project information will be printed below and
@@ -123,7 +123,7 @@ counts <- load_counts(counts_fn)
 counts <- counts[,colnames(counts) %in% coldata$sample]
 
 metrics <- load_metrics(se_object, multiqc_data_dir,
-                        gtf_fn, counts, singlecell) %>% 
+                        gtf_fn, counts, singleend) %>% 
   left_join(coldata, by = c('sample')) %>% 
   as.data.frame()
 metrics <- subset(metrics, metrics$sample %in% coldata$sample)
