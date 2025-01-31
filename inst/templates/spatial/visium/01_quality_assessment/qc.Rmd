@@ -1,0 +1,382 @@
+---
+title: "Visium QC"
+author: "Harvard Chan Bioinformatics Core"
+date: "`r Sys.Date()`"
+output:
+   html_document:
+      code_folding: hide
+      df_print: paged
+      highlights: pygments
+      number_sections: false
+      self_contained: true
+      theme: default
+      toc: true
+      toc_float:
+         collapsed: true
+         smooth_scroll: true
+params:
+  project_file: ./reports/information.R
+  results_dir: ./results
+  path_data: ./data
+---
+
+```{r, cache = FALSE, message = FALSE, warning=FALSE}
+# This set up the working directory to this file so all files can be found
+library(rstudioapi)
+setwd(fs::path_dir(getSourceEditorContext()$path))
+# NOTE: This code will check version, this is our recommendation, it may work
+#.      other versions
+stopifnot(R.version$major>= 4) # requires R4
+if (compareVersion(R.version$minor,"3.1")<0) warning("We recommend >= R4.3.1") 
+stopifnot(compareVersion(BiocManager::version(), "3.18")>=0)
+stopifnot(compareVersion(package.version("Seurat"), "5.0.0")>=0)
+```
+
+This code is in this ![](https://img.shields.io/badge/status-draft-grey) revision.
+
+
+```{r load_libraries, cache = FALSE, message = FALSE, warning=FALSE, echo=FALSE,}
+# Libraries
+library(bcbioR)
+library(Seurat)
+library(tidyverse)
+library(glue)
+library(gridExtra)
+library(scales)
+
+
+# Plotting aesthetics
+colors=cb_friendly_cols(1:15)
+ggplot2::theme_set(theme_prism(base_size = 14))
+opts_chunk[["set"]](
+    cache = F,
+    cache.lazy = FALSE,
+    dev = c("png", "pdf"),
+    error = TRUE,
+    highlight = TRUE,
+    message = FALSE,
+    prompt = FALSE,
+    tidy = FALSE,
+    warning = FALSE,
+    echo = T, 
+    fig.height = 4)
+
+# set seed for reproducibility
+set.seed(1234567890L)
+```
+
+# Project details
+
+-   Project: `r project`
+-   PI: `r PI`
+-   Analyst: `r analyst`
+-   Experiment: `r experiment`
+-   Aim: `r aim`
+
+The following samples were found in the data folder for this project:
+
+```{r samples}
+samples <- list.files(path_data)
+samples
+```
+
+## Visium Description
+
+This report is adapted from: https://nbisweden.github.io/workshop-scRNAseq/labs/compiled/seurat/seurat_07_spatial.html
+
+Spatial transcriptomic data with the Visium platform is in many ways similar to scRNAseq data. The data is represented per spot on the slide, as we have spatial barcode bust no cellular barcodes. Each spot contains UMI counts for 5-20 cells instead of single cells, but is still quite sparse in the same way as scRNAseq data is, but with the additional information about spatial location in the tissue.
+
+
+# 10X Sequencing Metrics {.tabset}
+
+Here, we take a quick look at metrics reported from spaceranger for each sample.
+
+```{r summary-metrics}
+# Create a for loop to create one dataframe with 10X metrics
+metrics <- data.frame()
+for (sample in samples) {
+  m <- read.csv(glue("{path_data}/{sample}/outs/metrics_summary.csv"))
+  metrics <- rbind(metrics, m)
+}
+```
+
+## Number of spots per slide
+
+```{r nSpots}
+metrics %>% 
+  ggplot(aes(x=Sample.ID, y=(Number.of.Spots.Under.Tissue), fill=Sample.ID)) + 
+  geom_col() +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1),
+        axis.title = element_text(size=rel(1.5)),
+        plot.title = element_text(hjust = 0.5, face="bold")) +
+  ggtitle("Number of Spots") +
+  xlab("") + ylab("Number of spots")
+```
+
+## Number of sequencing reads
+
+
+```{r nReads}
+metrics %>% 
+  ggplot(aes(x=Sample.ID, y=(Number.of.Reads/ 1000000), fill=Sample.ID)) + 
+  geom_col() +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1),
+        axis.title = element_text(size=rel(1.5)),
+        plot.title = element_text(hjust = 0.5, face="bold")) +
+  ggtitle("Number of sequencing reads") +
+  xlab("") + ylab("Number of reads (in millions)")
+```
+
+
+## Mean reads per spot
+
+**The recommended value here is 50,000.**
+
+```{r reads_per_spot}
+metrics %>%
+  ggplot(aes(x=Sample.ID, y=Mean.Reads.per.Spot, fill=Sample.ID)) +
+  geom_col() +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1),
+        axis.title = element_text(size=rel(1.5)),
+        plot.title = element_text(hjust = 0.5, face="bold")) +
+  ggtitle("Mean reads per spot") +
+  geom_hline(yintercept=50000, linetype=2)
+```
+
+
+## Fraction of reads in spots under tissue
+
+**The recommended value here is  > 50%.**
+
+Low fraction reads in spots under the tissue indicate that many of the reads were not assigned to tissue covered spots. This could be caused by: 
+
+* High levels of ambient RNA resulting from inefficient permeabilization
+* The incorrect image or orientation was used
+* Poor tissue detection
+
+```{r frac_reads}
+metrics %>%  
+  ggplot(aes(x=Sample.ID, y= (Fraction.Reads.in.Spots.Under.Tissue * 100), fill=Sample.ID)) + 
+  geom_col() +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1),
+        axis.title = element_text(size=rel(1.5)),
+        plot.title = element_text(hjust = 0.5, face="bold")) +
+  xlab("") + ylab("Fraction of reads in spots") +
+  ggtitle("Fraction of reads") + 
+  geom_hline(yintercept = 50, linetype =2) +
+  ylim(c(0, 100))
+```
+
+
+# Setup for analysis
+
+Next, we will run quality control in a similar manner to scRNAseq data. Start by loading in each sample and then merged into one Seurat object.
+
+```{r create_seurat}
+# Create seurat list
+seurat_list <- list()
+for (sample in samples) {
+  
+  # Load data to create a Seurat object
+  x <- Load10X_Spatial(glue("{path_data}/{sample}/outs/"))
+  x$orig.ident <- sample
+
+  # Add individual seurat objects to list
+  seurat_list[[sample]] <- x
+}
+
+# Merge together every seurat object in list
+merged <- merge(
+    x = seurat_list[[samples[1]]],
+    y = seurat_list[samples[2: length(samples)]],
+    project = project,
+    add.cell.ids = samples
+)
+
+merged
+```
+
+Next we make sure that all the relevant metadata for each cell is included in the seurat object by looking at the first few rows of the dataframe. Note that `nCounts` refers to the total number of UMIs for a spot while `nFeatures` tallies the number of genes that are expressed in the spot.
+
+```{r view_metadata}
+# This is great spot to add any additional metadata you may have for the samples
+
+# Calculate novelty score
+merged$log10GenesPerUMI <- log10(merged$nFeature_Spatial) / log10(merged$nCount_Spatial)
+
+merged@meta.data %>% head()
+```
+
+# Quality control per spot {.tabset}
+
+Similar to scRNAseq we use statistics on number of counts, number of features and percent mitochondria for quality control. However, the expected distributions for high-quality spots are different (compared to high-quality cells in scRNA-seq), since spots may contain zero, one, or multiple cells.
+
+## Number of UMIs detected per spot 
+
+This number is really dependent on tissue type, RNA quality, and sequencing depth. For example, with one of the public Visium datasets using the mouse brain hippocampus region, we saw an average of 4.5k genes and 20k UMIs per spot. 
+
+
+```{r nUMI}
+merged@meta.data %>%
+    ggplot(aes(x=orig.ident, y = nCount_Spatial)) + 
+    geom_violin(aes(fill=orig.ident), alpha = 0.5) +
+    geom_boxplot(width=0.1) +
+    geom_hline(yintercept = 10000, linetype = "dashed") +
+    scale_y_log10() +
+    theme_classic() +
+    ylab("density") +
+    theme(plot.title = element_text(hjust=0.5, face="bold")) +
+    ggtitle("Num UMIs per spot")
+```
+
+## Number of genes detected per spot 
+
+The number of genes per spot will vary by sample, however in this dataset values are generally on the high end. _The dashed line is drawn at 4000 genes, which is a fairly high threshold._
+
+
+```{r nGenes, fig.width=9}
+merged@meta.data %>%
+    ggplot(aes(x=orig.ident, y = nFeature_Spatial)) + 
+    geom_violin(aes(fill=orig.ident), alpha = 0.5) +
+    geom_boxplot(width=0.1) +
+    geom_hline(yintercept = 4000, linetype = "dashed") +
+    scale_y_log10() +
+    theme_classic() +
+    ylab("density") +
+    theme(plot.title = element_text(hjust=0.5, face="bold")) +
+    ggtitle("Num Genes per Spot")
+```
+
+## Overall complexity of transcriptional profile per spot
+
+We can evaluate each spot in terms of how complex the RNA species are by using a measure called the novelty score. The novelty score is computed by taking the ratio of nGenes over nUMI. If there are many captured transcripts (high nUMI) and a low number of genes detected in a cell, this likely means that you only captured a low number of genes and simply sequenced transcripts from those lower number of genes over and over again.
+
+With scRNA-seq this is more easily interpreted for a single cell, but for spatial data this would give us complexity of the spot, which is across multiple cells.
+
+
+```{r complexity}
+merged@meta.data %>%
+    ggplot(aes(x=log10GenesPerUMI, color=orig.ident, fill=orig.ident)) +
+    geom_density(alpha = 0.2) +
+    theme_classic() +
+    geom_vline(xintercept = 0.8) +
+    ggtitle("Novelty score") +
+    theme(plot.title = element_text(hjust=0.5, face="bold"))
+```
+
+
+# QC metrics visualized on slides {.tabset}
+
+Here, we can look at the distribution of UMI and gene counts on the individual tissue slide.
+
+```{r spatial-plot, results='asis', fig.width=7, fig.height=4}
+# Iterate through each sample to make visualizations for each slide
+for (sample in samples) {
+  cat("\n\n")
+
+  # Print plots for nUMI and nGenes for each spot on the slide
+  cat("## Sample", sample, "\n")
+  p <- SpatialFeaturePlot(seurat_list[[sample]],
+                          features = c("nCount_Spatial", "nFeature_Spatial"),
+                          max.cutoff = 'q80')
+  print(p)
+  cat("\n")
+ }
+```
+
+
+# Normalization and Clustering 
+
+Seurat recommends the use of SCTransform for spatial data. SCTransform normalizes the data, detects high-variance features, and stores the data in the SCT assay. We then perform clustering (at a default resolution of 0.8 with 30 PCs) and create UMAP coordinates.
+
+Let's look at the UMAP and clustering for each group to see if further integration is necessary.
+
+```{r sc_workflow}
+# Making sure that the rownames of metadata are the same as what is stored in Cells()
+rownames(merged@meta.data) <- Cells(merged)
+
+# Standard processing of counts matrix
+# SCTransform, PCA, clusters, and run UMAP
+merged <- SCTransform(merged, assay = "Spatial", verbose = TRUE)
+merged <- RunPCA(merged , assay = "SCT", verbose = FALSE)
+merged <- FindNeighbors(merged, reduction = "pca", dims = 1:30)
+merged <- FindClusters(merged, verbose = FALSE,
+                       resolution = c(0.2, 0.4, 0.6, 0.8, 1))
+merged <- RunUMAP(merged, reduction = "pca", dims = 1:30)
+```
+
+## UMAP distribution {.tabset}
+
+### Samples
+
+```{r umap_sample}
+Idents(merged) <- "orig.ident"
+DimPlot(merged, reduction = "umap")
+```
+
+### Samples split
+
+```{r umap_sample_split}
+# Get UMAP coordinates
+df <- FetchData(merged, c("umap_1", "umap_2", "orig.ident"))
+
+# Colors for each sample
+palette_fill <- hue_pal()(length(samples))
+names(palette_fill) <- samples
+
+# Create plot list to arrange later
+plot_list <- list()
+for (sample in samples) {
+  
+  # Get cells of one sample
+  df_sample <- df[df$orig.ident == sample, ]
+
+  # Plot color dots (for each sample) overlaid over grey
+  p <- ggplot() +
+        geom_point(data=df, 
+                   aes(x=umap_1, y=umap_2), color="lightgray", 
+                   alpha = 0.5, size=1, show.legend=FALSE) +
+        geom_point(data=df_sample, 
+                   aes(x=umap_1, y=umap_2), 
+                   color=palette_fill[sample]) +
+        theme_classic() +
+        ggtitle(sample)
+  
+  plot_list[[sample]] <- p
+}
+
+grid.arrange(grobs = plot_list)
+```
+
+
+### Clusters at resolution 0.8
+
+```{r umap_clusters}
+Idents(merged) <- "SCT_snn_res.0.8"
+p <- DimPlot(merged, reduction = "umap")
+LabelClusters(p, id ="ident",  fontface = "bold", size = 6, 
+              bg.colour = "white", bg.r = .2, force = 0)
+```
+
+# Clusters ontop slides
+
+```{r cluster_slides fig.height=15}
+SpatialDimPlot(merged, label = TRUE, ncol=1)
+```
+
+# Save seurat object
+
+```{r save_seurat}
+saveRDS(merged, "results/01_qc.RDS")
+```
+
+
+# Session Information
+
+```{r}
+sessionInfo()
+```
