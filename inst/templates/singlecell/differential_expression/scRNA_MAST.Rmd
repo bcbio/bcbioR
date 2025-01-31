@@ -1,0 +1,391 @@
+---
+title: "scRNA MAST"
+author: "Harvard Chan Bioinformatics Core"
+date: "`r Sys.Date()`"
+output:
+   html_document:
+      code_folding: hide
+      df_print: paged
+      highlights: pygments
+      number_sections: true
+      self_contained: true
+      theme: default
+      eval: false
+      toc: true
+      toc_float:
+         collapsed: true
+         smooth_scroll: true
+# editor_options: 
+#   chunk_output_type: inline
+params:
+   project_file: ../information.R
+   seurat_obj: "https://github.com/bcbio/bcbioR-test-data/raw/refs/heads/main/singlecell/tiny.rds"
+   column: "age"
+   contrasts: !r list(c("age", "YOUNG", "OLD"))
+   cluster_name: "2"
+   resolution_column: "integrated_snn_res.0.4"
+   
+---
+
+Template developed with materials from https://hbctraining.github.io/main/.
+
+
+```{r, message=FALSE, warning=FALSE,eval=T}
+library(tidyverse)
+stopifnot(R.version$major>= 4) # requires R4
+if (compareVersion(R.version$minor,"3.1")<0){
+  warning("We recommend >= R4.3.1")}
+stopifnot(compareVersion(as.character(BiocManager::version()), "3.16")>=0)
+stopifnot(compareVersion(as.character(packageVersion("Seurat")), "5.0.0")>=0)
+```
+
+
+```{r setup, cache=FALSE,message=FALSE,echo=FALSE,eval=T}
+# Load libraries'
+library(Seurat)
+library(tidyverse)
+library(data.table)
+library(ggprism)
+library(knitr)
+library(EnhancedVolcano)
+library(pheatmap)
+library(viridisLite)
+library(viridis)
+library(ggpubr)
+
+
+ggplot2::theme_set(theme_prism(base_size = 12))
+scale_colour_discrete <- function(...)
+  scale_colour_manual(..., values = as.vector(grafify:::graf_palettes[["kelly"]]))
+
+set.seed(1454944673L)
+opts_chunk[["set"]](
+    audodep = TRUE,
+    cache = FALSE,
+    cache.lazy = FALSE,
+    error = TRUE,
+    echo = F,
+    eval=F,
+    fig.height = 6,
+    fig.retina = 2L,
+    fig.width = 6,
+    message = FALSE,
+    tidy = F,
+    warning = F
+)
+
+invisible(list2env(params,environment()))
+source(project_file)
+grpmean <- function(grp,mat){
+  if(ncol(mat)==length(grp)){
+    mat <- t(mat)
+  }else{
+    stopifnot(nrow(mat)==length(grp))
+  }
+  mat = mat[names(grp),]
+  grpsum = rowsum(mat,grp,na.rm=T)
+  sorted_grpsize = table(grp)[rownames(grpsum)]
+  meangrp = grpsum/as.numeric(sorted_grpsize)
+  return(t(meangrp))
+}
+colorize <- function(x, color) {
+  if (knitr::is_latex_output()) {
+    sprintf("\\textcolor{%s}{%s}", color, x)
+  } else if (knitr::is_html_output()) {
+    sprintf("<span style='color: %s; font-weight:bold;'>%s</span>", color,
+      x)
+  } else x
+}
+```
+
+
+This code is in this ![](https://img.shields.io/badge/status-alpha-yellow) revision.
+
+
+# Overview 
+
+-   Project: `r project`
+-   PI: `r PI`
+-   Analyst: `r analyst`
+-   Experiment: `r experiment`
+-   Aim: `r aim`
+
+
+
+# MAST analysis 
+
+**Pre-processing**
+
+**Subset genes observed in at least 10% of cells** ...
+
+**Prep for MAST comparison** ...
+
+**MAST run with desired contrasts ** ...
+
+**Output results ** ...
+
+[Full MAST object saved]
+
+[MAST summary results output to csv files]
+
+[Significant MAST summary results output to csv files]
+
+## Differentially Expressed Genes Table
+
+```{r load in pre-computed outputs,eval=T,cache=F}
+topn=16
+data_subset <- readRDS("out/processed_seurat.rds")
+MAST_Result <- fread("out/FULL_MAST_RESULTS_2_age.csv")
+top_DEG <- MAST_Result %>% 
+  slice_min(order_by = fdr, n = topn, with_ties = F) %>% 
+  pull(primerid)
+geneMat <-  GetAssayData(data_subset, slot = "data", assay = "RNA")
+data_subset$contrast_grp <-paste0(data_subset@meta.data[[column]],
+                                  "_",data_subset$orig.ident)
+cellGrp <- setNames(data_subset$contrast_grp,colnames(geneMat))
+grp_mean <- grpmean(cellGrp,geneMat)
+```
+
+
+**[Option 1: numbers displayed in digits]**
+
+```{r,eval=T}
+MAST_Result %>%
+  arrange(fdr) %>% 
+  select(Gene = primerid,Estimate=coef,FDR = fdr) %>% 
+  mutate(Estimate=sprintf(Estimate,fmt = '%.2f'),
+         FDR =sprintf(FDR,fmt = '%.4f')) %>%
+  DT::datatable()
+```
+
+**[Option 2: FDR displayed in scientific notation]**
+
+```{r,eval=T}
+MAST_Result %>%
+  arrange(fdr) %>% 
+  select(Gene = primerid,Estimate=coef,FDR = fdr) %>% 
+  mutate(Estimate=sprintf(Estimate,fmt = '%.2f'),
+         FDR = formatC(FDR, format = "e", digits = 1)) %>%
+  DT::datatable()
+```
+
+
+## Group Mean Heatmap {.tabset}
+
+```{r group mean heatmap,fig.height=6,fig.width=8,results='asis',eval=T}
+
+cat("### ", column, "\n\n")
+grp_mean <- grp_mean[rowSums(grp_mean)>0,]
+p1 <- pheatmap(grp_mean, 
+         color = inferno(10), 
+         cluster_rows = T, 
+         show_rownames = F,
+         border_color = NA, 
+         fontsize = 10, 
+         scale = "row", 
+         fontsize_row = 10, 
+         height = 10,
+         angle_col = 0)
+print(p1)
+cat("\n\n")
+```
+
+
+
+## Volcano plot and Top DEG {.tabset}
+
+This volcano plot shows the genes that are significantly up- and down-regulated as a result of the analysis comparison. 
+
+The points highlighted:
+
+- in `r colorize("grey", "darkgrey")` points are non-significant. 
+- in `r colorize("blue", "lightblue")` have a padj > 0.05 and a log2-fold change > 0.5. 
+- in `r colorize("plum", "plum1")` have a padj < 0.05 and a log2-fold change < 0.5.
+- in `r colorize("purple", "purple")` are genes that have fdr < 0.05 and a log2-fold change > 0.5. 
+
+
+The dashed lines correspond to the cutoff values of log2 foldchance and padj that we have chosen.
+
+```{r volcano_plot,fig.height=10,fig.width=13,results='asis',eval=T}
+cat("### ", column, "\n\n")
+yrange <- c(-0.2,max(-log10(MAST_Result$fdr))+2)
+max_effect <- max(2,round(max(MAST_Result$coef)))
+min_effect <- min(-2,round(min(MAST_Result$coef)))
+xrange <- c(min_effect,max_effect)
+p1 <- EnhancedVolcano(MAST_Result,
+                      ylim=yrange,
+                      xlim= xrange,
+               lab= MAST_Result$primerid, 
+               selectLab = top_DEG,
+               # cut-offs
+               pCutoff = 0.05, 
+               FCcutoff = 0.5,
+               # axis, title
+               x = 'coef',
+               y = 'fdr', 
+               title="",
+               subtitle = "", 
+               # label 
+               drawConnectors = T, 
+               labSize = 7,
+               labCol = 'black',
+               labFace = 'bold',
+               # color
+               colAlpha = 4/5,
+               # legend 
+               legendPosition = 'right',
+               legendLabSize = 16,
+               legendIconSize = 5.0,
+               boxedLabels = TRUE,
+               max.overlaps = Inf,
+               col=c("darkgrey", "lightblue", "plum1", "purple")) 
+print(p1)
+cat("\n\n")
+```
+
+## % of expression for Top DEGs  {.tabset}
+
+```{r sc-heatmap seurat,fig.height=5,fig.width=10,eval=T}
+DotPlot(data_subset, features = top_DEG, 
+        group.by = "contrast_grp",assay = "RNA") +
+  RotatedAxis()+
+  geom_point(aes(size=pct.exp), shape = 21, colour="black", stroke=0.5) +
+  scale_colour_viridis(option="magma") +
+  guides(size=guide_legend(override.aes=list(shape=21, colour="black", fill="white")))+
+  labs(x="",y="")
+```
+
+## Plain sc-expression across contrast groups: top `r topn` DEGs {.tabset}
+
+```{r sc-expr for all DEG1,fig.height=5,fig.width=10,eval=T,results='asis'}
+top_n_exp <- t(geneMat[top_DEG,]) %>% 
+              as.data.frame() %>% 
+              mutate(contrast_grp = cellGrp[colnames(geneMat)])
+for (g in top_DEG){
+  cat("### ",g, "\n\n")
+  p1=ggplot(top_n_exp %>% dplyr::rename(val=g), aes(x = contrast_grp, y =val)) +
+      geom_boxplot(width=0.1,outliers = F)+
+      geom_violin(position=position_dodge(1),alpha=0.5,
+                  na.rm=TRUE,trim=FALSE)+
+      ggbeeswarm::geom_quasirandom(na.rm=TRUE,dodge.width=0.5,
+                                   method='quasirandom')+
+      theme_minimal() +
+      theme(
+        axis.text.x = element_text(size=rel(1.5),face="bold"),
+        plot.title = element_text(hjust = 0.5),
+        legend.position = "none"
+      )+
+    labs(x="",y="log1p(Sum Normalized Counts)")
+  print(p1)
+  cat("\n\n")
+}
+```
+
+
+
+## Colored sc-expression across contrast groups: top `r topn` DEGs {.tabset}
+
+```{r sc-expr for all DEG2,fig.height=5,fig.width=10,eval=T,results='asis'}
+relSize=1.5
+for (g in top_DEG){
+  cat("### ",g, "\n\n")
+  p1=ggplot(top_n_exp %>% dplyr::rename(val=g),
+       aes(x = contrast_grp,y =val,fill=contrast_grp))+
+    scale_fill_viridis_d(option = "D")+
+    geom_violin(alpha=0.5, position = position_dodge(width = .75),size=1,color=NA) +
+    geom_boxplot(notch = F,  outlier.size = -1, color="black",
+                 lwd=1, alpha = 0.7,show.legend = F,width=0.1)+
+    ggbeeswarm::geom_quasirandom(shape = 21,size=2, dodge.width = .75,
+                                 color="black",
+                                 alpha=.8,show.legend = F)+
+    theme_minimal() +
+    rremove("legend.title")+
+    theme(
+      axis.line = element_line(colour = "black",size=1),
+      axis.ticks = element_line(size=1,color="black"),
+      axis.text = element_text(color="black"),
+      axis.ticks.length=unit(0.2,"cm"),
+      strip.text = element_text(size = rel(relSize)),
+      legend.position = c(0.92, 0.9))+
+    font("xylab",size=rel(relSize))+  
+    font("xy",size=rel(relSize))+ 
+    font("xy.text", size = rel(relSize)) +  
+    font("legend.text",size = rel(relSize*0.7))+
+    guides(fill = guide_legend(override.aes =list(alpha = 1,color="black")))+
+    labs(x="",y="log1p(Sum Normalized Counts)")
+  print(p1)
+  cat("\n\n")
+}
+```
+
+
+## Dot styles: sc-expression across contrast groups {.tabset}
+
+```{r sc-expr for all DEG3,fig.height=5,fig.width=10,eval=T,results='asis'}
+cat("### ","quasirandom", "\n\n")
+p1=ggplot(top_n_exp, aes_string(x = "contrast_grp", y = "PERP")) +
+    geom_boxplot(width=0.1,outliers = F)+
+    geom_violin(position=position_dodge(1),alpha=0.5, na.rm=TRUE,trim=FALSE)+
+    ggbeeswarm::geom_quasirandom(na.rm=TRUE,dodge.width=0.5,method='quasirandom')+
+    theme_minimal() +
+    theme(
+      axis.text.x = element_text(size=rel(1.5),face="bold"),
+      plot.title = element_text(hjust = 0.5),
+      legend.position = "none"
+    )+
+  labs(x="",y="log1p(Sum Normalized Counts)")
+print(p1)
+cat("\n\n")
+```
+
+
+```{r sc-expr plot2,fig.height=5,fig.width=10,eval=T,results='asis'}
+cat("### ", "dotplot", "\n\n")
+p1 <- ggplot(top_n_exp, aes_string(x = "contrast_grp", y = g)) +
+    geom_boxplot(width=0.1,outliers = F)+
+    geom_violin(position=position_dodge(1),alpha=0.5, na.rm=TRUE,trim=FALSE)+
+    geom_dotplot(binaxis="y",stackdir='center',binwidth = 0.01)+
+    theme_minimal() +
+    theme(
+      axis.text.x = element_text(size=rel(1.5),face="bold"),
+      plot.title = element_text(hjust = 0.5),
+      legend.position = "none"
+    )+
+  labs(x="",y="log1p(Sum Normalized Counts)")
+print(p1)
+cat("\n\n")
+```
+
+```{r sc-expr plot3,fig.height=5,fig.width=10,eval=T,results='asis'}
+cat("### ","jitter" , "\n\n")
+p1 <- ggplot(top_n_exp, aes_string(x = "contrast_grp", y = g)) +
+    geom_boxplot(width=0.1,outliers = F)+
+    geom_violin(position=position_dodge(1),alpha=0.5, na.rm=TRUE,trim=FALSE)+
+    geom_jitter(width = 0.2)+
+    theme_minimal() +
+    theme(
+      axis.text.x = element_text(size=rel(1.5),face="bold"),
+      plot.title = element_text(hjust = 0.5),
+      legend.position = "none"
+    )+
+  labs(x="",y="log1p(Sum Normalized Counts)")
+print(p1)
+cat("\n\n")
+```
+
+
+
+# Method description
+
+MAST is used to generate differential expressed genes among the supplied contrast groups by taking into account the number of genes activated in every cell, also other batch information (e.g. different samples in the suppliedd `seurat` object). 
+
+Please read more about MAST in its [paper](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-015-0844-5) and [github repository](https://github.com/RGLab/MAST).
+
+# R session 
+
+List and version of tools used for the QC report generation.
+
+```{r}
+sessionInfo()
+```
+
