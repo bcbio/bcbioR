@@ -133,6 +133,11 @@ props <- getTransformedProps(meta$celltype,
 props$Proportions
 ```
 
+## Resources
+
+* [Speckle vignette](http://127.0.0.1:29356/library/speckle/doc/speckle.html#finding-significant-differences-in-cell-type-proportions-using-propeller)
+* [Application to mouse PBMC scRNA](https://phipsonlab.github.io/propeller-paper-analysis/RealDataAnalysis.html#Young_vs_Old)
+
 
 
 ```{r extracode, eval=FALSE}
