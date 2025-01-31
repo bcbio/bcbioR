@@ -1,7 +1,10 @@
 library(tidyverse)
 library(SummarizedExperiment)
 library(janitor)
-load_metrics <- function(se_object, multiqc_data_dir, gtf_fn, counts){
+load_metrics <- function(se=se_object, multiqc=multiqc_data_dir,
+                         gtf=gtf_fn,
+                         counts=counts,
+                         single_end=FALSE){
 
   # bcbio input
   if (!is.na(se_object)){
@@ -32,14 +35,21 @@ load_metrics <- function(se_object, multiqc_data_dir, gtf_fn, counts){
       summarize(total_reads = sum(fastqc_raw_total_sequences))
 
     # This renames to user-friendly names the metrics columns
+    if (single_end){
+      metrics <- metrics %>%
+        dplyr::filter(!is.na(fastqc_raw_total_sequences))
+    }else{
+      metrics <- metrics %>%
+        dplyr::filter(is.na(fastqc_raw_total_sequences))
+    }
     metrics <- metrics %>%
-      dplyr::filter(is.na(fastqc_raw_total_sequences)) %>%
       remove_empty(which = 'cols') %>%
       full_join(total_reads) %>%
       mutate(mapped_reads = samtools_reads_mapped) %>%
-      mutate(exonic_rate = exonic/(star_uniquely_mapped * 2)) %>%
-      mutate(intronic_rate = intronic/(star_uniquely_mapped * 2)) %>%
-      mutate(intergenic_rate = intergenic/(star_uniquely_mapped * 2)) %>%
+      rowwise() %>%
+      mutate(exonic_rate = exonic/(exonic + intronic + intergenic)) %>%
+      mutate(intronic_rate = intronic/(exonic + intronic + intergenic)) %>%
+      mutate(intergenic_rate = intergenic/(exonic + intronic + intergenic)) %>%
       mutate(x5_3_bias = qualimap_5_3_bias)
 
     # Sometimes we don't have rRNA due to mismatch annotation, We skip this if is the case
