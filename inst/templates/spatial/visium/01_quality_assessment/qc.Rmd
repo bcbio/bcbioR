@@ -15,7 +15,7 @@ output:
          collapsed: true
          smooth_scroll: true
 params:
-  project_file: ./reports/information.R
+  project_file: ../information.R
   results_dir: ./results
   path_data: ./data
 ---
@@ -34,7 +34,6 @@ stopifnot(compareVersion(package.version("Seurat"), "5.0.0")>=0)
 
 This code is in this ![](https://img.shields.io/badge/status-draft-grey) revision.
 
-
 ```{r load_libraries, cache = FALSE, message = FALSE, warning=FALSE, echo=FALSE,}
 # Libraries
 library(bcbioR)
@@ -43,11 +42,18 @@ library(tidyverse)
 library(glue)
 library(gridExtra)
 library(scales)
+library(ggprism)
+library(grafify)
+ggplot2::theme_set(theme_prism(base_size = 12))
+# https://grafify-vignettes.netlify.app/colour_palettes.html
+# NOTE change colors here if you wish
+scale_colour_discrete <- function(...)
+  scale_colour_manual(..., 
+                      values = as.vector(grafify:::graf_palettes[["kelly"]]))
+scale_fill_discrete <- function(...)
+  scale_fill_manual(..., 
+                      values = as.vector(grafify:::graf_palettes[["kelly"]]))
 
-
-# Plotting aesthetics
-colors=cb_friendly_cols(1:15)
-ggplot2::theme_set(theme_prism(base_size = 14))
 opts_chunk[["set"]](
     cache = F,
     cache.lazy = FALSE,
@@ -129,7 +135,6 @@ metrics %>%
   xlab("") + ylab("Number of reads (in millions)")
 ```
 
-
 ## Mean reads per spot
 
 **The recommended value here is 50,000.**
@@ -145,7 +150,6 @@ metrics %>%
   ggtitle("Mean reads per spot") +
   geom_hline(yintercept=50000, linetype=2)
 ```
-
 
 ## Fraction of reads in spots under tissue
 
@@ -170,7 +174,6 @@ metrics %>%
   geom_hline(yintercept = 50, linetype =2) +
   ylim(c(0, 100))
 ```
-
 
 # Setup for analysis
 
@@ -219,7 +222,6 @@ Similar to scRNAseq we use statistics on number of counts, number of features an
 
 This number is really dependent on tissue type, RNA quality, and sequencing depth. For example, with one of the public Visium datasets using the mouse brain hippocampus region, we saw an average of 4.5k genes and 20k UMIs per spot. 
 
-
 ```{r nUMI}
 merged@meta.data %>%
     ggplot(aes(x=orig.ident, y = nCount_Spatial)) + 
@@ -257,7 +259,6 @@ We can evaluate each spot in terms of how complex the RNA species are by using a
 
 With scRNA-seq this is more easily interpreted for a single cell, but for spatial data this would give us complexity of the spot, which is across multiple cells.
 
-
 ```{r complexity}
 merged@meta.data %>%
     ggplot(aes(x=log10GenesPerUMI, color=orig.ident, fill=orig.ident)) +
@@ -267,7 +268,6 @@ merged@meta.data %>%
     ggtitle("Novelty score") +
     theme(plot.title = element_text(hjust=0.5, face="bold"))
 ```
-
 
 # QC metrics visualized on slides {.tabset}
 
@@ -287,7 +287,6 @@ for (sample in samples) {
   cat("\n")
  }
 ```
-
 
 # Normalization and Clustering 
 
@@ -371,11 +370,18 @@ SpatialDimPlot(merged, label = TRUE, ncol=1)
 # Save seurat object
 
 ```{r save_seurat}
-saveRDS(merged, "results/01_qc.RDS")
+saveRDS(merged, file.path(params$results_dir, "01_qc.RDS"))
+```
+# Methods
+
+
+## Citation
+
+```{r citations}
+citation("Seurat")
 ```
 
-
-# Session Information
+## Session Information
 
 ```{r}
 sessionInfo()
