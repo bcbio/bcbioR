@@ -2,16 +2,6 @@
 title: "Quality Control for scATAC-Seq"
 author: "Harvard Chan Bioinformatics Core"
 date: "`r Sys.Date()`"
-params:
-    max_PRF: !r Inf 
-    min_PRF: 4200
-    max_FRiP: !r Inf
-    min_FRiP: 40
-    min_TSS: 2 
-    max_NS: 2
-    max_blacklistratio: 0.02
-    data_dir: !r file.path("data")
-    results_dir: !r file.path("results")
 output:
    html_document:
       code_folding: hide
@@ -24,12 +14,34 @@ output:
       toc_float:
          collapsed: true
          smooth_scroll: true
-editor_options: 
-  chunk_output_type: console
 params:
-  params_file: params_qc.R
+  max_PRF: !r Inf 
+  min_PRF: 4200
+  max_FRiP: !r Inf
+  min_FRiP: 40
+  min_TSS: 2 
+  max_NS: 2
+  max_blacklistratio: 0.02
+  data_dir: !r file.path("data")
+  results_dir: !r file.path("results")
+  project_file: ../information.R
+  #params_file: params_qc.R
 ---
 
+
+```{r, cache = FALSE, message = FALSE, warning=FALSE}
+# This set up the working directory to this file so all files can be found
+library(rstudioapi)
+setwd(fs::path_dir(getSourceEditorContext()$path))
+# NOTE: This code will check version, this is our recommendation, it may work
+#.      other versions
+stopifnot(R.version$major>= 4) # requires R4
+if (compareVersion(R.version$minor,"3.1")<0) warning("We recommend >= R4.3.1") 
+stopifnot(compareVersion(as.character(BiocManager::version()), "3.18")>=0)
+stopifnot(compareVersion(as.character(packageVersion("Seurat")), "5.0.0")>=0)
+```
+
+This code is in this ![](https://img.shields.io/badge/status-alpha-yellow) revision.
 
 ```{r source_params, echo = F}
 metadata_fn=''
@@ -159,7 +171,7 @@ filename <- 'data/scATAC_seurat.rds'
 if (!file.exists(filename)){
   
 }else{
-  seuart <- readRDS(filename)
+  seurat <- readRDS(filename)
 }
 ```
 

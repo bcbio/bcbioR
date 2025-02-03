@@ -6,9 +6,15 @@ Make sure there is a valid project name, and modify `information.R` with the rig
 
 `pre-process-w-cellranger.md` contains step by step guidelines on how to run cellranger and load data into R. This `scripts/seurat_init.R` script contains all the pieces to go from cellranger output to Seurat obj. It is assuming a mouse genome.
 
-# QC
+# Quality Assessment
 
-Currently we are working on deploying a shiny app to inspect the single cell object and find the best cut-offs for filtering. The Rmd that helps to visualize the before and after is `QC.Rmd`.
+## scATAC
+
+The Rmd that helps to visualize ATAC metrics is `scATAC_QC.Rmd`.
+
+## scRNA
+
+Currently we are working on deploying a shiny app to inspect the single cell object and find the best cut-offs for filtering. The Rmd that helps to visualize the before and after is `scRNA_QC.Rmd`.
 
 # Integration
 
