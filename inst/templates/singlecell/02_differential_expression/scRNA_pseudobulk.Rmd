@@ -14,10 +14,7 @@ output:
       toc_float:
          collapsed: true
          smooth_scroll: true
-editor_options: 
-  chunk_output_type: console
 params:
-   
    project_file: ../information.R
    seurat_obj: "https://github.com/bcbio/bcbioR-test-data/raw/refs/heads/main/singlecell/tiny.rds"
    column: "age"

@@ -14,8 +14,6 @@ output:
       toc_float:
          collapsed: true
          smooth_scroll: true
-editor_options: 
-  chunk_output_type: inline
 params:
     ## Combatseq and ruv can both be false or ONLY ONE can be true
   # numerator: tumor
@@ -57,8 +55,15 @@ source(params$project_file)
 map(list.files(params$functions_file,pattern = "*.R$",full.names = T), source) %>% invisible()
 # IMPORTANT set these values if you are not using the parameters in the header (lines 22-31)
 genome=params$genome
-library(org.Hs.eg.db)
-ann.org=org.Hs.eg.db
+if(grepl(genome, "hg|human", ignore.case = TRUE)) {
+   library(org.Hs.eg.db)
+   ann.org=org.Hs.eg.db
+} else if(grepl(genome, "mm|mouse", ignore.case = TRUE)) {
+   library(org.Mm.eg.db)
+   ann.org=org.Mm.eg.db
+} else {
+   warning("If you are working on an organism other than human or mouse: Bioconductor packages are also available for a number of other organisms. This code should work for any of the organisms with an eg.db package listed at https://bioconductor.org/packages/release/BiocViews.html#___Organism -- please search for your organism and assign ann.org manually.")
+}
 
 column=params$column
 # use contrast to set up multiple comparisons
@@ -145,6 +150,7 @@ metrics <- load_metrics(se_object, multiqc_data_dir, gtf_fn, counts) %>%
   left_join(coldata, by = c('sample')) %>% 
   as.data.frame()
 rownames(metrics) <- metrics$sample
+metrics <- subset(metrics, metrics$sample %in% coldata$sample)
 # if the names don't match in order or string check files names and coldata information
 counts = counts[,rownames(metrics)]
 coldata = coldata[rownames(metrics),]
@@ -161,9 +167,9 @@ stopifnot(all(names(counts) == rownames(metrics)))
 -   Aim: `r aim`
 
 ```{r load_counts_data}
-rdata = AnnotationDbi::select(ann.org, rownames(counts), 'SYMBOL', 'ENSEMBL') %>%
-  dplyr::select(gene_id = ENSEMBL, gene_name = SYMBOL) %>% 
-  distinct(gene_id, .keep_all = TRUE)
+rdata = AnnotationDbi::select(ann.org, rownames(counts), columns=c('SYMBOL', 'ENTREZID'), keytype = 'ENSEMBL') %>%
+dplyr::select(gene_id = ENSEMBL, gene_name = SYMBOL, entrez= ENTREZID) %>%
+distinct(gene_id, .keep_all = TRUE)
 
 ```
 
@@ -455,7 +461,11 @@ This volcano plot shows the genes that are significantly up- and down-regulated 
 for (contrast in names(de_list)){
   cat("### ", contrast, "\n\n")
   res <- de_list[[contrast]][["all"]]
-  res_mod <- res %>% mutate(lfc = replace(lfc, lfc < -5, -5)) %>% mutate(lfc = replace(lfc, lfc > 5, 5))
+res_mod <- res
+
+## The below line of code will change anything with an absolute(lfc) above 5 to a 5. This will help remove outliers to better frame the graph if wanted.  
+# res_mod <- res %>% mutate(lfc = replace(lfc, lfc < -5, -5)) %>% mutate(lfc = replace(lfc, lfc > 5, 5))
+
   show <- as.data.frame(res_mod[1:10, c("lfc", "padj", "gene_name")])
   p1=EnhancedVolcano(res_mod,
                   lab= res_mod$gene_name, 
@@ -465,11 +475,9 @@ for (contrast in names(de_list)){
                   x = 'lfc',
                   y = 'padj', 
                   title=contrast,
-                  col=as.vector(colors[c("darkgrey",
-                                         "lightblue",
-                                         "purple",
-                                         "purple")]),
-                  subtitle = "", drawConnectors = T,  max.overlaps = Inf) 
+                  col=col=c("darkgrey", "lightblue", "plum1", "purple"),
+                # xlim = c(-5,5),  ## set the x-axis to only show some points
+                  subtitle = "", drawConnectors = T,  max.overlaps = Inf ) 
   print(p1)
   cat("\n\n")
 }
@@ -553,7 +561,16 @@ for (contrast in names(de_list)){
 From the set of differentially expressed genes and using publicly available information about gene sets involved in biological processes and functions, we can calculate which biological processes and functions are significantly perturbed as a result of the treatment. 
 
 ```{r}
-all_in_life=get_databases_v2(sps="human")
+if(grepl(genome, "hg|human", ignore.case = TRUE)) {
+   all_in_life=get_databases_v2(sps="human")
+   run_FA=TRUE
+} else if(grepl(genome, "mm|mouse", ignore.case = TRUE)) {
+   all_in_life=get_databases_v2(sps="mouse")
+   run_FA=TRUE
+} else {
+   warning("If you are working on an organism other than human or mouse: This pathway enrichment is based on annotations from MSigDB https://www.gsea-msigdb.org/gsea/msigdb which only has human and mouse collections. For non-model organism pathway analysis, please see the template rnaseq/03_functional/Nonmodel_Organism_Pathway_Analysis.Rmd")
+   run_FA=FALSE
+}
 ```
 
 # Pathway Analysis- GSEA
@@ -564,7 +581,7 @@ Gene Set Enrichment Analysis (GSEA) is a computational method used to determine 
 - Incorporation of Prior Knowledge: Utilizes predefined gene sets, allowing integration of existing biological knowledge.
 - Contextual Relevance: Can reveal subtle but coordinated changes in biologically meaningful gene sets that might not be apparent when looking at individual genes.
 
-```{r, warning=F, message=F}
+```{r, warning=F, message=F, eval=run_FA}
 fa_gsea_list=lapply(de_list,function(contrast){
   
   res=contrast[["all"]]
@@ -580,7 +597,7 @@ fa_gsea_list=lapply(de_list,function(contrast){
  }) 
 ```
 
-```{r, results='asis'}
+```{r, results='asis', eval=run_FA}
 # NOTE DT::datatables doesn't work with tabset and for loops
 # You can use the following code to print dynamically or call manually sanitize_datatable()
 # multiple times
@@ -602,7 +619,7 @@ Over-Representation Analysis (ORA) is a statistical method used to determine whe
 - Biological Insight: Helps to identify pathways and processes that are significantly affected in the condition studied.
 - Prior Knowledge Integration: Utilizes existing biological knowledge through predefined gene sets.
 
-```{r, warning=F, message=F}
+```{r, warning=F, message=F, eval=run_FA}
 fa_list=lapply(de_list,function(contrast){
   
   res=contrast[["all"]]
@@ -631,7 +648,7 @@ fa_list=lapply(de_list,function(contrast){
 
 ## All significant genes {.tabset}
 
-```{r, results='asis'}
+```{r, results='asis', eval=run_FA}
 # NOTE DT::datatables doesn't work with tabset and for loops
 # You can use the following code to print dynamically or call manually sanitize_datatable()
 # multiple times
@@ -648,7 +665,7 @@ tagList(dt_list)
 
 ## Down-regulated genes {.tabset}
 
-```{r, results='asis'}
+```{r, results='asis', eval=run_FA}
 dt_list=list()
 for (contrast in names(de_list)){
   res_sig=fa_list[[contrast]][["down"]] %>% filter(padj < 0.05)
@@ -662,7 +679,7 @@ tagList(dt_list)
 
 ## Up-regulated genes {.tabset}
 
-```{r, results='asis'}
+```{r, results='asis', eval=run_FA}
 dt_list=list()
 for (contrast in names(de_list)){
   res_sig=fa_list[[contrast]][["up"]] %>% filter(padj < 0.05)
@@ -682,12 +699,15 @@ if (!is.null(subset_value) & !is.null(subset_value)){
 } else {
   filenames = "full"
 }
+
+filename = paste0(filenames)
+name_expression_fn=file.path(
+  basedir,
+  str_interp("${filename}_expression.csv"))
+write_csv(counts_norm, name_expression_fn)
+
 for (contrast in names(contrasts)){
-  filename = paste0(filenames, "_", contrast)
-  name_expression_fn=file.path(
-    basedir,
-    str_interp("${filename}_expression.csv"))
-  
+
   name_deg_fn=file.path(
     basedir,
     str_interp("${filename}_deg.csv"))
@@ -708,7 +728,6 @@ for (contrast in names(contrasts)){
   pathways_for_writing <- fa_list[[contrast]][["all"]] %>% 
     mutate(comparison = contrast)
   
-  write_csv(counts_norm, name_expression_fn)
   write_csv(res_for_writing, name_deg_fn)
   write_csv(pathways_for_writing, name_pathways_fn)
 }

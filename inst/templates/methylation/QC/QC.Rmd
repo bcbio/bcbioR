@@ -14,8 +14,6 @@ output:
       toc_float:
          collapsed: true
          smooth_scroll: true
-editor_options: 
-  chunk_output_type: console
 params:
   params_file: ../information.R
   meta_fn: ../meta/methylation_mucci_hbc04926.csv
