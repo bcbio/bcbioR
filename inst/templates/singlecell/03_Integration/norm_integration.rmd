@@ -69,8 +69,6 @@ ggplot2::theme_set(theme_prism(base_size = 12))
 scale_colour_discrete <- function(...)
   scale_colour_manual(..., values = as.vector(grafify:::graf_palettes[["kelly"]]))
 
-#options(ggplot2.discrete.colour= )
-
 # Set seed for reproducibility
 set.seed(1454944673L)
 opts_chunk[["set"]](
