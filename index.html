@@ -8,8 +8,8 @@
 <title>Templates and functions to guide downstream analysis and data interpretation • bcbioR</title>
 <script src="deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <link href="deps/bootstrap-5.3.1/bootstrap.min.css" rel="stylesheet">
-<script src="deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script><link href="deps/font-awesome-6.4.2/css/all.min.css" rel="stylesheet">
-<link href="deps/font-awesome-6.4.2/css/v4-shims.min.css" rel="stylesheet">
+<script src="deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script><link href="deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
+<link href="deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
 <script src="deps/headroom-0.11.0/headroom.min.js"></script><script src="deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="deps/search-1.0.0/fuse.min.js"></script><script src="deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="pkgdown.js"></script><meta property="og:title" content="Templates and functions to guide downstream analysis and data interpretation">
 <meta name="description" content="Collaborative code repository at the Harvard Chan Bioinformatics Core.">
 <meta property="og:description" content="Collaborative code repository at the Harvard Chan Bioinformatics Core.">
@@ -22,7 +22,7 @@
 
     <a class="navbar-brand me-2" href="index.html">bcbioR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.4.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -91,31 +91,62 @@
 <ul>
 <li>base/reports/example.Rmd: <img src="https://img.shields.io/badge/status-stable-green">
 </li>
-<li>rnaseq/DE/Intersections.Rmd: <img src="https://img.shields.io/badge/status-alpha-yellow">
+<li>
+<a href="rnaseq/01_quality_assessment/QC.Rmd">rnaseq/01_quality_assessment/QC.Rmd</a>: <img src="https://img.shields.io/badge/status-stable-green">
 </li>
-<li>rnaseq/DE/GSVA.Rmd: <img src="https://img.shields.io/badge/status-alpha-yellow">
+<li>
+<a href="rnaseq/02_differential_expression/DEG.Rmd">rnaseq/02_differential_expression/DEG.Rmd</a>: <img src="https://img.shields.io/badge/status-stable-green">
 </li>
-<li>rnaseq/DE/DEG.Rmd: <img src="https://img.shields.io/badge/status-stable-green">
+<li>
+<a href="rnaseq/03_functional/Nonmodel_Organism_Pathway_Analysis.Rmd">rnaseq/03_functional/Nonmodel_Organism_Pathway_Analysis.Rmd</a>: <img src="https://img.shields.io/badge/status-alpha-yellow">
 </li>
-<li>rnaseq/DE/Cross-comparison-analysis.Rmd: <img src="https://img.shields.io/badge/status-alpha-yellow">
+<li>
+<a href="rnaseq/03_functional/GSVA.Rmd">rnaseq/03_functional/GSVA.Rmd</a>: <img src="https://img.shields.io/badge/status-alpha-yellow">
 </li>
-<li>rnaseq/QC/QC_nf-core.Rmd: <img src="https://img.shields.io/badge/status-stable-green">
+<li>
+<a href="rnaseq/03_functional/Immune-deconvolution.Rmd">rnaseq/03_functional/Immune-deconvolution.Rmd</a>: <img src="https://img.shields.io/badge/status-alpha-yellow">
 </li>
-<li>singlecell/Integration/norm_integration.rmd: <img src="https://img.shields.io/badge/status-alpha-yellow">
+<li>
+<a href="rnaseq/03_comparative/Pair-wise-comparison-analysis.Rmd">rnaseq/03_comparative/Pair-wise-comparison-analysis.Rmd</a>: <img src="https://img.shields.io/badge/status-alpha-yellow">
 </li>
-<li>singlecell/QC/QC.rmd: <img src="https://img.shields.io/badge/status-alpha-yellow">
+<li>
+<a href="rnaseq/03_comparative/Intersections.Rmd">rnaseq/03_comparative/Intersections.Rmd</a>: <img src="https://img.shields.io/badge/status-alpha-yellow">
 </li>
-<li>singlecell_delux/CellToCell/cellchat.Rmd: <img src="https://img.shields.io/badge/status-draft-grey">
+<li>
+<a href="rnaseq/04_gene_patterns/WGCNA.Rmd">rnaseq/04_gene_patterns/WGCNA.Rmd</a>: <img src="https://img.shields.io/badge/status-alpha-yellow">
 </li>
-<li>chipseq/diffbind/diffbind.Rmd: <img src="https://img.shields.io/badge/status-alpha-yellow">
+<li>
+<a href="singlecell/01_quality_assessment/scATAC_QC.Rmd">singlecell/01_quality_assessment/scRNA_QC.Rmd</a>: <img src="https://img.shields.io/badge/status-stable-green">
 </li>
-<li>chipseq/QC/QC.Rmd: <img src="https://img.shields.io/badge/status-alpha-yellow">
+<li>
+<a href="singlecell/01_quality_assessment/scATAC_QC.Rmd">singlecell/01_quality_assessment/scATAC_QC.Rmd</a>: <img src="https://img.shields.io/badge/status-draft-grey">
 </li>
-<li>spatial/cosmx/QC/QC.Rmd: <img src="https://img.shields.io/badge/status-draft-grey">
+<li>
+<a href="singlecell/02_differential_expression/scRNA_MAST.Rmd">singlecell/02_differential_expression/scRNA_MAST.Rmd</a>: <img src="https://img.shields.io/badge/status-alpha-yellow">
 </li>
-<li>methylation/QC/QC.Rmd: <img src="https://img.shields.io/badge/status-draft-grey">
+<li>
+<a href="singlecell/02_differential_expression/scRNA_pseudobulk.Rmd">singlecell/02_differential_expression/scRNA_pseudobulk.Rmd</a>: <img src="https://img.shields.io/badge/status-alpha-yellow">
 </li>
-<li>multiomics/teaseq/QC/QC.Rmd: <img src="https://img.shields.io/badge/status-draft-grey">
+<li>
+<a href="singlecell/04_compositional/propeller.Rmd">singlecell/04_compositional/propeller.Rmd</a>: <img src="https://img.shields.io/badge/status-draft-grey">
+</li>
+<li>
+<a href="singlecell/04_compositional/sccomp.Rmd">singlecell/04_compositional/sccomp.Rmd</a>: <img src="https://img.shields.io/badge/status-draft-grey">
+</li>
+<li>
+<a href="singlecell_delux/01_CellToCell/cellchat.Rmd">singlecell_delux/01_CellToCell/cellchat.Rmd</a>: <img src="https://img.shields.io/badge/status-draft-grey">
+</li>
+<li>
+<a href="chipseq/02_diffbind/diffbind.Rmd">chipseq/02_diffbind/diffbind.Rmd</a>: <img src="https://img.shields.io/badge/status-alpha-yellow">
+</li>
+<li>
+<a href="chipseq/01_quality_assessment/QC.Rmd">chipseq/01_quality_assessment/QC.Rmd</a>: <img src="https://img.shields.io/badge/status-alpha-yellow">
+</li>
+<li>
+<a href="spatial/visium/01_quality_assessment/qc.Rmd">spatial/visium/01_quality_assessment/qc.Rmd</a>: <img src="https://img.shields.io/badge/status-draft-grey">
+</li>
+<li>
+<a href="spatial/cosmx/01_quality_assessment/QC.Rmd">spatial/cosmx/01_quality_assessment/QC.Rmd</a>: <img src="https://img.shields.io/badge/status-draft-grey">
 </li>
 </ul>
 <div class="section level3">
