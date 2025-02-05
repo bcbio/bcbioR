@@ -471,7 +471,7 @@ citation("ggplot2")
 citation("pheatmap")
 ```
 
-# R session
+## R session
 
 List and version of tools used for the QC report generation.
 
