@@ -1,0 +1,459 @@
+---
+title: "scRNA pseudobulk"
+author: "Harvard Chan Bioinformatics Core"
+date: "`r Sys.Date()`"
+output:
+   html_document:
+      code_folding: hide
+      df_print: paged
+      highlights: pygments
+      number_sections: true
+      self_contained: true
+      theme: default
+      toc: true
+      toc_float:
+         collapsed: true
+         smooth_scroll: true
+params:
+   project_file: ../information.R
+   seurat_obj: "https://github.com/bcbio/bcbioR-test-data/raw/refs/heads/main/singlecell/tiny.rds"
+   column: "age"
+   contrasts: !r list(c("age", "YOUNG", "OLD"))
+   cluster_name: "2"
+   resolution_column: "integrated_snn_res.0.4"
+---
+
+Template developed with materials from <https://hbctraining.github.io/main/>.
+
+```{r, message=FALSE, warning=FALSE}
+# This set up the working directory to this file so all files can be found
+
+library(rstudioapi)
+library(tidyverse)
+setwd(fs::path_dir(getSourceEditorContext()$path))
+# NOTE: This code will check version, this is our recommendation, it may work
+#.      other versions
+stopifnot(R.version$major>= 4) # requires R4
+if (compareVersion(R.version$minor,"3.1")<0) warning("We recommend >= R4.3.1") 
+stopifnot(compareVersion(as.character(BiocManager::version()), "3.18")>=0)
+stopifnot(compareVersion(as.character(packageVersion("Seurat")), "5.0.0")>=0)
+```
+
+```{r setup, cache=FALSE, message=FALSE, warning=FALSE, echo=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# Load libraries'
+#library(Matrix)
+library(SeuratObject)
+library(Seurat)
+library(harmony)
+library(knitr)
+library(rmarkdown)
+library(data.table)
+library(DT)
+library(patchwork)
+library(clustree)
+library(ggprism)
+library(grafify)
+library(R.utils)
+library(tidyverse)
+library(DESeq2)
+library(DEGreport)
+library(EnhancedVolcano)
+library(pheatmap)
+library(viridis)
+library(caTools)
+library(shiny)
+#library(future)
+
+ggplot2::theme_set(theme_prism(base_size = 12))
+# https://grafify-vignettes.netlify.app/colour_palettes.html
+# NOTE change colors here if you wish
+scale_colour_discrete <- function(...)
+  scale_colour_manual(..., values = as.vector(grafify:::graf_palettes[["kelly"]]))
+scale_fill_discrete <- function(...)
+  scale_fill_manual(..., values = as.vector(grafify:::graf_palettes[["kelly"]]))
+
+#options(ggplot2.discrete.colour= )
+
+# Set seed for reproducibility
+set.seed(1454944673L)
+opts_chunk[["set"]](
+    audodep = TRUE,
+    cache = FALSE,
+    cache.lazy = FALSE,
+    error = TRUE,
+    echo = TRUE,
+    warning = FALSE,
+    fig.height = 5L,
+    fig.retina = 2L,
+    fig.width = 9.6,
+    message = FALSE,
+    tidy = TRUE,
+    warning = TRUE
+)
+
+source(params$project_file)
+
+seurat_obj <- params$seurat_obj
+column <- params$column
+contrasts <- params$contrasts
+cluster_name <- params$cluster_name
+resolution_column <- params$resolution_column
+```
+
+This code is in this ![](https://img.shields.io/badge/status-alpha-yellow) revision.
+
+# Overview
+
+-   Project: `r project`
+-   PI: `r PI`
+-   Analyst: `r analyst`
+-   Experiment: `r experiment`
+-   Aim: `r aim`
+
+Here we will apply a pseudobulk approach to look for differentially expressed genes in one of our cell types.
+
+Using a pseudobulk approach involves the following steps:
+
+1.  Subsetting to the cells for the cell type(s) of interest to perform the DE analysis.
+2.  Extracting the raw counts after QC filtering of cells to be used for the DE analysis.
+3.  Aggregating the counts and metadata to the sample level.
+4.  Performing the DE analysis (you need at least two biological replicates per condition to perform the analysis, but more replicates are recommended).
+
+## Dataset
+
+```{r load_data, cache = FALSE}
+# Loading object
+if (isUrl(seurat_obj)){
+  seurat <- readRDS(url(seurat_obj))  
+}else{
+  seurat <- readRDS(seurat_obj)
+}
+
+DefaultAssay(seurat) <- "RNA"
+
+# Define color scales for up to 24 clusters/samples
+colsD <- RColorBrewer::brewer.pal(8, "Dark2")
+colsM <- RColorBrewer::brewer.pal(8, "Set2")
+colsL <- RColorBrewer::brewer.pal(8, "Pastel2")
+# Stack same colors from dark to pastel
+cols3 <- unlist(strsplit(paste(colsD, colsM, colsL, sep = "_"), "_"))
+cols2 <- c(unlist(strsplit(paste(colsD, colsM, sep = "_"), "_")), "deepskyblue2")
+```
+
+After filtering, each sample contributed the following number of cells to the analysis:
+
+```{r meta pre doub}
+table(seurat$orig.ident)
+```
+
+# Aggregate counts
+
+## Aggregate metadata at the sample level
+
+```{r rna_norm0, warning=FALSE, message=FALSE}
+meta_columns <- c("orig.ident", column)
+meta <- seurat@meta.data %>%
+            select(meta_columns) %>%
+            unique() %>%
+            remove_rownames()
+
+meta
+```
+
+## Aggregate counts
+
+To aggregate the counts, we will use the AggregateExpression() function from Seurat. It will take as input a Seurat object, and return summed counts ("pseudobulk") for each identity class. The default is to return a matrix with genes as rows, and identity classes as columns. We have set return.seurat to TRUE, which means rather than a matrix we will get an object of class Seurat. We have also specified which factors to aggregate on, using the group.by argument.
+
+```{r}
+seurat$sample <- seurat$orig.ident
+
+bulk <- AggregateExpression(
+            seurat,
+            return.seurat = T,
+            assays = "RNA",
+            group.by = c("sample",resolution_column,column )
+)
+```
+
+## Add number of cells per sample per cluster to the metadata
+
+```{r}
+# Number of cells by sample and celltype
+n_cells <- seurat@meta.data %>% 
+              dplyr::count(sample, .data[[column]], .data[[resolution_column]]) %>% 
+              dplyr::rename("n_cells"="n")
+#n_cells$sample <- str_replace(n_cells$sample, "_", "-")
+
+## extra check if aggregated sample names start with numbers
+n_cells$sample <- ifelse(grepl("^\\d", n_cells$sample), paste0("g",n_cells$sample), n_cells$sample)
+
+
+meta_bulk <- bulk@meta.data 
+meta_bulk$sample <- str_replace_all(meta_bulk$sample, "-", "_")
+
+meta_bulk[[resolution_column]] <- str_replace_all(meta_bulk[[resolution_column]], "-", "_")
+
+meta_bulk <- meta_bulk %>% left_join(n_cells, by=c("sample", resolution_column, column))
+rownames(meta_bulk) <- meta_bulk$orig.ident
+bulk@meta.data <- meta_bulk
+
+# Turn column into a factor
+#bulk[[column]] <- as.factor(bulk[[column]])
+# test for consistency
+
+stopifnot(all(Cells(bulk) == row.names(bulk@meta.data)))
+
+bulk@meta.data %>% head()
+```
+
+# DE analysis with DESeq2
+
+## Subset to cell type of interest
+
+```{r}
+Idents(object = bulk) <- resolution_column
+bulk_touse <- subset(x = bulk, idents = cluster_name)
+```
+
+## Check that we have enough cells
+
+Before moving on to a pseudobulk DGE analysis, it is important to identify how many cells we aggregated for each sample. We need to make sure that we have enough cells per sample after subsetting to one celltype. We recommend 50 cells per sample to move forward with confidence.
+
+```{r}
+ggplot(bulk_touse@meta.data, aes(x=orig.ident, y=n_cells)) +
+    geom_bar(stat="identity", color="black", aes(fill=.data[[column]])) +
+    theme_classic() +
+    theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
+    labs(x="Sample name", y="Number of cells") +
+    geom_text(aes(label=n_cells), vjust=-0.5)
+```
+
+## Run DE analysis
+
+Differential gene expression analysis of count data was performed using the Bioconductor R package, DESeq2, which fits the count data to a negative binomial model.
+
+Before fitting the model, we often look at a metric called dispersion, which is a measure for variance which also takes into consideration mean expression. A dispersion value is estimated for each individual gene, then 'shrunken' to a more accurate value based on expected variation for a typical gene exhibiting that level of expression. Finally, the shrunken dispersion value is used in the final GLM fit.
+
+We use the below dispersion plot, which should show an inverse relationship between dispersion and mean expression, to get an idea of whether our data is a good fit for the model.
+
+```{r}
+cluster_counts <- t(FetchData(bulk_touse, layer="counts", vars=rownames(bulk_touse)))
+formula <- as.formula(paste0("~ ", " + ", column))
+
+
+dds_to_use <- DESeqDataSetFromMatrix(cluster_counts, bulk_touse@meta.data, design = formula)
+de <- DESeq(dds_to_use)
+DESeq2::plotDispEsts(de)
+norm_matrix <- as.data.frame(counts(de, normalized=T))
+
+vsd <- vst(de)
+vsd_matrix <- assay(vsd)
+```
+
+Because it is difficult to accurately detect and quantify the expression of lowly expressed genes, differences in their expression between treatment conditions can be unduly exaggerated after the model is fit. We correct for this so that gene LFC is not dependent overall on basal gene expression level.
+
+In cases there are multiple groups and conditions across groups is recommended to use dummy variables instead of interaction terms: <https://bioconductor.org/packages/devel/bioc/vignettes/DESeq2/inst/doc/DESeq2.html#interactions>.
+
+The LRT is useful for testing multiple terms at once, for example testing 3 or more levels of a factor at once, or all interactions between two variables. The LRT for count data is conceptually similar to an analysis of variance (ANOVA) calculation in linear regression, except that in the case of the Negative Binomial GLM, we use an analysis of deviance (ANODEV), where the deviance captures the difference in likelihood between a full and a reduced model.
+
+```{r lfc_shrink}
+# NOTE As a note: Use `ashr` for comparisons with many groups to be able to pull out all the contrasts; otherwise `apeglm` is fine. It shrinks less.
+
+# NOTE We recommend LRT for time series
+
+# resultsNames(de) # check the order is right
+names_to_use=lapply(contrasts, function(contrast){coef = paste0(contrast[1], "_", contrast[2], "_vs_", contrast[3])})
+names(contrasts)=names_to_use
+de_list=lapply(contrasts, function(contrast){
+  resLFC = results(de, contrast=contrast)
+  coef = paste0(contrast[1], "_", contrast[2], "_vs_", contrast[3])
+  # resLFCS <- lfcShrink(de, coef=coef, type="apeglm")
+  resLFCS <- lfcShrink(de, contrast=contrast, type="ash")
+  
+  res <- as.data.frame(resLFCS) %>%
+    rownames_to_column('gene_id') %>% 
+    dplyr::rename(lfc = log2FoldChange) %>%
+    mutate(pi = abs(lfc) * -log10(padj)) %>% arrange(-pi)
+  
+  ## Filter out genes that have no expression or were filtered out by DESEQ2
+  res <- res[res$baseMean>0,] %>% drop_na(padj) %>% drop_na(pvalue)
+  
+  res_sig <- res %>% filter(padj < 0.05) %>% arrange(padj) 
+  results=list(lfc=resLFC, lfcs=resLFCS, all=res, sig=res_sig)
+  return(results)
+})
+
+# NOTE if you add manually any other comparison to the list with the following variables,
+# the code below will make the plots for those as wells:
+# de_list=c(de_list, new_comparison=list(lfc=resLFC, lfcs=resLFCS, all=res, sig=res_sig))
+```
+
+## MA plot {.tabset}
+
+This plot can help to:
+
+-   Identify Differential Expression: Genes that show a significant log-fold change (M value away from 0) indicate changes in expression between conditions.
+-   Assess Data Quality: The plot can help in identifying biases or systematic errors in the data. Ideally, most points should scatter around the M=0 line, indicating that there is no significant systematic difference between the conditions.
+-   Visualize data dispersion: The distribution of points along the A-axis gives a sense of the spread of expression levels and any patterns or anomalies in the dataset.
+
+```{r after_lfc_shrink, results='asis', message=F, warning=F}
+for (contrast in names(de_list)){
+  cat("### ", contrast, "\n\n")
+  p1=degMA(as.DEGSet(de_list[[contrast]]$lfc)) + ggtitle('Before LFC Shrinking')
+  print(p1)
+  p2=degMA(as.DEGSet(de_list[[contrast]]$lfcs), limit = 2) + ggtitle('After LFC Shrinking')
+  print(p2)
+  cat("\n\n")
+}
+```
+
+## Volcano plot {.tabset}
+
+This volcano plot shows the genes that are significantly up- and down-regulated as a result of the analysis comparison. The points highlighted in red are genes that have padj \< 0.05 and a log2-fold change \> 1. Points in blue have a padj \< 0.05 and a log2-fold change \< 1 and points in green have a padj \> 0.05 and a log2-fold change \> 2. Grey points are non-significant. The dashed lines correspond to the cutoff values of log2 foldchance and padj that we have chosen.
+
+```{r volcano_plot, fig.height=6, results='asis'}
+# degVolcano(res_mod[,c('lfc', 'padj')], plot_text = show) 
+for (contrast in names(de_list)){
+  cat("### ", contrast, "\n\n")
+  res <- de_list[[contrast]][["all"]]
+  res_mod <- res
+  show <- as.data.frame(res_mod[1:10, c("lfc", "padj", "gene_id")])
+  p1=EnhancedVolcano(res_mod,
+                  lab= res_mod$gene_id, 
+                  pCutoff = 0.05, 
+                  selectLab = c(show$gene_id),
+                  FCcutoff = 0.5,
+                  x = 'lfc',
+                  y = 'padj', 
+                  title=contrast,
+                  subtitle = "", drawConnectors = T,  max.overlaps = Inf) 
+  print(p1)
+  cat("\n\n")
+}
+```
+
+## Heatmap {.tabset}
+
+```{r heapmap, results='asis'}
+### Run pheatmap using the metadata data frame for the annotation
+for (contrast in names(de_list)){
+  cat("### ", contrast, "\n\n")
+  res_sig = de_list[[contrast]][["sig"]]
+  ma=norm_matrix[res_sig$gene_id,]
+
+  p1=pheatmap(ma, 
+           color = inferno(10), 
+           cluster_rows = T, 
+           show_rownames = F,
+           border_color = NA, 
+           fontsize = 10, 
+           scale = "row", 
+           fontsize_row = 10, 
+           height = 20)
+  print(p1)
+  cat("\n\n")
+}
+```
+
+## Differentially Expressed Genes {.tabset}
+
+```{r sig_genes_table, results='asis'}
+dt_list=list()
+for (contrast in names(de_list)){
+  res_sig=de_list[[contrast]][["sig"]]
+  dt_list=c(dt_list, 
+            list(contrast), 
+            list(DT::datatable(res_sig)))
+}
+tagList(dt_list)
+```
+
+## Plot top 16 genes - pseudobulk {.tabset}
+
+```{r top n DEGs pseudobulk, fig.height = 6, fig.width = 8, results='asis'}
+n = 16
+
+for (contrast in names(de_list)){
+  cat("### ", contrast, "\n\n")
+  res_sig = de_list[[contrast]][["sig"]]
+  top_n <- res_sig %>% slice_min(order_by = padj, n = n, with_ties = F) %>% 
+    dplyr::select(gene_id)
+  top_n_exp <- vsd_matrix %>% as.data.frame() %>% 
+    rownames_to_column('gene_id') %>%
+    # dplyr::select(-group, -group_name) %>% 
+    pivot_longer(!gene_id, names_to = 'sample', values_to = 'normalized_counts') %>%
+    right_join(top_n, relationship = "many-to-many") %>%
+    left_join(meta_bulk, by = c("sample"="orig.ident"))
+  
+  p1=ggplot(top_n_exp, aes(x = .data[[column]], y = normalized_counts)) +
+    geom_boxplot(outlier.shape = NA, linewidth=0.5, color="grey") + 
+    geom_point() +
+    facet_wrap(~gene_id, scales = 'free_y') + 
+    ggtitle(str_interp('Expression of Top ${n} DEGs - Pseudobulk')) +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+  print(p1)
+  cat("\n\n")
+}
+```
+
+## Plot top 16 genes - single cell {.tabset}
+
+```{r top n DEGs single cell, fig.height = 6, fig.width = 8, results='asis'}
+
+n = 16
+
+for (contrast in names(de_list)){
+  cat("### ", contrast, "{.tabset} \n\n")
+  res_sig = de_list[[contrast]][["sig"]]
+  top_n <- res_sig %>% slice_min(order_by = padj, n = n, with_ties = F) %>% 
+    dplyr::select(gene_id)
+  
+  seurat_topn <- subset(seurat, features = top_n$gene_id)
+  seurat_topn_meta <- seurat_topn@meta.data %>% as.data.frame() %>%
+    rownames_to_column('barcode')
+  
+  topn_counts_df <- LayerData(object = seurat_topn, assay = "RNA", layer = "data") %>%
+  # topn_counts_df <- seurat_topn@assays$RNA@layers$data %>% 
+    as.data.frame() %>% rownames_to_column('gene_id') %>% 
+    pivot_longer(!gene_id, names_to = 'barcode', values_to = 'lognorm_counts') %>%
+      left_join(seurat_topn_meta)
+
+  for (gene in top_n$gene_id){
+    
+    cat("#### ", gene, "\n\n")
+    
+    topn_counts_df_gene <- topn_counts_df %>% filter(gene_id == gene)
+    
+    p2 <- ggplot(topn_counts_df_gene, 
+                 aes(x = sample, y = lognorm_counts, fill = .data[[column]])) +
+      scale_fill_viridis_d(option = "D")+
+      geom_violin(alpha=0.5, 
+                  position = position_dodge(width = .75), linewidth = 1, color = NA) +
+      geom_boxplot(notch = F,  outlier.size = -1, color="black",
+                   lwd=1, alpha = 0.7,show.legend = F,width=0.1)+
+      ggbeeswarm::geom_quasirandom(shape = 21,size=2, dodge.width = .75,
+                                   color="black",
+                                   alpha=.8,show.legend = F) 
+    
+    print(p2)
+    
+    cat("\n\n")
+  }
+  
+  cat("\n\n")
+}
+
+```
+
+# Methods
+
+Seurat ([package](https://satijalab.org/seurat/), [paper](https://www.nature.com/articles/s41587-023-01767-y)) is used to aggregate the single cell expression data into pseudobulk samples, and DESeq2 ([package](https://bioconductor.org/packages/release/bioc/vignettes/DESeq2/inst/doc/DESeq2.html), [paper](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-014-0550-8)) is used to perform statistical analysis.
+
+# R session
+
+List and version of tools used for the QC report generation.
+
+```{r}
+sessionInfo()
+```

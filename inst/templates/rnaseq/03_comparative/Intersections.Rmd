@@ -1,0 +1,259 @@
+---
+title: "Comparing DE Results - Multiple Contrasts"
+author: "Harvard Chan Bioinformatics Core"
+date: "`r Sys.Date()`"
+output:
+   html_document:
+      code_folding: hide
+      df_print: paged
+      highlights: pygments
+      number_sections: true
+      self_contained: true
+      theme: default
+      toc: true
+      toc_float:
+         collapsed: true
+         smooth_scroll: true
+params:
+  project_file: ../information.R
+---
+
+```{r, message=FALSE, warning=FALSE}
+# This set up the working directory to this file so all files can be found
+library(rstudioapi)
+library(tidyverse)
+setwd(fs::path_dir(getSourceEditorContext()$path))
+# NOTE: This code will check version, this is our recommendation, it may work
+#.      other versions
+stopifnot(R.version$major>= 4) # requires R4
+if (compareVersion(R.version$minor,"3.1")<0) warning("We recommend >= R4.3.1") 
+stopifnot(compareVersion(as.character(BiocManager::version()), "3.18")>=0)
+```
+
+This code is in this ![](https://img.shields.io/badge/status-alpha-yellow) revision.
+
+```{r load_libraries, cache = FALSE, message = FALSE, warning=FALSE}
+library(rtracklayer)
+library(tidyverse)
+library(stringr)
+library(ggpubr)
+library(knitr)
+library(bcbioR)
+library(ggprism)
+library(viridis)
+library(pheatmap)
+library(janitor)
+library(ggvenn)
+library(ggplot2)
+library(UpSetR)
+library(ggprism)
+#library(org.Ce.eg.db)
+library(org.Hs.eg.db)
+#library(org.Mm.eg.db)
+
+colors=cb_friendly_cols(1:15)
+ggplot2::theme_set(theme_prism(base_size = 14))
+opts_chunk[["set"]](
+    cache = F,
+    cache.lazy = FALSE,
+    dev = c("png", "pdf"),
+    error = TRUE,
+    highlight = TRUE,
+    message = FALSE,
+    prompt = FALSE,
+    tidy = FALSE,
+    warning = FALSE,
+    echo = T, 
+    fig.height = 4)
+
+# set seed for reproducibility
+set.seed(1234567890L)
+```
+
+
+```{r load_params, cache = FALSE, message = FALSE, warning=FALSE}
+## Adjusted P-value used for significance
+padj_co <- 0.05
+## Log2FC used for significance. If no cutoff used put 0
+LFC <- 0.5
+## Normalized counts for ALL samples
+# norm <- "/Users/emb016/Documents/comparisons_templates/norm_counts.csv"
+# Load the count data, for this example it is the last columns of the DE table
+norm_counts <- read.csv("https://raw.githubusercontent.com/bcbio/bcbioR-test-data/main/rnaseq/cross-comparison/norm_counts.csv.gz",
+         row.names = 1)
+
+# Load the meta data, here we are making one for the exmaple
+metadata <- read_csv("https://raw.githubusercontent.com/bcbio/bcbioR-test-data/main/rnaseq/cross-comparison/meta.csv.gz") %>% as.data.frame()
+
+## Full results file (all genes) for contrast 1
+files=c("https://raw.githubusercontent.com/bcbio/bcbioR-test-data/main/rnaseq/cross-comparison/all_results_DMSO_vs_Group1.csv.gz",
+      "https://raw.githubusercontent.com/bcbio/bcbioR-test-data/main/rnaseq/cross-comparison/all_results_DMSO_vs_Group2.csv.gz",
+      "https://raw.githubusercontent.com/bcbio/bcbioR-test-data/main/rnaseq/cross-comparison/all_results_DMSO_vs_Group3.csv.gz")
+
+```
+
+# Load Data
+
+We load our dataset
+
+```{r load_data}
+
+## Name of contrast. This will be displayed on the figures.
+# you can manually indicate a list of names as comp_names=c("name1","name2"...)
+comp_names = basename(files) %>%
+  str_remove_all("all_results_|.csv|.gz") %>%
+  str_replace_all("_", " ")
+names(files)=comp_names
+N=length(files)
+stopifnot(length(files)==length(comp_names))
+
+## Make sure you have set up N above
+all_genes=lapply(names(files), function(name){
+    data <- read_csv(files[name]) %>%
+        dplyr::filter(padj <= 1)
+})
+sign_genes=lapply(names(files), function(name){
+    data <- read_csv(files[name]) %>%
+        dplyr::filter(padj <= 1)
+    data %>%
+        dplyr::filter(padj < padj_co, abs(lfc) > LFC)
+})
+```
+
+
+# Make list of comparisons
+
+```{r, fig.height=8, fig.width=8, warning=FALSE, error=FALSE, message=FALSE}
+de=lapply(sign_genes, function(x){
+  x$gene_id
+})
+names(de) <- comp_names
+```
+
+## Make an upset plot
+
+Because we have done so many tests venn diagrams no longer work for our data. Instead we will use upset plots. *These plots are relatively intuitive for 2 or 3 categories, but can tend to get more complex for >3 categories. In all cases, you will find the categories being compared and their size listed below the bar plots on the left. As you look to the right (directly below each bar) there are dots with connecting lines that denote which categories the overlap is between, or if there is no overlap (just a dot). The numbers at the top of the bars denote the size of the overlap.*
+
+```{r, fig.height=8, fig.width=12}
+upset(fromList(de), order.by = "freq", nsets=N)
+```
+
+## Pull intersect(s) of interest
+
+After identifying intersect(s) of interest we can determine which genes are found in which intersections
+
+```{r, warning=FALSE, error=FALSE, message=FALSE}
+## Grab intersection
+gene_names <- data.frame(gene=unique(unlist(de)))
+
+df1 <- lapply(de,function(x){
+  data.frame(gene = x)
+}) %>% 
+  bind_rows(.id = "path")
+
+df_int <- lapply(gene_names$gene,function(x){
+  # pull the name of the intersections
+  intersection <- df1 %>% 
+    dplyr::filter(gene==x) %>% 
+    arrange(path) %>% 
+    pull("path") %>% 
+    paste0(collapse = "|")
+  # build the dataframe
+  data.frame(gene = x,int = intersection)
+}) %>%  bind_rows()
+```
+
+```{r, eval=F}
+## Run this code to find the name of your intersect of interest. You will use this in the next code chunk
+table(df_int$int)
+```
+
+```{r, warning=FALSE, error=FALSE, message=FALSE}
+## NOTE: subset interaction of interest replace the intersect name with the name of the intersect from above. You can copy and paste the below commands to grab multiple intersects.
+
+Intersect1 <- subset(df_int, df_int$int=="DMSO vs Group2|DMSO vs Group3")
+```
+
+## Get annotation data
+
+```{r, warning=FALSE, error=FALSE, message=FALSE}
+# NOTE: edit this to be the correct organism. One set of annotations per intersect.
+# rdata = AnnotationDbi::select(org.Hs.eg.db, Intersect1$gene, 'SYMBOL', 'ENSEMBL') %>%
+#   dplyr::select(gene_id = ENSEMBL, gene_name = SYMBOL) %>%  distinct(gene_id, .keep_all = T)
+
+# NOTE: following code is only for test data, use the above with real data
+rdata=data.frame(gene_id=row.names(norm_counts), gene_name=row.names(norm_counts))
+```
+
+## Heatmap of intersect
+
+We generate a heatmap with all samples to see the patterns contained in this intersect. 
+
+```{r, fig.height=6, warning=FALSE, error=FALSE, message=FALSE}
+## NOTE: Assign factors of interest. These need to correspond to columns in your metadata.
+factor1 <- "Treatment"
+factor2 <- "Cell_line"
+
+# Extract significant genes
+stopifnot(all(Intersect1$gene %in% row.names(norm_counts)))
+sigGenes <- Intersect1$gene
+  
+### Extract normalized expression for significant genes 
+norm_sig <- norm_counts[sigGenes,] 
+meta <- data.frame(metadata[,print(factor1)],metadata[,print(factor1)])
+colnames(meta) <- c(print(factor1),print(factor2))
+rownames(meta) <- colnames(norm_sig)
+### Set a color palette
+heat_colors <- lapply(colnames(norm_sig), function(c){
+  l.col=colors[1:length(unique(norm_sig[[c]]))]
+  names(l.col)=unique(norm_sig[[c]])
+  l.col
+})
+
+### Run pheatmap using the metadata data frame for the annotation (11 x 5)
+pheatmap(norm_sig, 
+    color =  inferno(10), 
+    cluster_rows = T, 
+    show_rownames = F,
+    annotation = meta, 
+    annotation_colors = heat_colors,
+    border_color = NA, 
+    fontsize = 10, 
+    scale = "row", 
+    fontsize_row = 10, 
+    height = 20)
+```
+
+## Graph genes in intersect
+
+```{r, warning=FALSE, error=FALSE, message=FALSE}
+Intersect1_annot <- Intersect1 %>% left_join(rdata, by=c("gene"="gene_id"))
+# REMOVE to plot all
+Intersect1_annot <- Intersect1_annot[1:10,]
+
+graphs <- length(Intersect1_annot$gene)
+to_test <- t(norm_counts)
+rna = Intersect1_annot$gene
+names = Intersect1_annot$gene_name
+
+to_graph = data.frame(to_test[,rna])
+to_graph = to_graph[Intersect1_annot$gene]
+to_graph$Factor1 <- metadata[,factor1]
+to_graph$Factor2 <- metadata[,factor2]
+
+#out <- vector("list", length = graphs)
+for (i in seq(1,graphs)) {
+  to_graph$temp=to_graph[[i]]
+  print(ggplot(to_graph,aes(x=Factor1,y=temp,color=Factor2)) +
+    geom_boxplot() + geom_point(alpha=0.5, position = position_dodge(width = .75)) +
+      ylab(paste0(names[[i]]))  + xlab(factor1) +  scale_color_discrete(name = "Covariate"))
+}
+```
+
+# R session
+
+List and version of tools used for the QC report generation.
+
+```{r}
+sessionInfo()
+```

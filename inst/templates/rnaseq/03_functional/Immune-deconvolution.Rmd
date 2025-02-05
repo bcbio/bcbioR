@@ -1,0 +1,607 @@
+---
+title: "Immune Deconvolution"
+author: "Harvard Chan Bioinformatics Core"
+date: "`r Sys.Date()`"
+output:
+   html_document:
+      code_folding: hide
+      df_print: paged
+      highlights: pygments
+      number_sections: true
+      self_contained: true
+      theme: default
+      toc: true
+      toc_float:
+         collapsed: true
+         smooth_scroll: true
+params:
+  # information about project: project name, PI, analyst, experiment, aim
+  project_file: ../information.R
+  # paths to raw counts and TPM gene expression matrices and metadata table
+  params_file: params_immune_deconv.R
+  # metadata to separate by on plot
+  factor_of_interest_1: tissue
+  factor_of_interest_1_levels: c("Duo", "Ile")
+  factor_of_interest_2: timepoint
+  factor_of_interest_2_levels: c("0d", "2d", "4d", "6d", "8d", "2w", "3w", "4w")
+  # which organism are your expression matrices from?
+  # can be human or mouse
+  organism: mouse
+  # for TIMER method: which cancer type?
+  # run `immunedeconv::timer_available_cancers` to see options
+  # or see publication https://doi.org/10.1186/s13059-016-1028-7 for definitions
+  cancer_type: coad
+---
+
+Template developed with materials from the [Immune deconvolution vignette from immunedeconv](https://omnideconv.org/immunedeconv/articles/immunedeconv.html) and the [Immune infiltration tutorial from DFCI](https://liulab-dfci.github.io/RIMA/Infiltration.html).
+
+```{r check_wd_and_version}
+# this sets up the working directory to this file so all files can be found
+library(rstudioapi)
+setwd(fs::path_dir(getSourceEditorContext()$path))
+# NOTE: this code will check version, this is our recommendation, it may work with other versions
+stopifnot(R.version$major >= 4) # requires R4
+if (compareVersion(R.version$minor, "3.1") < 0) warning("We recommend >= R4.3.1") 
+stopifnot(compareVersion(as.character(BiocManager::version()), "3.18") >= 0)
+```
+
+This code is in this ![](https://img.shields.io/badge/status-draft-grey) revision.
+
+```{r load_params, cache = FALSE}
+# 1. set up input files in this R file (line 20: params_immune_deconv.R)
+source(params$params_file)
+# 2. set up project file (already done from QC probably)
+source(params$project_file)
+# IMPORTANT: set these values if you are not using the parameters in the header (lines 20-35)
+# input_counts <- "../counts/tximport-counts.csv"
+# input_tpm    <- "../counts/tximport-tpm.csv"
+# metadata <- "metadata.csv"
+factor_of_interest_1        <- params$factor_of_interest_1
+factor_of_interest_1_levels <- params$factor_of_interest_1_levels
+factor_of_interest_2        <- params$factor_of_interest_2
+factor_of_interest_2_levels <- params$factor_of_interest_2_levels
+organism    <- params$organism
+cancer_type <- params$cancer_type
+
+# determine which gene conversion chunks to run based on starting organism
+run_mouse <- if(organism == "mouse") TRUE else FALSE
+run_human <- if(organism == "human") TRUE else FALSE
+```
+
+```{r load_libraries, cache = FALSE, message = FALSE, warning=FALSE}
+library(tidyverse)
+# BiocManager::install('grimbough/biomaRt')
+library(biomaRt)
+# remotes::install_github("omnideconv/immunedeconv")
+library(immunedeconv)
+
+colors <- cb_friendly_cols(1:15)
+ggplot2::theme_set(theme_prism(base_size = 14))
+opts_chunk[["set"]](
+    cache = FALSE,
+    cache.lazy = FALSE,
+    dev = c("png", "pdf"),
+    error = TRUE,
+    highlight = TRUE,
+    message = FALSE,
+    prompt = FALSE,
+    tidy = FALSE,
+    warning = FALSE,
+    echo = TRUE, 
+    fig.height = 4)
+
+# set seed for reproducibility
+set.seed(1234567890L)
+```
+
+```{r sanitize_datatable}
+sanitize_datatable = function(df, ...) {
+ # remove dashes which cause wrapping
+  DT::datatable(df, ...,
+                rownames = gsub("-", "_", rownames(df)),
+                colnames = gsub("-", "_", colnames(df)))
+}
+```
+
+# Overview
+
+-   Project: `r project`
+-   PI: `r PI`
+-   Analyst: `r analyst`
+-   Experiment: `r experiment`
+-   Aim: `r aim`
+
+```{r load_metadata}
+# load metadata
+metadata <- read.csv(metadata)
+
+# make metadata columns into factors (so samples plot in the right order)
+metadata[, factor_of_interest_1] <- factor(metadata[, factor_of_interest_1],
+                                           levels = factor_of_interest_1_levels)
+metadata[, factor_of_interest_2] <- factor(metadata[, factor_of_interest_2],
+                                           levels = factor_of_interest_2_levels)
+```
+
+```{r load_gene_expression}
+# load gene expression matrix as data frame
+df_counts <- read.table(input_counts, sep = ",", row.names = 1, header = TRUE, check.names = FALSE)
+df_tpm    <- read.table(input_tpm,    sep = ",", row.names = 1, header = TRUE, check.names = FALSE)
+```
+
+```{r convert_gene_names_mouse, eval = run_mouse}
+# immunedeconv methods expect an input of a gene expression matrix as a data.frame or matrix where:
+#   rownames = MGI (for mouse methods) or HGNC (for human methods) symbols
+#   colnames = sample names
+# we currently have mouse Ensembl IDs as rownames
+# so will need to convert to MGI
+
+# get mouse reference
+ensembl_mouse <- useEnsembl(biomart = "genes", dataset = "mmusculus_gene_ensembl")
+genenames_mouse <- getBM(values     = rownames(df_counts), # vector of gene IDs (same for "counts" and "tpm")
+                         filters    = "ensembl_gene_id",   # type of gene ID we are using
+                         attributes = c("ensembl_gene_id", # attributes we want to retrieve
+                                        "mgi_symbol"),
+                         mart       = ensembl_mouse)       # mart we are using (defined above)
+
+# convert from mouse Ensembl ID (ENMUSG) to MGI ID (gene symbol)
+convert_gene_names_mouse_ensembl_to_MGI <- function(df) {
+  # convert gene names to MGI
+  df_clean <- df %>% rownames_to_column(var = "ensembl_gene_id") %>%
+    # remove existing rownames
+    as_tibble() %>%
+    # add MGI gene symbols
+    left_join(genenames_mouse, by = "ensembl_gene_id") %>%
+    # remove Ensembl gene IDs
+    dplyr::select(-ensembl_gene_id) %>%
+    # keep only distinct rows
+    distinct() %>%
+    # drop any rows where we now don't have gene symbols
+    subset(!is.na(mgi_symbol) & mgi_symbol != "")
+  
+  # combine any rows where multiple mouse Ensembl IDs map to the same gene symbol
+  df_clean <- df_clean %>% group_by(mgi_symbol) %>%
+    summarize(across(starts_with(c("Duo", "Ile")), sum))
+  
+  # turn MGI symbols back into rownames
+  df_clean <- df_clean %>% column_to_rownames("mgi_symbol")
+  
+  return(df_clean)
+}
+
+# convert from mouse Ensembl ID to mouse MGI symbol
+df_counts_mouse <- convert_gene_names_mouse_ensembl_to_MGI(df_counts)
+df_tpm_mouse    <- convert_gene_names_mouse_ensembl_to_MGI(df_tpm)
+
+# also convert from mouse MGI symbol to human HGNC symbol so we can run additional methods
+df_counts_human <- convert_human_mouse_genes(df_counts_mouse, convert_to = "human")
+df_tpm_human    <- convert_human_mouse_genes(df_tpm_mouse,    convert_to = "human")
+```
+
+```{r convert_gene_names_human, eval = run_human}
+# immunedeconv methods expect an input of a gene expression matrix as a data.frame or matrix where:
+#   rownames = MGI (for mouse methods) or HGNC (for human methods) symbols
+#   colnames = sample names
+# we currently have human Ensembl IDs as rownames
+# so will need to convert to HGNC
+
+# get human reference
+ensembl_human <- useEnsembl(biomart = "genes", dataset = "hsapiens_gene_ensembl")
+genenames_human <- getBM(values     = rownames(df_counts), # vector of gene IDs (same for "counts" and "tpm")
+                         filters    = "ensembl_gene_id",   # type of gene ID we are using
+                         attributes = c("ensembl_gene_id", # attributes we want to retrieve
+                                        "hgnc_symbol"),
+                         mart       = ensembl_human)       # mart we are using (defined above)
+
+# convert from human Ensembl ID (ENSG) to HGNC ID (gene symbol)
+convert_gene_names_human_ensembl_to_HGNC <- function(df) {
+  # convert gene names to HGNC
+  df_clean <- df %>% rownames_to_column(var = "ensembl_gene_id") %>%
+    # remove existing rownames
+    as_tibble() %>%
+    # add HGNC gene symbols
+    left_join(genenames_human, by = "ensembl_gene_id") %>%
+    # remove Ensembl gene IDs
+    dplyr::select(-ensembl_gene_id) %>%
+    # keep only distinct rows
+    distinct() %>%
+    # drop any rows where we now don't have gene symbols
+    subset(!is.na(hgnc_symbol) & hgnc_symbol != "")
+  
+  # combine any rows where multiple human Ensembl IDs map to the same gene symbol
+  df_clean <- df_clean %>% group_by(hgnc_symbol) %>%
+    summarize(across(starts_with(c("Duo", "Ile")), sum))
+  
+  # turn HGNC symbols back into rownames
+  df_clean <- df_clean %>% column_to_rownames("hgnc_symbol")
+  
+  return(df_clean)
+}
+
+# convert from human Ensembl ID to human HGNC symbol
+df_counts_human <- convert_gene_names_human_ensembl_to_HGNC(df_counts)
+df_tpm_human    <- convert_gene_names_human_ensembl_to_HGNC(df_tpm)
+
+# also convert from human HGNC symbol to mouse MGI symbol so we can run additional methods
+df_counts_mouse <- convert_human_mouse_genes(df_counts_human, convert_to = "mouse")
+df_tpm_mouse    <- convert_human_mouse_genes(df_tpm_human,    convert_to = "mouse")
+```
+
+```{r function_graph_results}
+graph_deconvolution_results <- function(res, method){
+  # reshape data to one row per sample per cell type
+  res_long <- res %>%
+    gather(sample, score, -cell_type) %>%
+    # add metadata columns
+    left_join(metadata, by = "sample")
+  
+  # graph
+  print(
+    res_long %>%
+      ggplot(aes(x = .data[[factor_of_interest_2]], y = score,
+                 color = cell_type, shape = .data[[factor_of_interest_1]])) +
+      geom_point(size = 4) +
+      ggtitle(paste0(method, ": Immune cell deconvolution")) +
+      facet_wrap(~cell_type, scales = "free", ncol = 3) +
+      scale_color_discrete(guide = "none") +
+      theme_bw() +
+      theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+  )
+  
+  # also graph subsets by factor_of_interest_1 (e.g. tissue type)
+  for(i in 1:length(factor_of_interest_1_levels)) {
+    print(
+      res_long %>% subset(.data[[factor_of_interest_1]] == factor_of_interest_1_levels[i]) %>%
+        ggplot(aes(x = .data[[factor_of_interest_2]], y = score, color = cell_type)) +
+        geom_point(size = 4) +
+        ggtitle(paste0(method, ": Immune cell deconvolution in ", factor_of_interest_1_levels[i])) +
+        facet_wrap(~cell_type, scales = "free", ncol = 3) +
+        scale_color_discrete(guide = "none") +
+        theme_bw() +
+        theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+    )
+  }
+}
+```
+
+# Immune deconvolution using mouse genes
+
+When using mouse MGI gene symbols, we have a total of `r nrow(df_counts_mouse)` genes available to test. `r if(organism == "human") cat("The number here is much smaller because not all human genes can be mapped to mouse genes.")`
+
+The following methods are currently available for mouse data: `r paste(names(deconvolution_methods_mouse), collapse = ", ")`.
+
+## mMCPcounter
+
+mMCPcounter is a mouse data-based method (related to the human method MCPcounter) using **`r nrow(df_counts_mouse)` genes**.
+
+mMCPcounter provides cell-type scores for each sample in arbitrary units that are **comparable between samples** but not between cell-types.
+
+```{r mmcp_counter, fig.width = 10, fig.height = 10}
+# TPM normalized is preferred input
+res_mmcp <- immunedeconv::deconvolute_mouse(df_tpm_mouse, "mmcp_counter")
+
+res_mmcp %>% sanitize_datatable()
+
+graph_deconvolution_results(res_mmcp, "mMCPcounter")
+
+# save results
+write.csv(res_mmcp, file = "results/mouse_mMCPcounter.csv", quote = FALSE)
+```
+
+## SeqImmuCC
+
+SeqImmuCC is a mouse data-based method using **`r nrow(df_counts_mouse)` genes**.
+
+SeqImmuCC provides cell-type scores for each sample in units that are **comparable between both samples and cell-types**.
+
+```{r seqimmucc, fig.width = 10, fig.height = 8}
+# raw counts is preferred input
+# requires additional parameter "algorithm": 'SVR' for CIBERSORT or 'LLSR' for least squares regression
+res_seqimmucc <- immunedeconv::deconvolute_mouse(df_counts_mouse, "seqimmucc", algorithm = "LLSR")
+
+res_seqimmucc %>% sanitize_datatable()
+
+graph_deconvolution_results(res_seqimmucc, "SeqImmuCC")
+
+# save results
+write.csv(res_seqimmucc, file = "results/mouse_SeqImmuCC.csv", quote = FALSE)
+```
+
+## DCQ
+
+DCQ is a mouse data-based method using **`r nrow(df_counts_mouse)` genes**.
+
+DCQ provides cell-type scores for each sample in arbitrary units that are **comparable between cell-types** but not between samples.
+
+```{r dcq, fig.width = 10, fig.height = 12}
+# TPM normalized is preferred input
+res_dcq <- immunedeconv::deconvolute_mouse(df_tpm_mouse, "dcq")
+
+res_dcq %>% sanitize_datatable()
+
+graph_deconvolution_results(res_dcq, "DCQ")
+
+# save results
+write.csv(res_dcq, file = "results/mouse_DCQ.csv", quote = FALSE)
+```
+
+## BASE
+
+BASE is a mouse data-based method using **`r nrow(df_counts_mouse)` genes**.
+
+BASE provides cell-type scores for each sample in arbitrary units that are **comparable between samples** but not between cell-types.
+
+```{r base, fig.width = 10, fig.height = 10}
+# TPM normalized is preferred input
+res_base <- immunedeconv::deconvolute_mouse(df_tpm_mouse, "base")
+
+res_base %>% sanitize_datatable()
+
+graph_deconvolution_results(res_base, "BASE")
+
+# save results
+write.csv(res_base, file = "results/mouse_BASE.csv", quote = FALSE)
+```
+
+# Immune deconvolution using human genes
+
+When using human HGNC gene symbols, we have a total of `r nrow(df_counts_human)` genes available to test. `r if(organism == "mouse") cat("The number here is much smaller because not all mouse genes can be mapped to human genes.")`
+
+The following methods are currently available for human data: `r paste(names(deconvolution_methods), collapse = ", ")`. `r if(organism == "mouse") cat("The reason to convert to human genes is that more methods are available for immune deconvolution.")`
+
+## CIBERSORT
+
+CIBERSORT is a human data-based method using **`r nrow(df_counts_human)` genes**.
+
+Unlike all the other modules, which were run in R in this report, CIBERSORT was run using [the online portal](https://cibersortx.stanford.edu/runcibersortx.php) due to its unique licensing agreement. The following parameters were used:
+
+- Job type: Impute Cell Fractions
+- Signature matrix file: LM22.update-gene-symbols.txt (22 immune cell types, built-in reference)
+- Mixture file: tpm_human.tsv
+- Batch correction: disabled
+- Disable quantile normalization: true
+  - *Disabling is recommended for RNA-Seq data*
+- Run mode (relative or absolute): absolute
+  - *Description: "Absolute mode scales relative cellular fractions into a score that reflects the absolute proportion of each cell type in a mixture. Although not currently expressed as a fraction, the absolute score can be directly compared across cell types (i.e., relative differences between cell types are maintained) and the default output (relative fractions) can be easily re-derived by normalizing the absolute scores to 1."*
+- Permutations: 100
+
+CIBERSORT-abs provides cell-type scores for each sample in units that are **comparable between both samples and cell-types**.
+
+```{r cibersort, fig.width = 10, fig.height = 16}
+# load results from web portal
+res_cibersort <- read.csv("results/human_CIBERSORT_web.csv", header = TRUE)
+
+# these results have columns = celltypes and rows = samples, which is reversed
+res_cibersort <- res_cibersort %>% column_to_rownames("Mixture") %>%
+  t() %>% as.data.frame() %>% rownames_to_column(var = "cell_type")
+
+# remove extra data that is not scores per sample / cell type
+res_cibersort <- subset(res_cibersort, !(cell_type %in% c("P.value",
+                                                          "Correlation",
+                                                          "RMSE",
+                                                          "Absolute.score..sig.score.")))
+
+# clean up cell type names
+res_cibersort$cell_type <- gsub("\\.", " ", res_cibersort$cell_type) # replace . with space
+res_cibersort$cell_type <- gsub("  ", " ", res_cibersort$cell_type)  # replace two spaces with single space
+
+res_cibersort %>% sanitize_datatable()
+
+graph_deconvolution_results(res_cibersort, "CIBERSORT-abs")
+```
+
+## TIMER (Tumor IMmune Estimation Resource)
+
+TIMER is a human data-based method using **`r nrow(df_counts_human)` genes**.
+
+TIMER provides cell-type scores for each sample in arbitrary units that are **comparable between samples** but not between cell-types.
+
+```{r timer, fig.width = 10, fig.height = 4}
+# TPM normalized is preferred input
+# requires additional parameter "indications": cancer type
+res_timer <- immunedeconv::deconvolute(df_tpm_human, "timer",
+                                       indications = rep(tolower(cancer_type), ncol(df_tpm_human)))
+
+res_timer %>% sanitize_datatable()
+
+graph_deconvolution_results(res_timer, "TIMER")
+
+# save results
+write.csv(res_timer, file = "results/human_TIMER.csv", quote = FALSE)
+```
+
+## quanTIseq
+
+quanTIseq is a human data-based method using **`r nrow(df_counts_human)` genes**.
+
+quanTIseq provides cell-type scores for each sample in absolute units that are **comparable between both samples and cell-types** and **can be interpreted as a cell fraction**.
+
+```{r quantiseq, fig.width = 10, fig.height = 8}
+# TPM normalized is preferred input
+res_quant <- immunedeconv::deconvolute(df_tpm_human, "quantiseq",
+                                       tumor = FALSE, arrays = FALSE)
+
+res_quant %>% sanitize_datatable()
+
+graph_deconvolution_results(res_quant, "quanTIseq")
+
+# save results
+write.csv(res_quant, file = "results/human_quanTIseq.csv", quote = FALSE)
+```
+
+## EPIC
+
+EPIC is a human data-based method using **`r nrow(df_counts_human)` genes**.
+
+EPIC provides cell-type scores for each sample in absolute units that are **comparable between both samples and cell-types** and **can be interpreted as a cell fraction**.
+
+```{r epic, fig.width = 10, fig.height = 6}
+# TPM normalized is preferred input
+# requires additional parameter "tumor": tumor data T/F
+res_epic <- immunedeconv::deconvolute(df_tpm_human, "epic",
+                                      tumor = FALSE)
+
+res_epic %>% sanitize_datatable()
+
+graph_deconvolution_results(res_epic, "EPIC")
+
+# save results
+write.csv(res_epic, file = "results/human_EPIC.csv", quote = FALSE)
+```
+
+## MCPcounter
+
+MCPcounter is a human data-based method (related to the mouse method mMCPcounter) using **`r nrow(df_counts_human)` genes**.
+
+MCPcounter provides cell-type scores for each sample in arbitrary units that are **comparable between samples** but not between cell-types.
+
+```{r mcp_counter, fig.width = 10, fig.height = 8}
+# TPM normalized is preferred input
+res_mcp <- immunedeconv::deconvolute(df_tpm_human, "mcp_counter")
+
+res_mcp %>% sanitize_datatable()
+
+graph_deconvolution_results(res_mcp, "MCPcounter")
+
+# save results
+write.csv(res_mcp, file = "results/human_MCPcounter.csv", quote = FALSE)
+```
+
+# Analysis using a custom gene set
+
+Since MCPcounter (human) and mMCPcounter (mouse) are marker-based, we can provide a custom set of genes to perform deconvolution of cell types not included by the above algorithms.
+
+As a reminder, these methods provide cell-type scores for each sample in arbitrary units that are **comparable between samples** but not between cell-types.
+
+## Human data
+
+For **human** data, the input gene list requires at least two columns (see [this example](https://raw.githubusercontent.com/ebecht/MCPcounter/master/Signatures/genes.txt) from the MCPcounter GitHub):
+
+1. **Cell population**, which defines which cell type each gene is a marker for,
+
+and one or more of
+
+2a. **HUGO symbols**, the HGNC gene identifier (which should already match the rownames of `df_tpm_human`)
+2b. **ENTREZID**
+2c. **ENSEMBL ID**
+
+```{r custom human}
+# what does their built-in signature look like?
+# https://raw.githubusercontent.com/ebecht/MCPcounter/master/Signatures/genes.txt
+
+# load markers
+# markers <- read.table("path/to/markers.txt", sep = "\t")
+# we are using here as an example marker genes for innate lymphoid cells (ILCs)
+markers <- data.frame(`Cell population` = rep(c("ILC1", "ILC2", "ILC3"), times = c(5, 7, 6)),
+                      `HUGO symbols` = c("IL12", "IL15", "IL18", "IFNG", "TNF",                # ILC1
+                                         "IL25", "IL33", "TSLP", "IL4", "IL5", "IL13", "AREG", # ILC2
+                                         "IL1B", "IL23", "IL17", "IL22", "LTA", "CSF2"))       # ILC3
+
+# check which marker genes are found in the human set
+# df_tpm_human[which(rownames(df_tpm_human) %in% markers$`HUGO symbols`),]
+
+# TPM normalized is preferred input
+res_mcp_custom <- immunedeconv::deconvolute_mcp_counter(df_tpm_human,
+                                                        # add our custom gene set
+                                                        genes = markers,
+                                                        # specify which gene identifiers we are using
+                                                        # options: "HUGO_symbols", "ENTREZ_ID", "ENSEMBL_ID"
+                                                        feature_types = "HUGO_symbols") %>%
+  as.data.frame() %>% rownames_to_column("cell_type")
+
+res_mcp_custom %>% DT::datatable()
+
+graph_deconvolution_results(res_mcp_custom, "MCPcounter for custom gene set")
+
+# save results
+write.csv(res_mcp_custom, file = "results/human_MCPcounter_custom.csv", quote = FALSE)
+```
+
+## Mouse data
+
+For **mouse** data, the input gene list requires at least two columns:
+
+1. **Denomination**, which defines which cell type each gene is a marker for,
+
+and one or more of
+
+2a. **Gene.Symbol**, the MGI gene identifier (which should already match the rownames of `df_tpm_mouse`)
+2b. **ENSEMBL.ID**
+
+```{r custom mouse}
+# what does their built-in signature look like?
+# data("mMCPcounter_signatures_GCRm39", envir = sys.frame(sys.nframe()), package = "mMCPcounter")
+
+# load markers
+# markers <- read.table("path/to/markers.txt", sep = "\t")
+# we are using here as an example marker genes for innate lymphoid cells (ILCs)
+markers <- data.frame(Denomination = rep(c("ILC1", "ILC2", "ILC3"),
+                                         times = c(6, 7, 7)),
+                      Gene.Symbol = c("Il12a", "Il12b", "Il15", "Il18", "Ifng", "Tnf",           # ILC1
+                                      "Il25", "Il33", "Tslp", "Il4", "Il5", "Il13", "Areg",      # ILC2
+                                      "Il1b", "Il23a", "Il17a", "Il22", "Il22b", "Lta", "Csf2")) # ILC3
+
+# check which marker genes are found in the mouse set
+# df_tpm_mouse[which(rownames(df_tpm_mouse) %in% markers$Gene.Symbol),]
+
+# specify which gene identifiers we are using
+# options: "Gene.Symbol", "ENSEMBL.ID"
+features <- "Gene.Symbol"
+
+# run mMCPcounter by hand
+# code adapted from: https://github.com/cit-bioinfo/mMCP-counter/blob/master/R/mMCP-counter.R
+median.na <- function(x) { return(median(x, na.rm = TRUE)) }
+cit.dfAggregate <- function(data, partition, MARGIN = 1, fAggreg = median.na) {
+  cMARGIN <- setdiff(c(1, 2), MARGIN)
+  n <- length(partition)
+  N <- dim(data)[MARGIN]
+  p <- dim(data)[cMARGIN]
+  if (n != N)
+    stop("ERROR - cit.dfAggregate : size of partition doesn't correspond to data dimension")
+  l <- split(1:N, partition)
+  d <- data
+  if (MARGIN == 2) { d <- t(data) }
+  d <- matrix(sapply(l,
+                     function(i) if(length(i) == 1) { unlist(d[i, ]) } else { apply(d[i, ], 2, fAggreg) }),
+              ncol = p, byrow = TRUE)
+  d <- as.data.frame(d)
+  rownames(d) <- names(l)
+  names(d) <- dimnames(data)[[cMARGIN]]
+  if (MARGIN == 2) { d <- as.data.frame(t(d)) }
+  d
+}
+foundGenes <- intersect(markers[,features], rownames(df_tpm_mouse))
+if(length(foundGenes) == 0){
+  stop("No signature found in input row names. Please ensure the features are accurately set.")
+}
+absentSignatures <- setdiff(unique(markers$Denomination),
+                            unique(markers[markers[,features] %in% rownames(df_tpm_mouse),
+                                           "Denomination"]))
+if(length(absentSignatures) > 0){
+  warning(paste("No genes were found for population(s): ", paste(absentSignatures, collapse = ", "),
+                ". Please ensure the genomeVersion argument is correct.", sep = ""))
+}
+localSig <- markers[markers[, features] %in% foundGenes, ]
+res_mmcp_custom <- df_tpm_mouse[localSig[, features], ]
+res_mmcp_custom <- cit.dfAggregate(res_mmcp_custom,
+                                   localSig$Denomination,
+                                   fAggreg = median.na)
+res_mmcp_custom <- res_mmcp_custom[apply(res_mmcp_custom, 1,
+                                         function(x){ sum(is.na(x)) }) < ncol(res_mmcp_custom),]
+
+res_mmcp_custom <- res_mmcp_custom %>% as.data.frame() %>% rownames_to_column("cell_type")
+
+res_mmcp_custom %>% DT::datatable()
+
+graph_deconvolution_results(res_mmcp_custom, "mMCPcounter for custom gene set")
+
+# save results
+write.csv(res_mmcp_custom, file = "results/mouse_mMCPcounter_custom.csv", quote = FALSE)
+```
+
+# R session
+
+List and version of tools used for the report generation.
+
+```{r}
+sessionInfo()
+```

@@ -1,0 +1,242 @@
+---
+title: "Comparing DE Results - Pairwise"
+author: "Harvard Chan Bioinformatics Core"
+date: "`r Sys.Date()`"
+output:
+   html_document:
+      code_folding: hide
+      df_print: paged
+      highlights: pygments
+      number_sections: true
+      self_contained: true
+      theme: default
+      toc: true
+      toc_float:
+         collapsed: true
+         smooth_scroll: true
+params:
+  project_file: ../information.R
+---
+```{r, message=FALSE, warning=FALSE}
+# This set up the working directory to this file so all files can be found
+library(rstudioapi)
+library(tidyverse)
+setwd(fs::path_dir(getSourceEditorContext()$path))
+# NOTE: This code will check version, this is our recommendation, it may work
+#.      other versions
+stopifnot(R.version$major>= 4) # requires R4
+if (compareVersion(R.version$minor,"3.1")<0) warning("We recommend >= R4.3.1") 
+stopifnot(compareVersion(as.character(BiocManager::version()), "3.18")>=0)
+```
+
+This code is in this ![](https://img.shields.io/badge/status-alpha-yellow) revision.
+
+```{r load_libraries, cache = FALSE, message = FALSE, warning=FALSE}
+library(rtracklayer)
+library(tidyverse)
+library(stringr)
+library(ggpubr)
+library(knitr)
+library(bcbioR)
+library(ggprism)
+library(viridis)
+library(pheatmap)
+library(janitor)
+library(ggvenn)
+library(ggplot2)
+
+colors=cb_friendly_cols(1:15)
+ggplot2::theme_set(theme_prism(base_size = 14))
+opts_chunk[["set"]](
+    cache = F,
+    cache.lazy = FALSE,
+    dev = c("png", "pdf"),
+    error = TRUE,
+    highlight = TRUE,
+    message = FALSE,
+    prompt = FALSE,
+    tidy = FALSE,
+    warning = FALSE,
+    echo = T, 
+    fig.height = 4)
+
+# set seed for reproducibility
+set.seed(1234567890L)
+```
+
+# Compare two differential expression analysis
+
+```{r load_params, cache = FALSE, message = FALSE, warning=FALSE}
+# 1. Set up input files in this R file (params_pairwisecomp.R)
+## Full results file (all genes) for contrastt 1
+comp1_fn <- 'https://raw.githubusercontent.com/bcbio/bcbioR-test-data/main/rnaseq/cross-comparison/all_results_DMSO_vs_Group1.csv.gz'
+## Name of contrast 1. This will be displayed on the figures
+comp1_name <- "DMSO vs. Group1"
+## Full results file (all genes) for contrast 2
+comp2_fn <- 'https://raw.githubusercontent.com/bcbio/bcbioR-test-data/main/rnaseq/cross-comparison/all_results_DMSO_vs_Group2.csv.gz'
+## Name of contrast 2. This will be displayed on the figures
+comp2_name <- "DMSO vs. Group2"
+## Adjusted P-value used for significance
+padj_co <- 0.05
+## Log2FC used for significance. If no cutoff used put 0
+LFC <- 0.5
+
+comp1 <- read_csv(comp1_fn) %>%
+        dplyr::filter(padj <= 1)
+comp2 <- read_csv(comp2_fn) %>%
+        dplyr::filter(padj <= 1)
+```
+
+## Load Data
+
+We load our dataset
+
+```{r load_data}
+# this code will load from bcbio or nf-core folder
+# NOTE make sure to set numerator and denominator
+
+comp1_sig <- comp1  %>%
+        dplyr::filter(padj < padj_co, abs(lfc) > LFC)
+
+comp2_sig <- comp2  %>%
+        dplyr::filter(padj < padj_co, abs(lfc) > LFC)
+```
+
+
+# Comparisons
+
+We start with a venn diagram looking at the overlap between our two contrasts
+
+```{r, fig.height=8, fig.width=8}
+name1 <- rlang::ensym(comp1_name)
+name2 <- rlang::ensym(comp2_name)
+names <- c(name1, name2)
+
+full <- list(comp1_sig$gene_id,comp2_sig$gene_id)
+names(full) <-names
+
+ggvenn(full, show_percentage = F)
+
+```
+
+## Compare effect sizes and direction
+
+We plot Log2FC for our contrasts and color points by whether or not they are significant in our contrasts. The black line is 1:1.
+
+
+```{r fig.height=6, fig.width=8}
+# Edit based on the data you are using
+
+#make sure to only use genes present in both results files
+test_intersect <- intersect(comp1$gene_id, comp2$gene_id)
+comp1_sub <- subset(comp1, comp1$gene_id %in% test_intersect)
+comp2_sub <- subset(comp2, comp2$gene_id %in% test_intersect)
+
+## Check that gene names match
+all(comp1_sub$gene_id== comp2_sub$gene_id)
+
+## Gather necessary data
+lfc <- data.frame(comp1_sub$gene_id, comp1_sub$gene_name, comp1_sub$lfc, comp2_sub$lfc)
+colnames(lfc) <- c("gene_id","gene_name", "comp1", "comp2")
+
+# subset to only include genes in both datasets and color by grouping
+DE_comp1 <- setdiff(comp1_sig$gene_id, comp2_sig$gene_id)
+DE_comp2 <- setdiff(comp2_sig$gene_id, comp1_sig$gene_id)
+DE_both <- intersect(comp2_sig$gene_id, comp1_sig$gene_id)
+not_sig <- comp1_sub$gene_id[!(comp1_sub$gene_id %in% c(DE_comp1,DE_comp2,DE_both))]
+  
+  
+col <- rep(4, nrow(lfc))
+col[lfc$gene_id %in% not_sig] <- 1
+col[lfc$gene_id %in% DE_comp1] <- 2
+col[lfc$gene_id %in% DE_comp2] <- 3
+col[lfc$gene_id %in% DE_both] <- 4
+
+
+lfc$col <- lfc %>% 
+  dplyr::mutate(color = case_when(
+    gene_id %in% DE_both ~ 3,
+    gene_id %in% DE_comp1 ~ 1,
+    gene_id %in% DE_comp2 ~ 2,
+    gene_id %in% not_sig ~ 8
+  )) %>% pull(color)
+lfc$col <- as.factor(lfc$col)
+
+
+ggplot(lfc, aes(x=comp1, y=comp2, color=col)) + geom_point() +
+  labs(color="Group") +
+  scale_color_discrete(name = "Group", labels = c(paste0("Only DE in ",paste0(comp1_name)), paste0("Only DE in ",paste0(comp2_name)),"DE in both comparisons", "Not Significant")) +
+  geom_abline(intercept=0, slope=1) +
+  geom_hline(aes(yintercept=0)) +
+  geom_vline(aes(xintercept=0)) +
+  scale_color_cb_friendly() +
+  xlab(paste0("Log2FC in ",paste0(comp1_name))) +
+  ylab(paste0("Log2FC in ",paste0(comp2_name)))
+
+```
+
+
+## Compare adjusted P-values
+
+We plot adjusted P-values for our contrasts and color points by whether or not they are significant in our contrasts. The black line is 1:1.
+
+
+```{r fig.height=6, fig.width=8}
+# Edit based on the data you are using
+
+#make sure to only use genes present in both results files
+test_intersect <- intersect(comp1$gene_id, comp2$gene_id)
+comp1_sub <- subset(comp1, comp1$gene_id %in% test_intersect)
+comp2_sub <- subset(comp2, comp2$gene_id %in% test_intersect)
+
+## Check that gene names match
+all(comp1_sub$gene_id== comp2_sub$gene_id)
+
+## Gather necessary data
+lfc <- data.frame(comp1_sub$gene_id, comp1_sub$gene_name, comp1_sub$padj, comp2_sub$padj)
+colnames(lfc) <- c("gene_id","gene_name", "comp1", "comp2")
+
+# subset to only include genes in both datasets and color by grouping
+DE_comp1 <- setdiff(comp1_sig$gene_id, comp2_sig$gene_id)
+DE_comp2 <- setdiff(comp2_sig$gene_id, comp1_sig$gene_id)
+DE_both <- intersect(comp2_sig$gene_id, comp1_sig$gene_id)
+not_sig <- comp1_sub$gene_id[!(comp1_sub$gene_id %in% c(DE_comp1,DE_comp2,DE_both))]
+  
+  
+col <- rep(4, nrow(lfc))
+col[lfc$gene_id %in% not_sig] <- 1
+col[lfc$gene_id %in% DE_comp1] <- 2
+col[lfc$gene_id %in% DE_comp2] <- 3
+col[lfc$gene_id %in% DE_both] <- 4
+
+
+lfc$col <- lfc %>% 
+  dplyr::mutate(color = case_when(
+    gene_id %in% DE_both ~ 3,
+    gene_id %in% DE_comp1 ~ 1,
+    gene_id %in% DE_comp2 ~ 2,
+    gene_id %in% not_sig ~ 8
+  )) %>% pull(color)
+lfc$col <- as.factor(lfc$col)
+
+
+ggplot(lfc, aes(x=-log10(comp1), y=-log10(comp2), color=col)) +
+  geom_point() + labs(color="Group") +
+  scale_color_discrete(name = "Group", labels = c(paste0("-Log10 adjusted p-value ",paste0(comp1_name)), paste0("-Log10 adjusted p-value ",paste0(comp2_name)),"DE in both comparisons", "Not Significant")) +
+  geom_abline(intercept=0, slope=1) +
+  geom_hline(aes(yintercept=0)) +
+  geom_vline(aes(xintercept=0)) +
+  scale_color_cb_friendly() +
+  xlab(paste0("Log2FC in ",paste0(comp1_name))) +
+  ylab(paste0("Log2FC in ",paste0(comp2_name)))
+
+```
+
+
+# R session
+
+List and version of tools used for the QC report generation.
+
+```{r}
+sessionInfo()
+```

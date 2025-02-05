@@ -1,0 +1,367 @@
+---
+title: "Quality Control for scATAC-Seq"
+author: "Harvard Chan Bioinformatics Core"
+date: "`r Sys.Date()`"
+output:
+   html_document:
+      code_folding: hide
+      df_print: paged
+      highlights: pygments
+      number_sections: true
+      self_contained: true
+      theme: default
+      toc: true
+      toc_float:
+         collapsed: true
+         smooth_scroll: true
+params:
+  max_PRF: !r Inf 
+  min_PRF: 4200
+  max_FRiP: !r Inf
+  min_FRiP: 40
+  min_TSS: 2 
+  max_NS: 2
+  max_blacklistratio: 0.02
+  data_dir: !r file.path("data")
+  results_dir: !r file.path("results")
+  project_file: ../information.R
+  #params_file: params_qc.R
+---
+
+
+```{r, cache = FALSE, message = FALSE, warning=FALSE}
+# This set up the working directory to this file so all files can be found
+library(rstudioapi)
+setwd(fs::path_dir(getSourceEditorContext()$path))
+# NOTE: This code will check version, this is our recommendation, it may work
+#.      other versions
+stopifnot(R.version$major>= 4) # requires R4
+if (compareVersion(R.version$minor,"3.1")<0) warning("We recommend >= R4.3.1") 
+stopifnot(compareVersion(as.character(BiocManager::version()), "3.18")>=0)
+stopifnot(compareVersion(as.character(packageVersion("Seurat")), "5.0.0")>=0)
+```
+
+This code is in this ![](https://img.shields.io/badge/status-alpha-yellow) revision.
+
+```{r source_params, echo = F}
+metadata_fn=''
+se_object=''
+```
+
+```{r load_libraries, cache = FALSE, message = FALSE, warning=FALSE}
+library(Seurat)
+library(Signac)
+library(tidyverse)
+library(ggplot2)
+library(ggrepel)
+library(cowplot)
+library(kableExtra)
+library(qs)
+library(bcbioR)
+ggplot2::theme_set(theme_light(base_size = 14))
+opts_chunk[["set"]](
+    cache = FALSE,
+    cache.lazy = FALSE,
+    dev = c("png", "pdf"),
+    error = TRUE,
+    highlight = TRUE,
+    message = FALSE,
+    prompt = FALSE,
+    tidy = FALSE,
+    warning = FALSE,
+    fig.height = 4)
+```
+
+
+```{r subchunkify, echo=FALSE, eval=FALSE}
+#' Create sub-chunks for plots
+#'
+#' taken from: https://stackoverflow.com/questions/15365829/dynamic-height-and-width-for-knitr-plots
+#'
+#' @param pl a plot object
+#' @param fig.height figure height
+#' @param fig.width figure width
+#' @param chunk_name name of the chunk
+#'
+#' @author Andreas Scharmueller \email{andschar@@protonmail.com}
+#'
+subchunkify = function(pl,
+                       fig.height = 7,
+                       fig.width = 5,
+                       chunk_name = 'plot') {
+  pl_deparsed = paste0(deparse(function() {
+    pl
+  }), collapse = '')
+  
+  sub_chunk = paste0(
+    "```{r ",
+    chunk_name,
+    ", fig.height=",
+    fig.height,
+    ", fig.width=",
+    fig.width,
+    ", dpi=72",
+    ", echo=FALSE, message=FALSE, warning=FALSE, fig.align='center'}",
+    "\n(",
+    pl_deparsed,
+    ")()",
+    "\n```"
+  )
+  
+  cat(knitr::knit(
+    text = knitr::knit_expand(text = sub_chunk),
+    quiet = TRUE
+  ))
+}
+```
+
+
+```{r sanitize-datatable}
+sanitize_datatable = function(df, ...) {
+ # remove dashes which cause wrapping
+ DT::datatable(df, ..., rownames=gsub("-", "_", rownames(df)),
+                   colnames=gsub("-", "_", colnames(df)))
+}
+```
+
+
+```{r not_in}
+`%!in%` = Negate(`%in%`)
+```
+
+
+# Overview
+
+-   Project: `r project`
+-   PI: `r PI`
+-   Analyst: `r analyst`
+-   Experiment: `r experiment`
+-   Aim: `r aim`
+
+
+# Samples and metadata
+
+```{r load_metadata}
+meta_df=read_csv(metadata_fn) %>% mutate(sample = tolower(description)) %>%
+  dplyr::select(-description)
+
+ggplot(meta_df, aes(sample_type, fill = sample_type)) +
+  geom_bar() + ylab("") + xlab("") +
+  scale_fill_cb_friendly()
+```
+
+
+```{r  show-metadata}
+se <- readRDS(se_object) #local
+
+
+metrics <- metadata(se)$metrics %>% 
+    full_join(meta_df , by = c("sample" = "sample"))
+
+meta_sm <- meta_df %>%
+  as.data.frame() %>%
+  column_to_rownames("sample")
+
+meta_sm %>% sanitize_datatable()
+
+```
+
+```{r create_or_read_seurat_obj}
+filename <- 'data/scATAC_seurat.rds'
+if (!file.exists(filename)){
+  
+}else{
+  seurat <- readRDS(filename)
+}
+```
+
+
+# ATAC-Seq {.tabset}
+
+We use some of the results from cellranger outputs and the peaks called using MACS2 for QCing the scATAC-Seq data. 
+
+## Read counts per cell
+
+```{r warning=FALSE, message=FALSE, results='asis', fig.width=12}
+VlnPlot(seurat, features = "nCount_MACS2peaks", ncol = 1, pt.size = 0) +
+  scale_fill_cb_friendly() +
+  xlab("") +
+  ylab("Reads")
+
+cat('\n\n')
+```
+## Detected peaks per cell
+
+```{r warning=FALSE, message=FALSE, fig.width=12}
+VlnPlot(seurat, features = "nFeature_MACS2peaks", ncol = 1, pt.size = 0) +
+  scale_fill_cb_friendly() +
+  xlab("") +
+  ylab("UMI")
+
+# VlnPlot(seurat, features = "nFeature_CellRangerPeaks", ncol = 1, pt.size = 0) +
+#   scale_fill_cb_friendly() +
+#   xlab("") +
+#   ylab("UMI")
+```
+
+## QC metrics {.tabset}
+
+### Total number of fragments in peaks {.tabset}
+
+This metric represents the total number of fragments (= reads) mapping within a region of the genome that is predicted to be accessible (= a peak). It's a measure of cellular sequencing depth / complexity. Cells with very few reads may need to be excluded due to low sequencing depth. Cells with extremely high levels may represent doublets, nuclei clumps, or other artefacts. 
+
+
+```{r results='asis', warning=FALSE, message=FALSE, fig.width=12, fig.height=8}
+DefaultAssay(seurat) <- "MACS2peaks"
+
+cat('#### Histogram \n\n')
+seurat@meta.data %>% 
+  ggplot(aes(x = atac_peak_region_fragments)) + 
+  geom_histogram() + 
+  facet_wrap(~sample, scale = 'free') +
+  geom_vline(xintercept = params$min_PRF)
+```
+
+
+```{r results='asis', warning=FALSE, message=FALSE, fig.width=12}
+cat('\n#### Violin plot\n\n')
+VlnPlot(
+  object = seurat,
+  features = 'atac_peak_region_fragments',
+  pt.size = 0
+) + ylab('Total number of fragments in peaks') + 
+  NoLegend() + 
+  geom_hline(yintercept = params$min_PRF) + xlab("") +
+  scale_fill_cb_friendly()
+
+cat('\n\n')
+```
+
+### Fraction of fragments in peaks
+
+It represents the fraction of all fragments that fall within ATAC-seq peaks. Cells with low values (i.e. <15-20%) often represent low-quality cells or technical artifacts that should be removed. Note that this value can be sensitive to the set of peaks used.
+
+```{r results='asis'}
+VlnPlot(
+  object = seurat,
+  features = 'pct_reads_in_peaks',
+  pt.size = 0
+) + NoLegend() + xlab("") +
+  scale_fill_cb_friendly() +
+  geom_hline(yintercept = params$min_FRiP) 
+
+cat('\n\n')
+```
+
+
+### Transcriptional start site (TSS) enrichment score {.tabset}
+
+The ENCODE project has defined an ATAC-seq targeting score based on the ratio of fragments centered at the TSS to fragments in TSS-flanking regions (see https://www.encodeproject.org/data-standards/terms/). Poor ATAC-seq experiments typically will have a low TSS enrichment score. We can compute this metric for each cell with the TSSEnrichment() function, and the results are stored in metadata under the column name TSS.enrichment.
+
+
+```{r results='asis'}
+VlnPlot(
+  object = seurat,
+  features = 'TSS.enrichment',
+  pt.size = 0
+) + scale_fill_cb_friendly() + NoLegend() + xlab("")
+cat('\n\n')
+```
+The following tabs show the TSS enrichment score distribution for each sample. Cells with high-quality ATAC-seq data should show a clear peak in reads at the TSS, with a decay the further we get from it.
+
+Each plot is split between cells with a high or low global TSS enrichment score (cuffoff at `r params$min_TSS`), to double-check whether cells with lowest enrichment scores still follow the expected pattern or rather need to be excluded.
+
+```{r results='asis'}
+seurat$TSS.group <- ifelse(seurat$TSS.enrichment > params$min_TSS, "High", "Low")
+Idents(seurat) <- 'sample'
+for (sample in levels(seurat$sample)){
+  cat('####', sample, '\n\n')
+  p <- TSSPlot(subset(x = seurat, idents = sample), group.by = "TSS.group") + NoLegend()
+  print(p)
+  cat('\n\n')
+}
+```
+
+### Nucleosome signal {.tabset}
+
+The histogram of DNA fragment sizes (determined from the paired-end sequencing reads) should exhibit a strong nucleosome banding pattern corresponding to the length of DNA wrapped around a single nucleosome, i.e peaks at approximately 100bp (nucleosome-free), and mono, di and tri nucleosome-bound peaks at 200, 400 and 600bp. We calculate this per single cell, and quantify the approximate ratio of mononucleosomal to nucleosome-free fragments (stored as nucleosome_signal). Cells with lower nucleosome signal have a higher ratio of nucleosome-free fragments.
+
+```{r warning = FALSE, results='asis'}
+seurat$nucleosome_group <- ifelse(seurat$nucleosome_signal > 1, "high NS", "low NS")
+for (sample in levels(seurat$sample)){
+  cat('####', sample, '\n\n')
+  p <- FragmentHistogram(seurat, group.by = 'nucleosome_group', cells = colnames(seurat[, seurat$sample == sample]))
+  print(p)
+  cat('\n\n')
+}
+# FragmentHistogram(seurat, group.by = 'nucleosome_group', cells = colnames(seurat[, seurat$sample == 'Control']))
+```
+
+```{r fig.width=12}
+VlnPlot(
+  object = seurat,
+  features = 'nucleosome_signal',
+  pt.size = 0
+) +   scale_fill_cb_friendly() +
+NoLegend() + xlab("")
+```
+
+
+
+
+### Blacklist ratio
+
+tIt's he ratio of reads in genomic blacklist regions. The [ENCODE project](https://www.encodeproject.org/) has provided a list of [blacklist regions](https://github.com/Boyle-Lab/Blacklist), representing reads which are often associated with artefactual signal. Cells with a high proportion of reads mapping to these areas (compared to reads mapping to peaks) often represent technical artifacts and should be removed. ENCODE blacklist regions for human (hg19 and GRCh38), mouse (mm10), Drosophila (dm3), and C. elegans (ce10) are included in the Signac package. **Peaks overlapping with the balcklist regions were removed in the analysis, so we don't show blacklist fraction here**.
+
+Line is drawn at `r params$max_blacklistratio`. 
+
+```{r fig.width=12}
+VlnPlot(
+  object = seurat,
+  features = 'blacklist_fraction',
+  pt.size = 0
+) +   scale_fill_cb_friendly() +
+  NoLegend() +
+  geom_hline(yintercept = params$max_blacklistratio) 
+  
+```
+
+
+## Normalization, linear dimensional reduction, and clustering
+
+* Normalization: Signac performs term frequency-inverse document frequency (TF-IDF) normalization. This is a two-step normalization procedure, that both normalizes across cells to correct for differences in cellular sequencing depth, and across peaks to give higher values to more rare peaks.
+
+* Feature selection: The low dynamic range of scATAC-seq data makes it challenging to perform variable feature selection, as we do for scRNA-seq. Instead, we can choose to use only the top n% of features (peaks) for dimensional reduction, or remove features present in less than n cells with the FindTopFeatures() function. Here, we will use all features, though we note that we see very similar results when using only a subset of features (try setting min.cutoff to ‘q75’ to use the top 25% all peaks), with faster runtimes. Features used for dimensional reduction are automatically set as VariableFeatures() for the Seurat object by this function.
+
+* Dimension reduction: We next run singular value decomposition (SVD) on the TD-IDF matrix, using the features (peaks) selected above. This returns a reduced dimension representation of the object (for users who are more familiar with scRNA-seq, you can think of this as analogous to the output of PCA).
+
+The combined steps of TF-IDF followed by SVD are known as latent semantic indexing (LSI), and were first introduced for the analysis of scATAC-seq data by [Cusanovich et al. 2015.](https://www.science.org/doi/10.1126/science.aax6234)
+
+The first LSI component often captures sequencing depth (techni ccal variation) rather than biological variation. If this is the case, the component should be removed from downstream analysis. We can assess the correlation between each LSI component and sequencing depth using the DepthCor() function (see below). 
+Here we see there is a very strong correlation between the first LSI component and the total number of counts for the cell, so we will perform downstream steps without this component.
+
+```{r results='asis'}
+DepthCor(seurat, assay = 'MACS2peaks')
+cat('\n\n')
+```
+
+## UMAP plots
+
+```{r results='asis'}
+DimPlot(object = seurat, group.by = 'sample', reduction = "umapATAC") +
+    scale_color_cb_friendly()
+
+cat('\n\n')
+```
+
+<!-- # {.unlisted .unnumbered} -->
+
+
+
+# R session
+
+List and version of tools used for the QC report generation.
+
+```{r}
+sessionInfo()
+```

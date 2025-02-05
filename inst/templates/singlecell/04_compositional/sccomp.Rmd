@@ -1,0 +1,164 @@
+---
+title: "Celltype composition with  scccomp"
+author: "Harvard Chan Bioinformatics Core"
+date: "`r Sys.Date()`"
+output:
+   html_document:
+      code_folding: hide
+      df_print: paged
+      highlights: pygments
+      number_sections: true
+      self_contained: true
+      theme: default
+      toc: true
+      toc_float:
+         collapsed: true
+         smooth_scroll: true
+params:
+   project_file: ../information.R
+---
+
+```{r, message=FALSE, warning=FALSE}
+# This set up the working directory to this file so all files can be found
+library(rstudioapi)
+library(tidyverse)
+setwd(fs::path_dir(getSourceEditorContext()$path))
+# NOTE: This code will check version, this is our recommendation, it may work
+#.      other versions
+stopifnot(R.version$major>= 4) # requires R4
+if (compareVersion(R.version$minor,"3.1")<0) warning("We recommend >= R4.3.1") 
+stopifnot(compareVersion(as.character(BiocManager::version()), "3.18")>=0)
+stopifnot(compareVersion(as.character(packageVersion("Seurat")), "5.0.0")>=0)
+```
+
+This code is in this ![](https://img.shields.io/badge/status-draft-grey) revision.
+
+
+```{r setup, cache=FALSE, message=FALSE, warning=FALSE, echo=FALSE}
+#knitr::opts_chunk$set(echo = TRUE)
+library(knitr)
+# Load libraries
+library(Seurat)
+library(sccomp)
+library(SummarizedExperiment)
+library(SingleCellExperiment)
+library(DEGreport)
+
+library(rmarkdown)
+library(tidyverse)
+library(data.table)
+library(DT)
+library(patchwork)
+library(pheatmap)
+
+library(ggprism)
+library(grafify)
+
+library(future)
+
+set.seed(1454944673L)
+opts_chunk[["set"]](
+    audodep = TRUE,
+    cache = FALSE,
+    cache.lazy = FALSE,
+    error = TRUE,
+    echo = FALSE,
+    fig.height = 5L,
+    fig.retina = 2L,
+    fig.width = 11,
+    message = FALSE,
+    tidy = TRUE,
+    warning = FALSE
+)
+
+ggplot2::theme_set(theme_prism(base_size = 12))
+# https://grafify-vignettes.netlify.app/colour_palettes.html
+# NOTE change colors here if you wish
+scale_colour_discrete <- function(...)
+  scale_colour_manual(..., values = as.vector(grafify:::graf_palettes[["kelly"]]))
+
+
+ if (future::supportsMulticore()) {
+   future::plan(future::multicore)
+ } else {
+   future::plan(future::multisession)
+ }
+```
+
+
+## Load object and subset
+
+```{r}
+seurat <- readRDS("data.rds")
+
+subset_seurat <-  subset(x = seurat, subset= condition %in% c("Ctrl","Treat"))
+
+Idents(object = subset_seurat) <- "celltype"
+
+DefaultAssay(subset_seurat) <- "RNA"
+```
+
+## Sccomp 
+
+
+To test for differential cell composition we use [sccomp](https://github.com/MangiolaLaboratory/sccomp) a method for differential composition and variability analyses that jointly models data count distribution, compositionality, group-specific variability, and proportion mean–variability association, being aware of outliers.
+
+Our model includes condition (TN vs. cold). For each cell type we get results for the intercept and our factors. We can see the results of the fit, the effects of the factor on composition and variability. You also can see the uncertainty around those effects. In the output table, the estimate columns start with the prefix c_ indicate composition, or with v_ indicate variability (when formula_variability is set). We have not used formula_variability so we only have v_ estimates for our intercept.
+
+```{r}
+sccomp_result = 
+  subset_seurat |>
+  sccomp_estimate( 
+    formula_composition = ~ condition, # change to the right variable
+    .sample =  sample, 
+    .cell_group = celltype, # change to the right variable
+    bimodal_mean_variability_association = TRUE,
+    cores = 1 
+  ) |> 
+  sccomp_remove_outliers(cores = 1, verbose = FALSE) |> # Optional
+  sccomp_test()
+
+
+sccomp_result
+```
+
+### Fold Change
+
+```{r}
+sccomp_result |> 
+   sccomp_proportional_fold_change(
+     formula_composition = ~  condition,
+     from =  "Ctrl", 
+     to = "Treat"
+    ) |> 
+  select(celltype, statement)
+```
+
+### Boxplot of results
+
+Here we see proportion of each cell type in our two groups (TN and cold7). The blue boxplots represent the posterior predictive check. If the model is likely to be descriptively adequate to the data, the blue box plot should roughly overlay with the black box plot, which represents the observed data. Dots indicate samples and outlier samples are coloured in red. Boxplots colored red indicate significant differences in proportion between our groups.
+
+```{r}
+sccomp_result |> 
+  sccomp_boxplot(factor = "condition")
+```
+
+### 1-D visualization
+
+A plot of estimates of differential composition (c_) on the x-axis. The error bars represent 95% credible intervals. The dashed lines represent the minimal effect that the hypothesis test is based on. An effect is labelled as significant if bigger than the minimal effect according to the 95% credible interval. We get figures for both factors in our model.
+
+```{r}
+sccomp_result |> 
+  plot_1D_intervals()
+```
+
+# Conclusion
+
+# R Session 
+
+Below is the output of the R session used to generate this report. Included is information on R version, OS, and versions of packages installed and used.
+
+```{r sessionInfo}
+# Get session information
+sessionInfo()
+```
