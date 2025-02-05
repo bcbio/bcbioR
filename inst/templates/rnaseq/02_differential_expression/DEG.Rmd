@@ -104,6 +104,10 @@ library(ggprism)
 library(viridis)
 library(ggprism)
 library(grafify)
+
+filter=dplyr::filter
+select=dplyr::select
+
 ggplot2::theme_set(theme_prism(base_size = 12))
 # https://grafify-vignettes.netlify.app/colour_palettes.html
 # NOTE change colors here if you wish
@@ -498,7 +502,7 @@ res_mod <- res
                   x = 'lfc',
                   y = 'padj', 
                   title=contrast,
-                  col=col=c("darkgrey", "lightblue", "plum1", "purple"),
+                  col=c("darkgrey", "lightblue", "plum1", "purple"),
                 # xlim = c(-5,5),  ## set the x-axis to only show some points
                   subtitle = "", drawConnectors = T,  max.overlaps = Inf ) 
   print(p1)
@@ -648,21 +652,25 @@ fa_list=lapply(de_list,function(contrast){
   res=contrast[["all"]]
   universe=res %>% 
     filter(!is.na(padj)) %>% pull(gene_id)
-  universe_mapping = AnnotationDbi::select(ann.org, universe, 'ENSEMBL', columns=c('ENTREZID', 'SYMBOL'))
+  universe_mapping = rdata %>% filter(gene_id %in% universe, !is.na(entrez))
+    # AnnotationDbi::select(ann.org, universe, 'ENSEMBL', columns=c('ENTREZID', 'SYMBOL'))
   
   ora_input = res %>% filter(!is.na(padj), padj<0.01, abs(lfc)> 0.3) %>% pull(gene_id)
   #change to the right species
-  input_entrezid <- AnnotationDbi::select(ann.org, ora_input, 'ENSEMBL', columns = c('ENTREZID', 'SYMBOL'))
+  input_entrezid <- rdata %>% filter(gene_id %in% ora_input, !is.na(entrez))
+    # AnnotationDbi::select(ann.org, ora_input, 'ENSEMBL', columns = c('ENTREZID', 'SYMBOL'))
   all=run_fora_v2(input_entrezid, universe_mapping,all_in_life)
   
   ora_input = res %>% filter(!is.na(padj), padj<0.01, lfc> 0.3) %>% pull(gene_id)
   #change to the right species
-  input_entrezid <- AnnotationDbi::select(ann.org, ora_input, 'ENSEMBL', columns = c('ENTREZID', 'SYMBOL'))
+  input_entrezid <- rdata %>% filter(gene_id %in% ora_input, !is.na(entrez))
+    # AnnotationDbi::select(ann.org, ora_input, 'ENSEMBL', columns = c('ENTREZID', 'SYMBOL'))
   up=run_fora_v2(input_entrezid, universe_mapping,all_in_life)
 
   ora_input = res %>% filter(!is.na(padj), padj<0.01, lfc< -0.3) %>% pull(gene_id)
   #change to the right species
-  input_entrezid <- AnnotationDbi::select(ann.org, ora_input, 'ENSEMBL', columns = c('ENTREZID', 'SYMBOL'))
+  input_entrezid <- rdata %>% filter(gene_id %in% ora_input, !is.na(entrez))
+    # AnnotationDbi::select(ann.org, ora_input, 'ENSEMBL', columns = c('ENTREZID', 'SYMBOL'))
   down=run_fora_v2(input_entrezid, universe_mapping,all_in_life)
 
   list(all=all,up=up,down=down)
@@ -727,6 +735,8 @@ filename = paste0(filenames)
 name_expression_fn=file.path(
   basedir,
   str_interp("${filename}_expression.csv"))
+counts_norm=norm_matrix %>% as.data.frame() %>% 
+  rownames_to_column("gene_id") 
 write_csv(counts_norm, name_expression_fn)
 
 for (contrast in names(contrasts)){
@@ -739,10 +749,6 @@ for (contrast in names(contrasts)){
     basedir,
     str_interp("${filename}_pathways.csv"))
 
-  counts_norm=norm_matrix %>% as.data.frame() %>% 
-    rownames_to_column("gene_id") %>% 
-    mutate(comparison = contrast)
-  
   res_for_writing <- de_list[[contrast]][["all"]] %>% 
     mutate(comparison = contrast)
   
@@ -755,6 +761,18 @@ for (contrast in names(contrasts)){
   write_csv(pathways_for_writing, name_pathways_fn)
 }
 
+```
+
+# Conclusion
+
+# Methods
+
+## R package references
+
+```{r citations, results='asis'}
+citation("DESeq2")
+citation("ggplot2")
+citation("pheatmap")
 ```
 
 # R session
