@@ -55,10 +55,10 @@ source(params$project_file)
 map(list.files(params$functions_file,pattern = "*.R$",full.names = T), source) %>% invisible()
 # IMPORTANT set these values if you are not using the parameters in the header (lines 22-31)
 genome=params$genome
-if(grepl(genome, "hg|human", ignore.case = TRUE)) {
+if(grepl("hg|human", genome, ignore.case = TRUE)) {
    library(org.Hs.eg.db)
    ann.org=org.Hs.eg.db
-} else if(grepl(genome, "mm|mouse", ignore.case = TRUE)) {
+} else if(grepl("mm|mouse", genome, ignore.case = TRUE)) {
    library(org.Mm.eg.db)
    ann.org=org.Mm.eg.db
 } else {
@@ -80,24 +80,28 @@ factor_of_interest <- column
 
 
 ```{r load_libraries, cache = FALSE, message = FALSE, warning=FALSE}
+library(knitr)
+library(tidyverse)
+library(janitor)
+library(purrr)
+library(ggpubr)
+
+#library(AnnotationHub)
+#library(ensembldb)
 library(rtracklayer)
 library(DESeq2)
-library(tidyverse)
-library(stringr)
+library(vegan)
+library(EnhancedVolcano)
 library(DEGreport)
-library(ggpubr)
+library(pheatmap)
 library(msigdbr)
 library(fgsea)
-library(knitr)
-library(EnhancedVolcano)
+
+library(htmltools)
+library(ggforce)
+library(RColorBrewer)
 library(ggprism)
 library(viridis)
-library(pheatmap)
-library(janitor)
-library(ggforce)
-library(vegan)
-library(htmltools)
-library(RColorBrewer)
 library(ggprism)
 library(grafify)
 ggplot2::theme_set(theme_prism(base_size = 12))
@@ -167,10 +171,30 @@ stopifnot(all(names(counts) == rownames(metrics)))
 -   Aim: `r aim`
 
 ```{r load_counts_data}
-rdata = AnnotationDbi::select(ann.org, rownames(counts), columns=c('SYMBOL', 'ENTREZID'), keytype = 'ENSEMBL') %>%
-dplyr::select(gene_id = ENSEMBL, gene_name = SYMBOL, entrez= ENTREZID) %>%
-distinct(gene_id, .keep_all = TRUE)
+# Query AnnotationHub
+ah <- AnnotationHub::AnnotationHub()
 
+if (grepl("hg|human", genome, ignore.case = TRUE)) {
+  ens <- AnnotationHub::query(ah, c("Homo sapiens", "EnsDb"))
+  ens <- ens[["AH119325"]]
+} else if(grepl("mm|mouse", genome, ignore.case = TRUE)) {
+  ens <- AnnotationHub::query(ah, c("Mus musculus", "EnsDb"))
+  ens <- ens[["AH116340"]]
+} else {
+  cat("Warning:please, get a table that contains gene_id, gene_name and entrez to continue using this template.")
+}
+
+# Create a gene-level dataframe 
+# NOTE change this code if you are not using AnnotationHub
+#       the rdata is a table with gene_id, gene_name and entrez columns
+rdata <- ensembldb::genes(ens, return.type = "data.frame")  %>%
+  dplyr::select(gene_id, gene_name, entrez=entrezid,
+                gene_biotype, description) %>% 
+  dplyr::filter(gene_id %in% rownames(counts)) %>% 
+  dplyr::distinct(gene_id, .keep_all = TRUE)
+
+# Keep one entrez Id per gene
+rdata$entrez <- purrr::map(rdata$entrez,1) %>%  unlist()
 ```
 
 # Set up
@@ -230,7 +254,6 @@ vare.disa <- vegdist(t(assay(vsd_before)))
 mod = betadisper(vare.disa, metrics[[factor_of_interest]])
 anova(mod)
 permutest(mod, pairwise = TRUE)
-
 ```
 
 
@@ -561,10 +584,10 @@ for (contrast in names(de_list)){
 From the set of differentially expressed genes and using publicly available information about gene sets involved in biological processes and functions, we can calculate which biological processes and functions are significantly perturbed as a result of the treatment. 
 
 ```{r}
-if(grepl(genome, "hg|human", ignore.case = TRUE)) {
+if(grepl("hg|human", genome, ignore.case = TRUE)) {
    all_in_life=get_databases_v2(sps="human")
    run_FA=TRUE
-} else if(grepl(genome, "mm|mouse", ignore.case = TRUE)) {
+} else if(grepl("mm|mouse", genome, ignore.case = TRUE)) {
    all_in_life=get_databases_v2(sps="mouse")
    run_FA=TRUE
 } else {

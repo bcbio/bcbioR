@@ -46,11 +46,7 @@ This code is in this ![](https://img.shields.io/badge/status-stable-green) revis
 #    this is used to color plots, it needs to be part of the metadata
 factor_of_interest=params$factor_of_interest
 genome=params$genome
-<<<<<<< HEAD
-singleend=params$singleend
-=======
 single_end=params$single_end
->>>>>>> c37fcd42e9e4ba276293a9bc591e6298affd14e5
 # 2. Set input files in this file
 source(params$params_file)
 # 3. If you set up this file, project information will be printed below and
