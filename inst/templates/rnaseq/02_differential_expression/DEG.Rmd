@@ -25,7 +25,8 @@ params:
   genome: hg38
   ruv: false
   combatseq: false
-  params_file: params_de-example.R
+  # params_file: ../00_params/params.R 
+  params_file: ../00_params/params-example.R
   project_file: ../information.R
   functions_file: ../00_libs
 ---
@@ -659,7 +660,7 @@ fa_list=lapply(de_list,function(contrast){
   #change to the right species
   input_entrezid <- rdata %>% filter(gene_id %in% ora_input, !is.na(entrez))
     # AnnotationDbi::select(ann.org, ora_input, 'ENSEMBL', columns = c('ENTREZID', 'SYMBOL'))
-  all=run_fora_v2(input_entrezid, universe_mapping,all_in_life)
+  all=run_fora_v2(input_entrezid, universe_mapping, all_in_life)
   
   ora_input = res %>% filter(!is.na(padj), padj<0.01, lfc> 0.3) %>% pull(gene_id)
   #change to the right species
