@@ -143,7 +143,14 @@ To enable meaningful visualization of the data, we apply a minimal normalization
 
 **We start with log normalization because it is good to observe the data and any trends using a simple transformation. More complex methods like SCT can alter the data in a way that is not as intuitive to interpret.**
 
-```{r rna_norm0, warning=FALSE, message=FALSE}
+```{r, eval=file.exists("seurat_lognorm.rds")}
+#NOTE run the chunk below to create this object, and loading will be used while
+#     knitting to speed up the rendering
+seurat_lognorm = readRDS("seurat_lognorm.rds")
+```
+
+
+```{r rna_norm0, eval=!exists("seurat_lognorm"), warning=FALSE, message=FALSE}
 #Normalize data
 seurat_lognorm <- NormalizeData(seurat_qc,
                              normalization.method = "LogNormalize",
@@ -158,6 +165,9 @@ seurat_lognorm <- ScaleData(seurat_lognorm, model.use = "linear")
 # Calculate PCs and UMAP
 seurat_lognorm <- RunPCA(seurat_lognorm)
 seurat_lognorm <- RunUMAP(seurat_lognorm, 1:40)
+
+saveRDS(seurat_lognorm, file="seurat_lognorm.rds")
+
 ```
 
 ## Examine highly variable genes
@@ -296,7 +306,7 @@ We searched for the top 3000 genes with the largest variability in expression le
 **We keep each sample separate for SCT normalization.**
 
 ```{r, eval=file.exists("seurat_sctnorm.rds")}
-#NOTE run the chunck below to create this object, and loading will be used while
+#NOTE run the chunk below to create this object, and loading will be used while
 #     knitting to speed up the rendering
 seurat_sctnorm = readRDS("seurat_sctnorm.rds")
 ```
