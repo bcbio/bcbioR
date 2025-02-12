@@ -1,4 +1,6 @@
 # info params
+date = "YYYYMMDD"
+basedir <- './' # where to write down output files
 
 # Your data
 # This is the file used to run nf-core or compatible to that
