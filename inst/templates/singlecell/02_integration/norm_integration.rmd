@@ -548,6 +548,8 @@ For single-modality scRNA-seq analysis, `Seurat` clusters the cells using a Louv
 
 A limitation of this approach is that the number of identified clusters depends on the chosen resolution, a parameter that must be set by the user and does not necessarily reflect the underlying biology of the dataset. For most single-cell datasets, a resolution of 0.1 to 1 will provide a reasonable number of clusters. Complex datasets with multiple cell types may require a larger resolution, and vice versa.
 
+The code below will generate clusters for resolutions 0.1, 0.2, 0.4, 0.6, 0.8, and 1.0. After generating these clusters we will examine them below using a tree based approach and simply overlaying cluster ids onto the umap. We recommend keeping all of the clusters in the metadata as you move forward in case you want to go back and try a different one. To switch between different resolutions you simply need to reset your cell identities to the correct column in the metadata `Idents(object = pbmc) <- "resolution_0.2"`
+
 ```{r find_neighbors all,  echo=TRUE}
 # NOTE use seurat_harmony or seurat_cca
 # seurat_clust <- FindNeighbors(seurat_harmony, assay = "SCT",
