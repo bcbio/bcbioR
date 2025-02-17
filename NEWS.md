@@ -1,3 +1,24 @@
+# bcbioR 0.4.1
+
+- in DEG.Rmd, write expression table only once	https://github.com/bcbio/bcbioR/issues/63
+- add methods to RNA QC and DE templates	https://github.com/bcbio/bcbioR/issues/61
+- sc DE pseudobulk
+- sc DE MAST
+- compositional analysis scRNA
+- entrezid for enrichment analysesS	v0.4.1	P1
+- subset data based on metadata file.	https://github.com/bcbio/bcbioR/issues/64
+- ATACseq QC report
+- Add WGCNA analysis to RNAseq
+- bug, should be !is.na	https://github.com/bcbio/bcbioR/issues/73
+- line of code in volcano plot causes odd figures	https://github.com/bcbio/bcbioR/issues/70
+- volcano plot colors	https://github.com/bcbio/bcbioR/issues/74
+- remove inline option in RMD	https://github.com/bcbio/bcbioR/issues/78
+- change x lab to reads	https://github.com/bcbio/bcbioR/issues/75
+- Visium RMD template	
+- fix mouse genome for nfcore and templates
+- adapt to mouse and another genome in the DE RNAseq template	https://github.com/bcbio/bcbioR/issues/80
+- Change to Annotation Hub	https://github.com/bcbio/bcbioR/issues/94
+
 # bcbioR 0.3.1
 
 - Fix bugs in RNAseq

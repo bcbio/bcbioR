@@ -14,8 +14,6 @@ output:
       toc_float:
          collapsed: true
          smooth_scroll: true
-editor_options: 
-  chunk_output_type: console
 params:
   params_file: ../information.R
   meta_fn: ../meta/methylation_mucci_hbc04926.csv
@@ -29,7 +27,7 @@ setwd(fs::path_dir(getSourceEditorContext()$path))
 #.      other versions
 stopifnot(R.version$major>= 4) # requires R4
 if (compareVersion(R.version$minor,"3.1")<0) warning("We recommend >= R4.3.1") 
-stopifnot(compareVersion(BiocManager::version(), "3.18")>=0)
+stopifnot(compareVersion(as.character(BiocManager::version()), "3.18")>=0)
 ```
 
 This code is in this ![](https://img.shields.io/badge/status-draft-grey) revision.

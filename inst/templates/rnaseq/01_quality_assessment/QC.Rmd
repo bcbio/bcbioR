@@ -14,17 +14,16 @@ output:
       toc_float:
          collapsed: true
          smooth_scroll: true
-editor_options: 
-  chunk_output_type: console
 params:
   # Fill this file with the right paths to nfcore output
   # Put hg38, mm10, mm39, or other
-  # params_file: params_qc_nf-core-example.R # example data
-  params_file: params_qc_nf-core-example.R
+  # params_file: ../00_params/params.R 
+  params_file: ../00_params/params-example.R # example data
   genome: hg38
+  single_end: false
+  factor_of_interest: sample_type
   project_file: ../information.R
   functions_file: ../00_libs/load_data.R
-  factor_of_interest: sample_type
 ---
 
 Template developed with materials from https://hbctraining.github.io/main/.
@@ -47,6 +46,7 @@ This code is in this ![](https://img.shields.io/badge/status-stable-green) revis
 #    this is used to color plots, it needs to be part of the metadata
 factor_of_interest=params$factor_of_interest
 genome=params$genome
+single_end=params$single_end
 # 2. Set input files in this file
 source(params$params_file)
 # 3. If you set up this file, project information will be printed below and
@@ -122,9 +122,11 @@ coldata$sample=row.names(coldata)
 counts <- load_counts(counts_fn)
 counts <- counts[,colnames(counts) %in% coldata$sample]
 
-metrics <- load_metrics(se_object, multiqc_data_dir, gtf_fn, counts) %>% 
+metrics <- load_metrics(se_object, multiqc_data_dir,
+                        gtf_fn, counts, single_end) %>% 
   left_join(coldata, by = c('sample')) %>% 
   as.data.frame()
+metrics <- subset(metrics, metrics$sample %in% coldata$sample)
 # TODO: change order as needed
 order <- unique(metrics[["sample"]])
 rownames(metrics) <- metrics$sample
@@ -160,15 +162,15 @@ Here, we want to see consistency and a minimum of 20 million reads (the grey lin
 ```{r plot_total_reads}
 metrics %>%
   ggplot(aes(x = factor(sample, level = order),
-             y = total_reads, 
+             y = total_reads/1000000, 
              fill = .data[[factor_of_interest]])) +
   geom_bar(stat = "identity") +
   coord_flip() +
-  scale_y_continuous(name = "million reads") +
+  scale_y_continuous(name = "Millions of reads") +
   scale_x_discrete(limits = rev) +
   xlab("") + 
   ggtitle("Total reads") +
-  geom_hline(yintercept=20000000, color = "grey", linewidth=2)
+  geom_hline(yintercept=20, color = "grey", linewidth=2)
 
 metrics %>%
     ggplot(aes(x = .data[[factor_of_interest]],
@@ -198,6 +200,7 @@ metrics %>%
                color = .data[[factor_of_interest]])) +
     geom_point(alpha = 0.5, size=4) +
     coord_flip() +
+    ylab("Mapped Reads %") +
     scale_x_discrete(limits = rev) +
     ylim(0, 100) +
   ggtitle("Mapping rate") + xlab("") +
@@ -253,13 +256,14 @@ This plot shows how complex the samples are. We expect samples with more reads t
 
 ```{r plot_gene_saturation}
 metrics %>% 
-  ggplot(aes(x = total_reads, 
+  ggplot(aes(x = total_reads/1000000, 
              y = n_genes,
              color = .data[[factor_of_interest]])) +
   geom_point(alpha = 0.5, size=4) +
   scale_x_log10() +
   ggtitle("Gene saturation") +
-  ylab("Number of genes")
+  ylab("Number of genes") +
+  xlab("Millions of reads")
 ```
 
 ## Exonic mapping rate
@@ -343,7 +347,7 @@ metrics %>%
 
 There should be little bias, i.e. the values should be close to 1, or at least consistent among samples
 
-```{r plot_53_bias}
+```{r plot_53_bias, eval=!all(is.na((metrics['r_and_t_rna_rate'])))}
 metrics %>%
   ggplot(aes(x = factor(sample, level = order),
              y = x5_3_bias, 
@@ -410,19 +414,6 @@ pca2 + scale_color_grafify(palette = "kelly")
 
 ```
 
-# Covariates analysis
-
-When there are multiple factors that can influence the results of a given experiment, it is useful to assess which of them is responsible for the most variance as determined by PCA. This method adapts the method described by Daily et al. for which they integrated a method to correlate covariates with principal components values to determine the importance of each factor. 
-
-```{r covariate-plot,fig.height=12, fig.width=10}
-## Remove non-useful columns output by nf-core
-coldat_2 <- data.frame(coldat_for_pca[,!(colnames(coldat_for_pca) %in% c("fastq_1", "fastq_2", "salmon_library_types", "salmon_compatible_fragment_ratio", "samtools_reads_mapped_percent", "samtools_reads_properly_paired_percent", "samtools_mapped_passed_pct", "strandedness", "qualimap_5_3_bias"))])
-
-# Remove missing data
-coldat_2 <- na.omit(coldat_2)
-degCovariates(vst, metadata = coldat_2)
-```
-
 ## Hierarchical clustering
 
 Inter-correlation analysis (ICA) is another way to look at how well samples
@@ -453,7 +444,34 @@ p <- pheatmap(vst_cor,
 p
 ```
 
-# R session
+# Covariates analysis
+
+When there are multiple factors that can influence the results of a given experiment, it is useful to assess which of them is responsible for the most variance as determined by PCA. This method adapts the method described by Daily et al. for which they integrated a method to correlate covariates with principal components values to determine the importance of each factor. 
+
+```{r covariate-plot,fig.height=12, fig.width=10}
+## Remove non-useful columns output by nf-core
+coldat_2 <- data.frame(coldat_for_pca[,!(colnames(coldat_for_pca) %in% c("fastq_1", "fastq_2", "salmon_library_types", "salmon_compatible_fragment_ratio", "samtools_reads_mapped_percent", "samtools_reads_properly_paired_percent", "samtools_mapped_passed_pct", "strandedness", "qualimap_5_3_bias"))])
+
+# Remove missing data
+coldat_2 <- na.omit(coldat_2)
+degCovariates(vst, metadata = coldat_2)
+```
+
+# Conclusions
+
+# Methods
+
+RNA-seq counts were generated by the nf-core rnaseq pipeline [version] using Salmon (Patro et al. 2017). Downstream analyses were performed using `r version$version.string`. Counts were imported into R using DESeq2 version `r packageVersion("DESeq2")` (Love, Huber, and Anders 2014). Gene annotations were obtained from Ensembl. Plots were generated by ggplot2 (Wickham 2016). Heatmaps were generated by pheatmap (Kolde 2019).
+
+## R package references
+
+```{r citations, results='asis'}
+citation("DESeq2")
+citation("ggplot2")
+citation("pheatmap")
+```
+
+## R session
 
 List and version of tools used for the QC report generation.
 

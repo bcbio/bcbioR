@@ -14,8 +14,6 @@ output:
       toc_float:
          collapsed: true
          smooth_scroll: true
-editor_options: 
-  chunk_output_type: inline
 params:
   # set column name and contrasts to be factors of interest
   column: "sample_type"

@@ -3,19 +3,18 @@ library(clusterProfiler)
 source <- "https://github.com/bcbio/resources/raw/refs/heads/main/gene_sets/gene_sets/20240904"
 get_databases_v2=function(sps="human"){
   gmt.files=list(human=c("h.all.v2024.1.Hs.entrez.gmt",
-                         "c5.go.v2024.1.Hs.entrez.gmt",
+                         #"c5.go.v2024.1.Hs.entrez.gmt",
                          "c5.go.mf.v2024.1.Hs.entrez.gmt",
                          "c5.go.cc.v2024.1.Hs.entrez.gmt",
                          "c5.go.bp.v2024.1.Hs.entrez.gmt",
                          "c2.cp.reactome.v2024.1.Hs.entrez.gmt",
                          "c2.cp.kegg_legacy.v2024.1.Hs.entrez.gmt"),
                  mouse=c("mh.all.v2024.1.Mm.entrez.gmt",
-                         "m5.go.v2024.1.Mm.entrez.gmt",
+                         #"m5.go.v2024.1.Mm.entrez.gmt",
                          "m5.go.mf.v2024.1.Mm.entrez.gmt",
                          "m5.go.cc.v2024.1.Mm.entrez.gmt",
                          "m5.go.bp.v2024.1.Mm.entrez.gmt",
-                         "m2.cp.reactome.v2024.1.Mm.entrez.gmt",
-                         "m2.cp.kegg_legacy.v2024.1.Mm.entrez.gmt"))
+                         "m2.cp.reactome.v2024.1.Mm.entrez.gmt"))
   all_in_life=lapply(gmt.files[[sps]], function(gmt){
     df=read.gmt(file.path(source,sps,gmt))
     names(df)=c("gs_name", "entrez_gene")
@@ -41,15 +40,15 @@ get_databases=function(sps="human"){
 }
 
 run_fora_v2=function(input, uni, all_in_life){
-  total_deg=length(unique(input$ENTREZID))/length(unique(uni$ENTREZID))
+  total_deg=length(unique(input$entrez))/length(unique(uni$entrez))
   pathways_ora_all = lapply(names(all_in_life), function(database){
     p = all_in_life[[database]]
     #browser()
     pathway = split(x = p$entrez_gene, f = p$gs_name)
     db_name = database
     respath <- fora(pathways = pathway,
-                    genes = unique(input$ENTREZID),
-                    universe = unique(uni$ENTREZID),
+                    genes = unique(input$entrez),
+                    universe = unique(uni$entrez),
                     minSize  = 15,
                     maxSize  = 500)
     respath  %>%
@@ -58,11 +57,11 @@ run_fora_v2=function(input, uni, all_in_life){
     mutate(analysis="ORA")
   ora_tb = pathways_ora_all %>% unnest(overlapGenes) %>%
     group_by(pathway) %>%
-    left_join(uni, by =c("overlapGenes"="ENTREZID")) %>%
-    dplyr::select(pathway, padj, NES, SYMBOL, analysis,
+    left_join(uni, by =c("overlapGenes"="entrez")) %>%
+    dplyr::select(pathway, padj, NES, gene_name, analysis,
                   database) %>%
     group_by(pathway,padj,NES,database,analysis) %>%
-    summarise(genes=paste(SYMBOL,collapse = ","))
+    summarise(genes=paste(gene_name,collapse = ","))
   ora_tb
 
 }
