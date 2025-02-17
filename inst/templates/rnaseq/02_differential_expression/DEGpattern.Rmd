@@ -18,10 +18,7 @@ output:
 params:
    deseq_obj: "DEGpattern_deseq_obj.rds"
    deseq_meta: "DEGpattern_deseq_meta.rds"
-   deseq_result: "DEGpattern_deseq_results.rds"
-   padj.cutoff: 0.05
-   topN: 1000
-   
+   deseq_deg: "DEGpattern_deseq_DEGs_padj0.05_topN1000.rds"
 ---
 
 # Overview of this report
@@ -36,11 +33,11 @@ Three intermediate files required for this tutorial are `.rds` files containing:
 
 - `deseq_obj`: a `DESeq2` object formatted from your tximport
 - `deseq_meta`: a `data.frame` specifying the sample groups of interest
-- `deseq_result`: a `DESeq2` results object after running `DESeq()` analysis
+- `deseq_deg`: a named vector with Differentially Expressed Genes (DEG) as the name and adjusted p value as the value.
 
 All test data can be found in [bcbioR test data github repo](https://github.com/bcbio/bcbioR-test-data/tree/main/rnaseq).
 
-There are two additional parameters can be tuned:
+There are two additional parameters can be tuned in generating `deseq_deg` from the original `DESeq2` results:
 
 - `padj.cutoff`: cutoff for adjusted p-value of DESeq results; Default: 0.05
 - `topN`: A second filtering after `padj.cutoff` to keep only top significant genes for clustering for computing efficiency. If number of significant genes are less than the number supplied here, all genes will be used for clustering. Default: 1000 
@@ -48,7 +45,7 @@ There are two additional parameters can be tuned:
 ```{r setup, cache=FALSE,message=FALSE,echo=FALSE,eval=T}
 stopifnot(R.version$major>= 4) # requires R4
 options(stringsAsFactors = F)
-pacman::p_load(DEGreport,DESeq2,dplyr,ggplot2,knitr)
+pacman::p_load(DEGreport,DESeq2,dplyr,ggplot2,knitr,glue)
 ggplot2::theme_set(ggprism::theme_prism(base_size = 12))
 catCols <- as.vector(grafify:::graf_palettes[["kelly"]])
 scale_colour_discrete <- function(...)
@@ -74,33 +71,27 @@ invisible(list2env(params,environment()))
 ```
 
 ```{r data-loadin}
-dds <- readRDS(deseq_obj)
-dds_lrt <- readRDS(deseq_result)
-meta <- readRDS(deseq_meta)
+raw_bcbio <- "https://raw.githubusercontent.com/bcbio/bcbioR-test-data/main/"
+testdata_dir="rnaseq/DEGpattern"
+
+dds <- readRDS(url(glue("{raw_bcbio}/{testdata_dir}/{deseq_obj}")))
+meta <- readRDS(url(glue("{raw_bcbio}/{testdata_dir}/{deseq_meta}")))
+deg <- readRDS(url(glue("{raw_bcbio}/{testdata_dir}/{deseq_deg}")))
 ```
 
 
 ```{r result-extract}
 rld_mat <- assay(rlog(dds, blind=TRUE))
-res_LRT <- results(dds_lrt) %>% na.omit()
-gene_padj <- setNames(res_LRT$padj,rownames(res_LRT))
-gene_sig <- gene_padj[gene_padj<padj.cutoff]
-gene2cluster <- sort(gene_sig)[1:min(length(gene_sig),topN)]
 ```
 
 # Identifying clusters of genes with shared expression profiles
-
-We now have this list of `r length(gene_sig)` significant genes (padj < `r padj.cutoff`) that we know are changing in some way across the three different sample groups.
 
 A good next step is to identify groups of genes that share a pattern of expression change across the sample groups (levels). 
 
 To do this we will be using a clustering tool called `degPatterns` from the `DEGreport` package. The `degPatterns` tool uses a **hierarchical clustering approach based on pair-wise correlations** between genes, then cuts the hierarchical tree to generate groups of genes with similar expression profiles. The tool cuts the tree in a way to optimize the diversity of the clusters, such that the variability inter-cluster > the variability intra-cluster.
 
-To accelerate the process, we will subset to keep only the top `r topN` genes sorted by p-adjusted value.  
-
-
 ```{r cluster-DEGpattern}
-cluster_rlog <- rld_mat[names(gene2cluster), ]
+cluster_rlog <- rld_mat[names(deg), ]
 ```
 
 The rlog transformed counts for the significant genes are input to `degPatterns` along with a few additional arguments:
