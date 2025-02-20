@@ -80,11 +80,8 @@ fastq_files
 │   ├── sample2_I1_001.fastq.gz
 ```
 
-## Run Cellranger
+If you do not have this structure here is a simple bash script to create it. Simply strip suffixes off all sample names and put them in a file called samples.txt
 
-The easiest way to run cellranger is using the array feature on O2. [Here](https://github.com/hbc/knowledgebase/blob/master/rc/arrays_in_slurm.md) is a tutorial on arrays.
-
-To run cellranger as an array you will need one extra file. This file called `samples.txt` will have the name of each sample on its own line.
 
 ```
 sample1
@@ -93,6 +90,26 @@ sample3
 ...
 sampleN
 ```
+
+Then modify the suffixes here to match yours and run this bash script on the command line:
+
+```
+while read p; do
+  mkdir ${p}
+  mv ${p}_R1_001.fastq.gz ${p}
+  mv ${p}_R2_001.fastq.gz ${p}
+  mv ${p}_I1_001.fastq.gz ${p}
+  mv ${p}_I2_001.fastq.gz ${p}
+done < samples.txt
+```
+
+This will create the desired folder structure for cellranger.
+
+## Run Cellranger
+
+The easiest way to run cellranger is using the array feature on O2. [Here](https://github.com/hbc/knowledgebase/blob/master/rc/arrays_in_slurm.md) is a tutorial on arrays.
+
+To run cellranger as an array you will need one extra file. This file called `samples.txt` will have the name of each sample on its own line. See above for format.
 
 for ease `samples.txt` should be in the same directory as your sbatch script.
 
