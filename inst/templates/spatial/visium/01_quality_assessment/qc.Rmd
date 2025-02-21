@@ -17,33 +17,67 @@ output:
 params:
   project_file: ../information.R
   results_dir: ./results
-  path_data: ./data
+  visiumHD_obj: "MsBrain_FF-A1_subset.qs"
 ---
+
+This code is in this ![](https://img.shields.io/badge/status-draft-grey) revision.
+
+## Visium Description
+
+This report was adapted from [this tutorial](https://nbisweden.github.io/workshop-scRNAseq/labs/compiled/seurat/seurat_08_spatial.html). 
+
+Spatial transcriptomic data with the Visium (HD) platform is in many ways similar to scRNAseq data. The data is represented per spot/bin on the slide, as we have spatial barcode but no cellular barcodes. 
+
+For Visium data, each spot contains UMI counts for 5-20 cells instead of single cells, but is still quite sparse in the same way as scRNAseq data is, but with the additional information about spatial location in the tissue.
+
+For Visium HD, the slide contain two 6.5 x 6.5 mm Capture Areas with a continuous lawn of oligonucleotides arrayed in millions of 2 x 2 µm barcoded squares without gaps, achieving **single cell–scale spatial resolution**. The data is output at 2 µm, as well as multiple bin sizes. You can choose the bin resolution for downstream visualization and analysis. 
+
+The term **spot(s)/bin(s)** are used throughout this tutorial which corresponds to two technology Visium and Visium HD.
+
+The main objective of quality control is to filter the data so that we include only data from spots/bins that are of high quality. This makes it so that when we cluster our spots/bins, it is easier to identify distinct cell type populations.
+
+In spatial transcriptomic data, the main challenge is in **delineating spots/bins that are poor quality from spots/bins containing reads from less complex cells**. If you expect a particular cell type in your dataset to be less transcriptionally active as compared other cell types in your dataset, the spots/bins underneath this cell type will naturally have fewer detected genes and transcripts. However, having fewer detected genes and transcripts can also be a technical artifact and not a result of biological signal. 
+
+Various metrics can be used to filter low-quality cells from high-quality ones, including:
+
+- **UMI counts per spot/bin** - This is the number of unique transcripts detected per spot/bin. Because the spot/bin are very small, this number is less than what we would expect for non-spatial scRNAseq data.
+- **Genes detected per spot/bin** - This is the number of unique genes detected per spot/bin. Again, because the spots/bins are very small, this number is less than what we would expect for non-spatial scRNAseq data.
+- **Complexity (novelty score)** - The novelty score is computed by taking the ratio of nGenes over nUMI. If there are many captured transcripts (high nUMI) and a low number of genes detected in a spot, this likely means that you only captured a low number of genes and simply sequenced transcripts from those lower number of genes over and over again. These low complexity (low novelty) spots/bins could represent a specific cell type (i.e. red blood cells which lack a typical transcriptome), or could be due to an artifact or contamination. Generally, we expect the novelty score to be above 0.80 for good quality spots/bins.
+- **Mitochondrial counts ratio** - This metric can identify whether there is a large amount of mitochondrial contamination from dead or dying cells. We define poor quality samples for mitochondrial counts as spots/bins which surpass the 0.2 (20%) mitochondrial ratio mark, unless of course you are expecting this in your sample.
+- **Hemoglobin counts ratio** - This metric can identify whether there is a large amount of hemoglobin gene contamination from blood. We define poor quality samples for hemoglobin counts as spots/bins which surpass the 0.2 (20%) hemoglobin ratio mark, unless of course you are expecting this in your sample.
 
 ```{r, cache = FALSE, message = FALSE, warning=FALSE}
 # This set up the working directory to this file so all files can be found
 library(rstudioapi)
 setwd(fs::path_dir(getSourceEditorContext()$path))
-# NOTE: This code will check version, this is our recommendation, it may work
-#.      other versions
 stopifnot(R.version$major>= 4) # requires R4
 if (compareVersion(R.version$minor,"3.1")<0) warning("We recommend >= R4.3.1") 
-stopifnot(compareVersion(as.character(BiocManager::version()), "3.18")>=0)
-stopifnot(compareVersion(as.character(packageVersion("Seurat")), "5.0.0")>=0)
+stopifnot(compareVersion(as.character(BiocManager::version()), "3.16")>=0)
+stopifnot(compareVersion(as.character(packageVersion("Seurat")), "5.1")>=0)
 ```
 
-This code is in this ![](https://img.shields.io/badge/status-draft-grey) revision.
+
 
 ```{r load_libraries, cache = FALSE, message = FALSE, warning=FALSE, echo=FALSE,}
-# Libraries
 library(bcbioR)
-library(Seurat)
-library(tidyverse)
+library(knitr)
 library(glue)
-library(gridExtra)
-library(scales)
+library(qs)
+library(dplyr)
+library(purrr)
+library(ggplot2)
 library(ggprism)
 library(grafify)
+library(ggpubr)
+library(gridExtra)
+library(scales)
+library(Seurat)
+
+import::from(magrittr,set_colnames,set_rownames,"%<>%")
+
+invisible(list2env(params,environment()))
+source(project_file)
+
 ggplot2::theme_set(theme_prism(base_size = 12))
 # https://grafify-vignettes.netlify.app/colour_palettes.html
 # NOTE change colors here if you wish
@@ -71,7 +105,7 @@ opts_chunk[["set"]](
 set.seed(1234567890L)
 ```
 
-# Project details
+## Project details
 
 -   Project: `r project`
 -   PI: `r PI`
@@ -79,309 +113,169 @@ set.seed(1234567890L)
 -   Experiment: `r experiment`
 -   Aim: `r aim`
 
-The following samples were found in the data folder for this project:
-
-```{r samples}
-samples <- list.files(path_data)
-samples
+```{r metric-calc}
+# Metrics like `nCount` and `nfeature` are named with the suffix of default assay name, to make the variable usage more generalizable, we removed the suffix by pulling out the default assay of the visium `seurat` object.
+visium <- qread(visiumHD_obj)
+visium <- PercentageFeatureSet(visium, "^mt-", col.name = "percent_mito")
+visium <- PercentageFeatureSet(visium, "^Hb.*-", col.name = "percent_hb")
+metaD <- visium@meta.data
+metaD$log10GenesPerUMI <- log10(metaD$nFeature)/log10(metaD$nCount)
+colnames(metaD)%<>%gsub(pattern=glue("_{DefaultAssay(visium)}"),replacement="")
 ```
 
-## Visium Description
+Let's take a quick look at the data and make a decision on whether we need to apply any filtering.
 
-This report is adapted from: https://nbisweden.github.io/workshop-scRNAseq/labs/compiled/seurat/seurat_07_spatial.html
+## Quality control per spot/bin{.tabset}
 
-Spatial transcriptomic data with the Visium platform is in many ways similar to scRNAseq data. The data is represented per spot on the slide, as we have spatial barcode bust no cellular barcodes. Each spot contains UMI counts for 5-20 cells instead of single cells, but is still quite sparse in the same way as scRNAseq data is, but with the additional information about spatial location in the tissue.
+### Number of UMIs and genes detected per spot/bin
 
+Those two metrics is really dependent on tissue type, RNA quality, and sequencing depth. Since the test data is generated from Visium HD technology, we use bin and corresponding reference thresholds in the plot. Reference line at 100 is plotted as the suggested cut-offs for both metrics. 
 
-# 10X Sequencing Metrics {.tabset}
-
-Here, we take a quick look at metrics reported from spaceranger for each sample.
-
-```{r summary-metrics}
-# Create a for loop to create one dataframe with 10X metrics
-metrics <- data.frame()
-for (sample in samples) {
-  m <- read.csv(glue("{path_data}/{sample}/outs/metrics_summary.csv"))
-  metrics <- rbind(metrics, m)
-}
-```
-
-## Number of spots per slide
-
-```{r nSpots}
-metrics %>% 
-  ggplot(aes(x=Sample.ID, y=(Number.of.Spots.Under.Tissue), fill=Sample.ID)) + 
-  geom_col() +
-  theme_classic() +
-  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1),
-        axis.title = element_text(size=rel(1.5)),
-        plot.title = element_text(hjust = 0.5, face="bold")) +
-  ggtitle("Number of Spots") +
-  xlab("") + ylab("Number of spots")
-```
-
-## Number of sequencing reads
-
-
-```{r nReads}
-metrics %>% 
-  ggplot(aes(x=Sample.ID, y=(Number.of.Reads/ 1000000), fill=Sample.ID)) + 
-  geom_col() +
-  theme_classic() +
-  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1),
-        axis.title = element_text(size=rel(1.5)),
-        plot.title = element_text(hjust = 0.5, face="bold")) +
-  ggtitle("Number of sequencing reads") +
-  xlab("") + ylab("Number of reads (in millions)")
-```
-
-## Mean reads per spot
-
-**The recommended value here is 50,000.**
-
-```{r reads_per_spot}
-metrics %>%
-  ggplot(aes(x=Sample.ID, y=Mean.Reads.per.Spot, fill=Sample.ID)) +
-  geom_col() +
-  theme_classic() +
-  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1),
-        axis.title = element_text(size=rel(1.5)),
-        plot.title = element_text(hjust = 0.5, face="bold")) +
-  ggtitle("Mean reads per spot") +
-  geom_hline(yintercept=50000, linetype=2)
-```
-
-## Fraction of reads in spots under tissue
-
-**The recommended value here is  > 50%.**
-
-Low fraction reads in spots under the tissue indicate that many of the reads were not assigned to tissue covered spots. This could be caused by: 
-
-* High levels of ambient RNA resulting from inefficient permeabilization
-* The incorrect image or orientation was used
-* Poor tissue detection
-
-```{r frac_reads}
-metrics %>%  
-  ggplot(aes(x=Sample.ID, y= (Fraction.Reads.in.Spots.Under.Tissue * 100), fill=Sample.ID)) + 
-  geom_col() +
-  theme_classic() +
-  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1),
-        axis.title = element_text(size=rel(1.5)),
-        plot.title = element_text(hjust = 0.5, face="bold")) +
-  xlab("") + ylab("Fraction of reads in spots") +
-  ggtitle("Fraction of reads") + 
-  geom_hline(yintercept = 50, linetype =2) +
-  ylim(c(0, 100))
-```
-
-# Setup for analysis
-
-Next, we will run quality control in a similar manner to scRNAseq data. Start by loading in each sample and then merged into one Seurat object.
-
-```{r create_seurat}
-# Create seurat list
-seurat_list <- list()
-for (sample in samples) {
-  
-  # Load data to create a Seurat object
-  x <- Load10X_Spatial(glue("{path_data}/{sample}/outs/"))
-  x$orig.ident <- sample
-
-  # Add individual seurat objects to list
-  seurat_list[[sample]] <- x
-}
-
-# Merge together every seurat object in list
-merged <- merge(
-    x = seurat_list[[samples[1]]],
-    y = seurat_list[samples[2: length(samples)]],
-    project = project,
-    add.cell.ids = samples
+```{r}
+summary_metaD <- apply(metaD[,-1],2,mean)
+metacol_label <- list("nFeature"="Genes","nCount"="UMI")
+refs <- list("nFeature"=100,"nCount"=100)
+dists_before <- imap(metacol_label,\(label,col)
+  ggdensity(metaD,
+          x = col,xscale="log10",add = "mean", rug = TRUE,
+          alpha = 0.2,fill = "lightgray",
+          xlab=glue("Number of {label} per bin(in log10 scale)"),
+          ylab="Cell density",
+          title=glue('Pre-QC {label}/Bin'))+
+  geom_vline(xintercept = refs[[col]],color="darkred",cex=rel(1.3),linetype="dashed")+
+  annotate("text",x=summary_metaD[col],y = Inf,
+           label = glue("Mean \n = {round(summary_metaD[col],0)}"),
+            vjust = 1,hjust=2)
 )
-
-merged
+dists_before[[1]] | dists_before[[2]]
 ```
 
-Next we make sure that all the relevant metadata for each cell is included in the seurat object by looking at the first few rows of the dataframe. Note that `nCounts` refers to the total number of UMIs for a spot while `nFeatures` tallies the number of genes that are expressed in the spot.
 
-```{r view_metadata}
-# This is great spot to add any additional metadata you may have for the samples
+### Overall complexity of transcriptional profile per spot/bin
 
-# Calculate novelty score
-merged$log10GenesPerUMI <- log10(merged$nFeature_Spatial) / log10(merged$nCount_Spatial)
-
-merged@meta.data %>% head()
-```
-
-# Quality control per spot {.tabset}
-
-Similar to scRNAseq we use statistics on number of counts, number of features and percent mitochondria for quality control. However, the expected distributions for high-quality spots are different (compared to high-quality cells in scRNA-seq), since spots may contain zero, one, or multiple cells.
-
-## Number of UMIs detected per spot 
-
-This number is really dependent on tissue type, RNA quality, and sequencing depth. For example, with one of the public Visium datasets using the mouse brain hippocampus region, we saw an average of 4.5k genes and 20k UMIs per spot. 
-
-```{r nUMI}
-merged@meta.data %>%
-    ggplot(aes(x=orig.ident, y = nCount_Spatial)) + 
-    geom_violin(aes(fill=orig.ident), alpha = 0.5) +
-    geom_boxplot(width=0.1) +
-    geom_hline(yintercept = 10000, linetype = "dashed") +
-    scale_y_log10() +
-    theme_classic() +
-    ylab("density") +
-    theme(plot.title = element_text(hjust=0.5, face="bold")) +
-    ggtitle("Num UMIs per spot")
-```
-
-## Number of genes detected per spot 
-
-The number of genes per spot will vary by sample, however in this dataset values are generally on the high end. _The dashed line is drawn at 4000 genes, which is a fairly high threshold._
-
-
-```{r nGenes, fig.width=9}
-merged@meta.data %>%
-    ggplot(aes(x=orig.ident, y = nFeature_Spatial)) + 
-    geom_violin(aes(fill=orig.ident), alpha = 0.5) +
-    geom_boxplot(width=0.1) +
-    geom_hline(yintercept = 4000, linetype = "dashed") +
-    scale_y_log10() +
-    theme_classic() +
-    ylab("density") +
-    theme(plot.title = element_text(hjust=0.5, face="bold")) +
-    ggtitle("Num Genes per Spot")
-```
-
-## Overall complexity of transcriptional profile per spot
-
-We can evaluate each spot in terms of how complex the RNA species are by using a measure called the novelty score. The novelty score is computed by taking the ratio of nGenes over nUMI. If there are many captured transcripts (high nUMI) and a low number of genes detected in a cell, this likely means that you only captured a low number of genes and simply sequenced transcripts from those lower number of genes over and over again.
+We can evaluate each spot/bin in terms of how complex the RNA species are by using a measure called the novelty score. The novelty score is computed by taking the ratio of nGenes over nUMI. If there are many captured transcripts (high nUMI) and a low number of genes detected in a cell, this likely means that you only captured a low number of genes and simply sequenced transcripts from those lower number of genes over and over again.
 
 With scRNA-seq this is more easily interpreted for a single cell, but for spatial data this would give us complexity of the spot, which is across multiple cells.
 
 ```{r complexity}
-merged@meta.data %>%
-    ggplot(aes(x=log10GenesPerUMI, color=orig.ident, fill=orig.ident)) +
-    geom_density(alpha = 0.2) +
-    theme_classic() +
-    geom_vline(xintercept = 0.8) +
-    ggtitle("Novelty score") +
+col <- "log10GenesPerUMI"
+ggdensity(metaD,x = col,add = "mean", rug = TRUE,
+          alpha = 0.2,fill = "lightgray",
+          xlab="complexity",ylab="Cell density",title=glue('Novelty score'))+
+  geom_vline(xintercept = 0.8,color="darkred",cex=rel(1.3),linetype="dashed")+
+  annotate("text",x=summary_metaD[col],y = Inf,
+           label = glue("Mean = {round(summary_metaD[col],0)}"),
+            vjust = 1,hjust=2)+
     theme(plot.title = element_text(hjust=0.5, face="bold"))
 ```
 
-# QC metrics visualized on slides {.tabset}
+### mitochondria & hemoglospot/bingene ratios
 
-Here, we can look at the distribution of UMI and gene counts on the individual tissue slide.
+```{r}
+ggplot(metaD %>% 
+         select(orig.ident,starts_with("percent_")) %>% 
+         tidyr::gather(class,percent_unexpected,-orig.ident), 
+        aes_string(x = "orig.ident", y = "percent_unexpected")) +
+    geom_violin(position=position_dodge(1),alpha=1, na.rm=TRUE,trim=FALSE)+
+    ggbeeswarm::geom_quasirandom(na.rm=TRUE,dodge.width=0.5,
+                                 method='quasirandom',alpha=0.01)+
+    geom_boxplot(width=0.1,outliers = F)+
+   geom_hline(yintercept=20)+
+   facet_grid(~class,scales = "free")+
+    theme(
+      axis.text.x = element_text(size=rel(1),face="bold"),
+      plot.title = element_text(hjust = 0.5),
+      strip.text.x = element_text(size = rel(1.5), colour = "black"),
+      legend.position = "none"
+          )+
+  scale_y_log10(breaks=c(1,5,10,20,100))+
+  # ylim(c(0,100))+
+  labs(x="",y="% of contamination genes")
+```
 
-```{r spatial-plot, results='asis', fig.width=7, fig.height=4}
-# Iterate through each sample to make visualizations for each slide
-for (sample in samples) {
+## QC metrics visualized on slides{.tabset}
+
+Here, we can look at all the QC metrics we discussed above on the individual tissue slide.
+
+```{r}
+features2check <- c(glue('nCount_{DefaultAssay(visium)}'),
+                    glue('nFeature_{DefaultAssay(visium)}'),
+                    "percent_mito","percent_hb")
+```
+
+```{r spatial-plot,fig.height=5,fig.width=5,eval=T,results='asis'}
+for(f in features2check){
+  cat("### ", f, "\n\n")
+  p1 <- SpatialFeaturePlot(visium, 
+                   feature = f,
+                  pt.size.factor = 8)
+  print(p1)
   cat("\n\n")
-
-  # Print plots for nUMI and nGenes for each spot on the slide
-  cat("## Sample", sample, "\n")
-  p <- SpatialFeaturePlot(seurat_list[[sample]],
-                          features = c("nCount_Spatial", "nFeature_Spatial"),
-                          max.cutoff = 'q80')
-  print(p)
-  cat("\n")
- }
-```
-
-# Normalization and Clustering 
-
-Seurat recommends the use of SCTransform for spatial data. SCTransform normalizes the data, detects high-variance features, and stores the data in the SCT assay. We then perform clustering (at a default resolution of 0.8 with 30 PCs) and create UMAP coordinates.
-
-Let's look at the UMAP and clustering for each group to see if further integration is necessary.
-
-```{r sc_workflow}
-# Making sure that the rownames of metadata are the same as what is stored in Cells()
-rownames(merged@meta.data) <- Cells(merged)
-
-# Standard processing of counts matrix
-# SCTransform, PCA, clusters, and run UMAP
-merged <- SCTransform(merged, assay = "Spatial", verbose = TRUE)
-merged <- RunPCA(merged , assay = "SCT", verbose = FALSE)
-merged <- FindNeighbors(merged, reduction = "pca", dims = 1:30)
-merged <- FindClusters(merged, verbose = FALSE,
-                       resolution = c(0.2, 0.4, 0.6, 0.8, 1))
-merged <- RunUMAP(merged, reduction = "pca", dims = 1:30)
-```
-
-## UMAP distribution {.tabset}
-
-### Samples
-
-```{r umap_sample}
-Idents(merged) <- "orig.ident"
-DimPlot(merged, reduction = "umap")
-```
-
-### Samples split
-
-```{r umap_sample_split}
-# Get UMAP coordinates
-df <- FetchData(merged, c("umap_1", "umap_2", "orig.ident"))
-
-# Colors for each sample
-palette_fill <- hue_pal()(length(samples))
-names(palette_fill) <- samples
-
-# Create plot list to arrange later
-plot_list <- list()
-for (sample in samples) {
-  
-  # Get cells of one sample
-  df_sample <- df[df$orig.ident == sample, ]
-
-  # Plot color dots (for each sample) overlaid over grey
-  p <- ggplot() +
-        geom_point(data=df, 
-                   aes(x=umap_1, y=umap_2), color="lightgray", 
-                   alpha = 0.5, size=1, show.legend=FALSE) +
-        geom_point(data=df_sample, 
-                   aes(x=umap_1, y=umap_2), 
-                   color=palette_fill[sample]) +
-        theme_classic() +
-        ggtitle(sample)
-  
-  plot_list[[sample]] <- p
 }
-
-grid.arrange(grobs = plot_list)
 ```
 
+## Top expressed genes
 
-### Clusters at resolution 0.8
+Now, it is time to choose some cut-offs for QC metrics mentioned above and removing low-quality cells, as well as mitochondria, hemoglobin genes from the feature space and we can take a quick look at what are our top 20 expressed genes.
 
-```{r umap_clusters}
-Idents(merged) <- "SCT_snn_res.0.8"
-p <- DimPlot(merged, reduction = "umap")
-LabelClusters(p, id ="ident",  fontface = "bold", size = 6, 
-              bg.colour = "white", bg.r = .2, force = 0)
+```{r filtering,fig.height=7,fig.width=7}
+GeneVar <- glue('nFeature_{DefaultAssay(visium)}')
+UMIVar <- glue('nCount_{DefaultAssay(visium)}')
+cutoffs <- list("nFeature"=100,"nCount"=100,"hb"=20,"mito"=20)
+Qced <-  visium@meta.data[,GeneVar] > cutoffs$nFeature & 
+     visium@meta.data[,UMIVar] > cutoffs$nCount & 
+     visium$percent_hb < cutoffs$hb & 
+     visium$percent_mito < cutoffs$mito
+visium <- visium[,Qced]
+# Filter Mitocondrial
+visium <- visium[!grepl("^mt-", rownames(visium)), ]
+# Filter Hemoglobin gene (optional if that is a problem on your data)
+visium <- visium[!grepl("^Hb.*-", rownames(visium)), ]
+
+C <- GetAssayData(visium, slot = "counts")
+C@x <- C@x / rep.int(colSums(C), diff(C@p))
+most_expressed <- order(Matrix::rowSums(C), decreasing = T)[20:1]
+exprD <- as.data.frame(t(C[most_expressed, ])) %>% 
+  tibble::rownames_to_column("bin") %>% 
+  tidyr::gather(gene,expr,-bin)
+
+
+ggplot(exprD,aes(x=gene,y=expr,color=gene,fill=gene))+
+  geom_violin(position=position_dodge(1),alpha=0.5,
+              na.rm=TRUE,trim=FALSE)+
+  geom_boxplot(width=0.1,outliers = F,color="black")+
+  theme_minimal()+
+  theme(
+      axis.text.x = element_text(size=rel(1),face="bold"),
+      plot.title = element_text(hjust = 0.5),
+      legend.position = "none"
+    )+ 
+  scale_y_log10(breaks=c(0.001,.01,.1,1),labels=c(0.1,1,10,100))+
+  labs(x="",y="% of total UMIs/bin \n (log10 scaled)")+
+  coord_flip()
 ```
 
-# Clusters ontop slides
-
-```{r cluster_slides fig.height=15}
-SpatialDimPlot(merged, label = TRUE, ncol=1)
-```
-
-# Save seurat object
 
 ```{r save_seurat}
-saveRDS(merged, file.path(params$results_dir, "01_qc.RDS"))
+if(!dir.exists(results_dir)){
+  system(glue("mkdir -p {results_dir}"))
+}
+saveRDS(visium, file.path(results_dir, "01_qc.RDS"))
+outputPath = file.path(results_dir, "01_qc.RDS")
 ```
-# Methods
+
+We saved your qc-filled Seurat object in **`r outputPath`**.
+
+## Methods
 
 
-## Citation
+### Citation
 
 ```{r citations}
 citation("Seurat")
 ```
 
-## Session Information
+### Session Information
 
 ```{r}
 sessionInfo()
