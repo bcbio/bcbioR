@@ -75,7 +75,7 @@ opts_chunk[["set"]](
 invisible(list2env(params,environment()))
 
 inputRead <- function(f){
-  if(isUrl(deseq_obj)){
+  if(R.utils::isUrl(deseq_obj)){
   return(readRDS(url(deseq_obj)))
   }else{
   return(readRDS(deseq_obj))
