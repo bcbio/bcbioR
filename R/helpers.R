@@ -201,6 +201,7 @@ copy_templates <- function(path, pipeline, org=NULL){
     parts = c("templates/multiomics")
   }else if(pipeline=="spatial"){
     parts = c("templates/spatial")
+    # apps=c(apps, SpatialViz="https://github.com/hbc/RShiny_app-SpatialViz/archive/refs/tags/Latest.zip")
   }else if(pipeline=="chipseq"){
     parts = c("templates/chipseq")
   }

@@ -200,6 +200,11 @@ rdata <- ensembldb::genes(ens, return.type = "data.frame")  %>%
 
 # Keep one entrez Id per gene
 rdata$entrez <- purrr::map(rdata$entrez,1) %>%  unlist()
+# Filter not needed genes
+# rdata <- rdata %>% filter(!grepl("ncRNA", gene_biotype)) %>% 
+#   filter(!grepl('Mir', gene_name)) %>% # other examples
+#   filter(!grepl('Snor', gene_name))
+# counts <- counts[rdata$gene_id,]
 ```
 
 # Set up
