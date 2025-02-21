@@ -16,9 +16,9 @@ output:
          collapsed: true
          smooth_scroll: true
 params:
-   deseq_obj: "DEGpattern_deseq_obj.rds"
-   deseq_meta: "DEGpattern_deseq_meta.rds"
-   deseq_deg: "DEGpattern_deseq_DEGs_padj0.05_topN1000.rds"
+   deseq_obj: "https://raw.githubusercontent.com/bcbio/bcbioR-test-data/main/rnaseq/DEGpattern/DEGpattern_deseq_obj.rds"
+   deseq_meta: "https://raw.githubusercontent.com/bcbio/bcbioR-test-data/main/rnaseq/DEGpattern/DEGpattern_deseq_meta.rds"
+   deseq_deg: "https://raw.githubusercontent.com/bcbio/bcbioR-test-data/main/rnaseq/DEGpattern/DEGpattern_deseq_DEGs_padj0.05_topN1000.rds"
 ---
 
 # Overview of this report
@@ -45,7 +45,12 @@ There are two additional parameters can be tuned in generating `deseq_deg` from 
 ```{r setup, cache=FALSE,message=FALSE,echo=FALSE,eval=T}
 stopifnot(R.version$major>= 4) # requires R4
 options(stringsAsFactors = F)
-pacman::p_load(DEGreport,DESeq2,dplyr,ggplot2,knitr,glue)
+library(DEGreport)
+library(DESeq2)
+library(dplyr)
+library(ggplot2)
+library(knitr)
+library(glue)
 ggplot2::theme_set(ggprism::theme_prism(base_size = 12))
 catCols <- as.vector(grafify:::graf_palettes[["kelly"]])
 scale_colour_discrete <- function(...)
@@ -68,15 +73,20 @@ opts_chunk[["set"]](
 )
 
 invisible(list2env(params,environment()))
+
+inputRead <- function(f){
+  if(isUrl(deseq_obj)){
+  return(readRDS(url(deseq_obj)))
+  }else{
+  return(readRDS(deseq_obj))
+}
+}
 ```
 
 ```{r data-loadin}
-raw_bcbio <- "https://raw.githubusercontent.com/bcbio/bcbioR-test-data/main/"
-testdata_dir="rnaseq/DEGpattern"
-
-dds <- readRDS(url(glue("{raw_bcbio}/{testdata_dir}/{deseq_obj}")))
-meta <- readRDS(url(glue("{raw_bcbio}/{testdata_dir}/{deseq_meta}")))
-deg <- readRDS(url(glue("{raw_bcbio}/{testdata_dir}/{deseq_deg}")))
+dds <- inputRead(deseq_obj)
+meta <- inputRead(deseq_meta)
+deg <- inputRead(deseq_deg)
 ```
 
 

@@ -54,22 +54,27 @@ stopifnot(R.version$major>= 4) # requires R4
 if (compareVersion(R.version$minor,"3.1")<0) warning("We recommend >= R4.3.1") 
 stopifnot(compareVersion(as.character(BiocManager::version()), "3.16")>=0)
 stopifnot(compareVersion(as.character(packageVersion("Seurat")), "5.1")>=0)
-
-# devtools::install_version(c('Matrix'), c('1.6.4'))
-# devtools::install_version(c('SeuratObject'), c('5.0.2'))
-# devtools::install_version(c('Seurat'), c('5.1'))
-# to-do: write more informative msg to direct the upgrade seurat version
 ```
 
 
 
 ```{r load_libraries, cache = FALSE, message = FALSE, warning=FALSE, echo=FALSE,}
-pacman::p_load(bcbioR,knitr,
-               glue,qs,dplyr,purrr,
-               ggplot2,ggprism,grafify,ggpubr,
-               gridExtra,scales,
-               Seurat)
+library(bcbioR)
+library(knitr)
+library(glue)
+library(qs)
+library(dplyr)
+library(purrr)
+library(ggplot2)
+library(ggprism)
+library(grafify)
+library(ggpubr)
+library(gridExtra)
+library(scales)
+library(Seurat)
+
 import::from(magrittr,set_colnames,set_rownames,"%<>%")
+
 invisible(list2env(params,environment()))
 source(project_file)
 
@@ -110,7 +115,6 @@ set.seed(1234567890L)
 
 ```{r metric-calc}
 # Metrics like `nCount` and `nfeature` are named with the suffix of default assay name, to make the variable usage more generalizable, we removed the suffix by pulling out the default assay of the visium `seurat` object.
-
 visium <- qread(visiumHD_obj)
 visium <- PercentageFeatureSet(visium, "^mt-", col.name = "percent_mito")
 visium <- PercentageFeatureSet(visium, "^Hb.*-", col.name = "percent_hb")
@@ -125,12 +129,12 @@ Let's take a quick look at the data and make a decision on whether we need to ap
 
 ### Number of UMIs and genes detected per spot/bin
 
-Those two metrics is really dependent on tissue type, RNA quality, and sequencing depth. Since the test data is generated from Visium HD technology, we use bin and corresponding reference thresholds in the plot. Two reference lines 20 and 100 are plotted as the suggested cut-offs. 100 UMI per bin is suggested from 10x website and a 5 fold difference between two metrics are taken here.
+Those two metrics is really dependent on tissue type, RNA quality, and sequencing depth. Since the test data is generated from Visium HD technology, we use bin and corresponding reference thresholds in the plot. Reference line at 100 is plotted as the suggested cut-offs for both metrics. 
 
 ```{r}
 summary_metaD <- apply(metaD[,-1],2,mean)
 metacol_label <- list("nFeature"="Genes","nCount"="UMI")
-refs <- list("nFeature"=20,"nCount"=100)
+refs <- list("nFeature"=100,"nCount"=100)
 dists_before <- imap(metacol_label,\(label,col)
   ggdensity(metaD,
           x = col,xscale="log10",add = "mean", rug = TRUE,
@@ -176,16 +180,16 @@ ggplot(metaD %>%
     ggbeeswarm::geom_quasirandom(na.rm=TRUE,dodge.width=0.5,
                                  method='quasirandom',alpha=0.01)+
     geom_boxplot(width=0.1,outliers = F)+
-   geom_hline(yintercept=0.2)+
+   geom_hline(yintercept=20)+
    facet_grid(~class,scales = "free")+
     theme(
       axis.text.x = element_text(size=rel(1),face="bold"),
       plot.title = element_text(hjust = 0.5),
       strip.text.x = element_text(size = rel(1.5), colour = "black"),
       legend.position = "none"
-    )+ scale_y_continuous(trans = log2_trans(),
-    breaks = trans_breaks("log2", function(x) 2^x),
-    labels = trans_format("log2", math_format(2^.x)))+
+          )+
+  scale_y_log10(breaks=c(1,5,10,20,100))+
+  # ylim(c(0,100))+
   labs(x="",y="% of contamination genes")
 ```
 
@@ -217,7 +221,7 @@ Now, it is time to choose some cut-offs for QC metrics mentioned above and remov
 ```{r filtering,fig.height=7,fig.width=7}
 GeneVar <- glue('nFeature_{DefaultAssay(visium)}')
 UMIVar <- glue('nCount_{DefaultAssay(visium)}')
-cutoffs <- list("nFeature"=20,"nCount"=100,"hb"=20,"mito"=20)
+cutoffs <- list("nFeature"=100,"nCount"=100,"hb"=20,"mito"=20)
 Qced <-  visium@meta.data[,GeneVar] > cutoffs$nFeature & 
      visium@meta.data[,UMIVar] > cutoffs$nCount & 
      visium$percent_hb < cutoffs$hb & 
