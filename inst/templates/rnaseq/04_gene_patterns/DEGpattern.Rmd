@@ -1,0 +1,169 @@
+---
+title: "DEGpattern visualizations"
+author: "Harvard Chan Bioinformatics Core"
+date: "`r Sys.Date()`"
+output:
+   html_document:
+      code_folding: hide
+      df_print: paged
+      highlights: pygments
+      number_sections: true
+      self_contained: true
+      theme: default
+      eval: true
+      toc: true
+      toc_float:
+         collapsed: true
+         smooth_scroll: true
+params:
+   deseq_obj: "https://raw.githubusercontent.com/bcbio/bcbioR-test-data/main/rnaseq/DEGpattern/DEGpattern_deseq_obj.rds"
+   deseq_meta: "https://raw.githubusercontent.com/bcbio/bcbioR-test-data/main/rnaseq/DEGpattern/DEGpattern_deseq_meta.rds"
+   deseq_deg: "https://raw.githubusercontent.com/bcbio/bcbioR-test-data/main/rnaseq/DEGpattern/DEGpattern_deseq_DEGs_padj0.05_topN1000.rds"
+---
+
+# Overview of this report
+
+Template developed with materials in HBC training: [Intro-to-DGE](https://github.com/hbctraining/Intro-to-DGE/blob/master/lessons/08a_DGE_LRT_results.md).
+
+Default test data was originally from this [paper](https://pubmed.ncbi.nlm.nih.gov/25464849/), required raw data can be downloaded with links ([Salmon data](https://www.dropbox.com/s/oz9yralwbtphw8u/data.zip?dl=1), [Annotation file](https://github.com/hbctraining/DGE_workshop_salmon/raw/master/data/tx2gene_grch38_ens94.txt)). 
+
+Steps taking from raw data to intermediate files required for this visualization can be found in `Data_prep.R` and are adapted from two main DGE training materials: [data set up](https://github.com/hbctraining/Intro-to-DGE/blob/master/lessons/01b_DGE_setup_and_overview.md); [count normalization](https://github.com/hbctraining/Intro-to-DGE/blob/master/lessons/02_DGE_count_normalization.md).
+
+Three intermediate files required for this tutorial are `.rds` files containing:
+
+- `deseq_obj`: a `DESeq2` object formatted from your tximport
+- `deseq_meta`: a `data.frame` specifying the sample groups of interest
+- `deseq_deg`: a named vector with Differentially Expressed Genes (DEG) as the name and adjusted p value as the value.
+
+All test data can be found in [bcbioR test data github repo](https://github.com/bcbio/bcbioR-test-data/tree/main/rnaseq).
+
+There are two additional parameters can be tuned in generating `deseq_deg` from the original `DESeq2` results:
+
+- `padj.cutoff`: cutoff for adjusted p-value of DESeq results; Default: 0.05
+- `topN`: A second filtering after `padj.cutoff` to keep only top significant genes for clustering for computing efficiency. If number of significant genes are less than the number supplied here, all genes will be used for clustering. Default: 1000 
+
+```{r setup, cache=FALSE,message=FALSE,echo=FALSE,eval=T}
+stopifnot(R.version$major>= 4) # requires R4
+options(stringsAsFactors = F)
+library(DEGreport)
+library(DESeq2)
+library(dplyr)
+library(ggplot2)
+library(knitr)
+library(glue)
+ggplot2::theme_set(ggprism::theme_prism(base_size = 12))
+catCols <- as.vector(grafify:::graf_palettes[["kelly"]])
+scale_colour_discrete <- function(...)
+  scale_colour_manual(...,values = catCols)
+
+set.seed(1454944673L)
+opts_chunk[["set"]](
+    audodep = TRUE,
+    cache = FALSE,
+    cache.lazy = FALSE,
+    error = TRUE,
+    echo = F,
+    eval=T,
+    fig.height = 6,
+    fig.retina = 2L,
+    fig.width = 6,
+    message = FALSE,
+    tidy = F,
+    warning = F
+)
+
+invisible(list2env(params,environment()))
+
+inputRead <- function(f){
+  if(R.utils::isUrl(deseq_obj)){
+  return(readRDS(url(deseq_obj)))
+  }else{
+  return(readRDS(deseq_obj))
+}
+}
+```
+
+```{r data-loadin}
+dds <- inputRead(deseq_obj)
+meta <- inputRead(deseq_meta)
+deg <- inputRead(deseq_deg)
+```
+
+
+```{r result-extract}
+rld_mat <- assay(rlog(dds, blind=TRUE))
+```
+
+# Identifying clusters of genes with shared expression profiles
+
+A good next step is to identify groups of genes that share a pattern of expression change across the sample groups (levels). 
+
+To do this we will be using a clustering tool called `degPatterns` from the `DEGreport` package. The `degPatterns` tool uses a **hierarchical clustering approach based on pair-wise correlations** between genes, then cuts the hierarchical tree to generate groups of genes with similar expression profiles. The tool cuts the tree in a way to optimize the diversity of the clusters, such that the variability inter-cluster > the variability intra-cluster.
+
+```{r cluster-DEGpattern}
+cluster_rlog <- rld_mat[names(deg), ]
+```
+
+The rlog transformed counts for the significant genes are input to `degPatterns` along with a few additional arguments:
+
+* `metadata`: the metadata dataframe that corresponds to samples
+* `time`: character column name in metadata that will be used as variable that changes
+* `col`: character column name in metadata to separate samples
+
+```{r plot-DEGpattern}
+clusters <- degPatterns(cluster_rlog, 
+                        metadata = meta,
+                        time = "sampletype",
+                        col=NULL,plot=F)
+P <- clusters$plot+
+  theme_bw()+
+  theme(legend.position="None",
+        strip.text = element_text(size = rel(1.5)),
+        strip.background = element_blank())+
+  scale_x_discrete(labels=gsub("_","\n",levels(meta$sampletype)))
+print(P)
+```
+
+The genes have been clustered into four different groups. For each group of genes, we have a boxplot illustrating expression change across the different sample groups. A line graph is overlayed to illustrate the trend in expression change.
+
+
+# Zoom in a specific cluster of genes
+
+
+Since we are interested in Group 1, we can filter the dataframe to keep only those genes:
+
+```{r display-clusters}
+# Extract the Group 1 genes
+DT::datatable(clusters$df %>%
+          dplyr::filter(cluster == 1),rownames= FALSE)
+```
+
+After extracting a group of genes, we can use annotation packages to obtain additional information. We can also use these lists of genes as input to downstream functional analysis tools to obtain more biological insight and see whether the groups of genes share a specific function. 
+
+
+---
+*This lesson has been developed by members of the teaching team at the [Harvard Chan Bioinformatics Core (HBC)](http://bioinformatics.sph.harvard.edu/). These are open access materials distributed under the terms of the [Creative Commons Attribution license](https://creativecommons.org/licenses/by/4.0/) (CC BY 4.0), which permits unrestricted use, distribution, and reproduction in any medium, provided the original author and source are credited.*
+
+* *Materials and hands-on activities were adapted from [RNA-seq workflow](http://www.bioconductor.org/help/workflows/rnaseqGene/#de) on the Bioconductor website*
+
+# Conclusions
+
+# Methods
+
+## R package references
+
+```{r citations, results='asis'}
+citation("DEGreport")
+citation("DESeq2")
+citation("ggplot2")
+citation("dplyr")
+```
+
+## R session 
+
+List and version of tools used for the QC report generation.
+
+```{r}
+sessionInfo()
+```
+

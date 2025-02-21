@@ -17,8 +17,8 @@ output:
 params:
   # Fill this file with the right paths to nfcore output
   # Put hg38, mm10, mm39, or other
-  # params_file: params_qc-example.R # example data
-  params_file: params_qc-example.R
+  # params_file: ../00_params/params.R 
+  params_file: ../00_params/params-example.R # example data
   genome: hg38
   single_end: false
   factor_of_interest: sample_type

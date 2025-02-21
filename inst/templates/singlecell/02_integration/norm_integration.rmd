@@ -143,7 +143,14 @@ To enable meaningful visualization of the data, we apply a minimal normalization
 
 **We start with log normalization because it is good to observe the data and any trends using a simple transformation. More complex methods like SCT can alter the data in a way that is not as intuitive to interpret.**
 
-```{r rna_norm0, warning=FALSE, message=FALSE}
+```{r, eval=file.exists("seurat_lognorm.rds")}
+#NOTE run the chunk below to create this object, and loading will be used while
+#     knitting to speed up the rendering
+seurat_lognorm = readRDS("seurat_lognorm.rds")
+```
+
+
+```{r rna_norm0, eval=!exists("seurat_lognorm"), warning=FALSE, message=FALSE}
 #Normalize data
 seurat_lognorm <- NormalizeData(seurat_qc,
                              normalization.method = "LogNormalize",
@@ -158,6 +165,9 @@ seurat_lognorm <- ScaleData(seurat_lognorm, model.use = "linear")
 # Calculate PCs and UMAP
 seurat_lognorm <- RunPCA(seurat_lognorm)
 seurat_lognorm <- RunUMAP(seurat_lognorm, 1:40)
+
+saveRDS(seurat_lognorm, file="seurat_lognorm.rds")
+
 ```
 
 ## Examine highly variable genes
@@ -296,7 +306,7 @@ We searched for the top 3000 genes with the largest variability in expression le
 **We keep each sample separate for SCT normalization.**
 
 ```{r, eval=file.exists("seurat_sctnorm.rds")}
-#NOTE run the chunck below to create this object, and loading will be used while
+#NOTE run the chunk below to create this object, and loading will be used while
 #     knitting to speed up the rendering
 seurat_sctnorm = readRDS("seurat_sctnorm.rds")
 ```
@@ -547,6 +557,16 @@ p1 | p2 | p3
 For single-modality scRNA-seq analysis, `Seurat` clusters the cells using a Louvain clustering approach. First, a K-nearest neighbor (KNN) graph is built, where cells are connected if they have a similar transcriptome, as determined from their scores on the first PCs. Then, the graph is partitioned into "communities" or "clusters" of interconnected cells that are more tightly connected with each other than with cells outside of the corresponding cluster.
 
 A limitation of this approach is that the number of identified clusters depends on the chosen resolution, a parameter that must be set by the user and does not necessarily reflect the underlying biology of the dataset. For most single-cell datasets, a resolution of 0.1 to 1 will provide a reasonable number of clusters. Complex datasets with multiple cell types may require a larger resolution, and vice versa.
+
+The code below will generate clusters for resolutions 0.1, 0.2, 0.4, 0.6, 0.8, and 1.0. Note that the names of the cluster will include important information about which slot in seurat was used for clustering.
+
+- Harmony with log normalized data : SNN_res.
+
+- Harmony with SCT normalized data : SCT_res.
+
+- CCA : integrated_snn_res.
+
+After generating these clusters we will examine them below using a tree based approach and simply overlaying cluster ids onto the umap. We recommend keeping all of the clusters in the metadata as you move forward in case you want to go back and try a different one. To switch between different resolutions you simply need to reset your cell identities to the correct column in the metadata. For example: `Idents(object = seurat_clust) <- "SCT_res.0.2"`
 
 ```{r find_neighbors all,  echo=TRUE}
 # NOTE use seurat_harmony or seurat_cca

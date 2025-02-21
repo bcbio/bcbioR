@@ -1,5 +1,6 @@
-# info params
-
+# project params
+date = "YYYYMMDD"
+basedir <- './' # where to write down output files
 
 # Example data
 coldata_fn='https://raw.githubusercontent.com/bcbio/bcbioR-test-data/devel/rnaseq/nf-core/coldata.csv'

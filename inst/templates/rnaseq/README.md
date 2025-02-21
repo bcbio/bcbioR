@@ -48,4 +48,7 @@ On the `YAML` header file of the `Rmd` you can specify some parameters or just s
 ### Gene pattern analysis
 
 - `04_gene_patterns/WGCNA.Rmd` shows an example on how to use the [WGCNA](https://cran.r-project.org/web/packages/WGCNA/index.html) package to find gene modules in the gene expression data.
+- `04_gene_patterns/DEGpatterns.Rmd` shows an example on hot to cluster set of genes across conditions and time points to identify specific profiles.
+
+
 
