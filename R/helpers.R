@@ -185,13 +185,31 @@ deploy_apps <- function(apps, path){
   })
 }
 
+deploy_repos <- function(repo_url, path){
+  ui_info("Getting templates from {ui_value(repo_url)}")
+
+  dest_file=file.path(path, paste0(names(repo_url), ".zip"))
+  download.file(url = repo_url,
+                destfile = dest_file)
+  unzip(zipfile = dest_file, exdir = dirname(dest_file))
+  fs::file_delete(dest_file)
+  repo_unzip_path <- file.path(path,
+                               paste0(names(repo_url), "-main"))
+  copy_files_in_folder(repo_unzip_path,
+                       path)
+  fs::dir_delete(repo_unzip_path)
+}
+
 copy_templates <- function(path, pipeline, org=NULL){
   apps=list()
   base = c("bcbioR")
+  repos = c()
   if (pipeline=="base"){
     parts = c("templates/base")
   }else if(pipeline=="nf-core/rnaseq"){
     parts = c("templates/rnaseq")
+    repos = "https://github.com/bcbio/rnaseq-reports/archive/refs/heads/main.zip"
+    names(repos)="rnaseq-reports"
   }else if(pipeline=="singlecell"){
     parts = c("templates/singlecell")
     apps=c(apps, scRNAseq_qc="https://github.com/hbc/scRNAseq_qc_app/archive/refs/heads/main.zip")
@@ -205,13 +223,19 @@ copy_templates <- function(path, pipeline, org=NULL){
   }else if(pipeline=="chipseq"){
     parts = c("templates/chipseq")
   }
-  analysis_template <- fs::path_package(base, parts)
 
-  ui_info("Getting templates from {ui_value(analysis_template)}")
-  # ls_files <- grep("org", list.files(analysis_template, full.names = TRUE),
-  #                  value = TRUE, invert = TRUE)
-  # ui_info("{ui_value(length(ls_files))} amount of files to copy")
-  copy_files_in_folder(analysis_template, path)
+  #check if it is url or folder
+  if (isUrl(repos)){
+    deploy_repos(repos, path)
+  }else{
+    analysis_template <- fs::path_package(base, parts)
+
+    ui_info("Getting templates from {ui_value(analysis_template)}")
+    # ls_files <- grep("org", list.files(analysis_template, full.names = TRUE),
+    #                  value = TRUE, invert = TRUE)
+    # ui_info("{ui_value(length(ls_files))} amount of files to copy")
+    copy_files_in_folder(analysis_template, path)
+  }
   if (!is.null(org)){
     org_template <- fs::path_package(base, parts, "org", org)
     if (fs::dir_exists(org_template)){
