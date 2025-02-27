@@ -202,7 +202,7 @@ metadata0 %>%
   	scale_x_log10() + 
   	theme_classic() +
   	geom_vline(xintercept = c(0.1)) + 
-    facet_wrap(. ~ surgery) +
+    facet_wrap(. ~ orig.ident) +
     ggtitle("Percentage of mitochondrial gene expression per cell in raw dataset")
 ```
 
