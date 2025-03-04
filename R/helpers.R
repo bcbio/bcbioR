@@ -203,7 +203,7 @@ deploy_repos <- function(repo_url, path){
 copy_templates <- function(path, pipeline, org=NULL){
   apps=list()
   base = c("bcbioR")
-  repos = c()
+  repos = c("none")
   if (pipeline=="base"){
     parts = c("templates/base")
   }else if(pipeline=="nf-core/rnaseq"){
