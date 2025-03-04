@@ -764,6 +764,24 @@ for (contrast in names(contrasts)){
 
 ```
 
+If you would like to use `DEGpatterns.Rmd` template to visualize trends of gene changes across conditions/groups, please save the following output:
+
+```{r}
+saveRDS(dds_to_use,"DEGpattern_deseq_obj.rds")
+saveRDS(coldata,"DEGpattern_deseq_meta.rds")
+
+padj.cutoff <- 0.05
+topN <- 1000
+deg_List <- imap(de_list,\(contrast_de,contrast){
+  res_LRT <- contrast_de[["sig"]]
+  gene_padj <- setNames(res_LRT$padj,rownames(res_LRT))
+  gene_sig <- gene_padj[gene_padj<padj.cutoff]
+  degs <- sort(gene_sig)[1:min(length(gene_sig),topN)]
+  saveRDS(degs,glue("DEGpattern_deseq_{contrast}_DEGs_padj{padj.cutoff}_topN{topN}.rds"))
+  return(degs)
+})
+# Please note, you can choose to combine all significant results across contrast as well
+```
 # Conclusion
 
 # Methods
