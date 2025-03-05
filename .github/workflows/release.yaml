@@ -1,0 +1,82 @@
+name: Create Release on Merge from Devel to Main
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout the repository
+      uses: actions/checkout@v2
+
+    - name: Get Latest Tag
+      id: get_latest_tag
+      run: |
+        git fetch --tags
+        latest_tag=$(git describe --tags `git rev-list --tags --max-count=1`)
+        latest_tag=${latest_tag:-'v0.0.0'}
+        echo "latest_tag=${latest_tag}" >> $GITHUB_ENV
+
+    - name: Determine Version Bump
+      id: version_bump
+      run: |
+        echo "Determining version bump from commit messages..."
+        major=0
+        minor=0
+        patch=0
+
+        # Get commit messages from last release tag to HEAD
+        commits=$(git log ${GITHUB_ENV[latest_tag]..HEAD --oneline --pretty=%B)
+
+        for commit in $commits; do
+          if [[ "$commit" == *"BREAKING CHANGE"* ]]; then
+            major=1
+            break
+          elif [[ "$commit" == *"feat:"* ]]; then
+            minor=1
+          elif [[ "$commit" == *"fix:"* ]]; then
+            patch=1
+          fi
+        done
+
+        IFS='.' read -r vmajor vminor vpatch <<< "${GITHUB_ENV[latest_tag]#v}"
+
+        if [[ "$major" -eq 1 ]]; then
+          vmajor=$((vmajor + 1))
+          vminor=0
+          vpatch=0
+        elif [[ "$minor" -eq 1 ]]; then
+          vminor=$((vminor + 1))
+          vpatch=0
+        elif [[ "$patch" -eq 1 ]]; then
+          vpatch=$((vpatch + 1))
+        fi
+
+        new_version="v${vmajor}.${vminor}.${vpatch}"
+        echo "new_version=${new_version}" >> $GITHUB_ENV
+        echo "New version is $new_version"
+
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ env.new_version }}
+        release_name: Release ${{ env.new_version }}
+        draft: false
+        prerelease: false
+
+    - name: Upload Release Asset
+      if: steps.create_release.outputs.upload_url != ''
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: path/to/your/asset.zip
+        asset_name: asset.zip
+        asset_content_type: application/zip

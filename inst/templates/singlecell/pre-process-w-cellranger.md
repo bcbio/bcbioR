@@ -211,7 +211,7 @@ for (i in 3:length(seurat_ID)) {
 
 seurat_merge <- merge(x = get(seurat_ID[1]), 
                       y = u,
-                      add.cell.ids = all_samples, 
+                      add.cell.ids = samples, 
                       project = "my_scRNA_project")
 
 ```
@@ -262,6 +262,8 @@ seurat_merge$Log10GenesPerUMI <- log10(seurat_merge$nFeature_RNA) / log10(seurat
 
 # Import experimental metadata
 metaexp <- read.csv("/path/to/experimental/metadata/meta.csv")
+metadata <- seurat_merge@meta.data
+metadata$barcode <- rownames(metadata)
 
 # Check matching of IDs
 all(metaexp$sample %in% metadata$orig.ident)
