@@ -73,10 +73,38 @@ knitr::opts_chunk[["set"]](
 
 
 
-```{r load and filter no ribo}
+```{r load }
 ## Load data
 seurat_raw <- readRDS(seurat_obj)
+```
 
+
+```{r find doublets, eval = F}
+# if you suspect that your dataset contains doublets, you can use this code to 
+# detect them and filter them out. if your seurat object contains data from more
+# than one sample, it is important to pass the metadata column containing the 
+# sample name to scDblFinder using the "samples" argument
+
+sce <- as.SingleCellExperiment(seurat_raw, assay = 'RNA')
+sce <- scDblFinder(sce, samples = "orig.ident")
+
+meta_scdblfinder <- sce@colData@listData %>%
+    as.data.frame() %>%
+    dplyr::select(starts_with("scDblFinder")) %>%
+  mutate(barcode = sce@colData@rownames)
+
+seurat_raw_meta <- seurat_raw@meta.data
+
+seurat_raw_meta_new <- seurat_raw_meta %>% left_join(meta_scdblfinder, by = 'barcode')
+rownames(seurat_raw_meta_new) <- seurat_raw_meta_new$barcode
+seurat_raw@meta.data <- seurat_raw_meta_new
+
+seurat_raw<- subset(seurat_raw, scDblFinder.class == 'singlet')
+
+
+```
+
+```{r filter no ribo, eval = !ribosomal, warning=FALSE, results='asis'}
 ## Creat QC object USE METRICS YOU CHOSE IN THE RSHINY APP
 
 seurat_qc <- subset(x = seurat_raw,
@@ -91,7 +119,7 @@ seurat_qc <- subset(x = seurat_raw,
 ```
 
 
-```{r load and filter ribo, eval=ribosomal, warning=FALSE, results='asis'}
+```{r filter ribo, eval=ribosomal, warning=FALSE, results='asis'}
 
 seurat_qc <- subset(x = seurat_raw,
                     subset = (nCount_RNA >= nCount_RNA_cutoff)
