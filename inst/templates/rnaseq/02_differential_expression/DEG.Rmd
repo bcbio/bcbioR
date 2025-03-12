@@ -749,11 +749,11 @@ for (contrast in names(contrasts)){
 
   name_deg_fn=file.path(
     basedir,
-    str_interp("${filename}_deg.csv"))
+    str_interp("${filename}_${contrast}_deg.csv"))
   
   name_pathways_fn=file.path(
     basedir,
-    str_interp("${filename}_pathways.csv"))
+    str_interp("${filename}_${contrast}_pathways.csv"))
 
   res_for_writing <- de_list[[contrast]][["all"]] %>% 
     mutate(comparison = contrast)
