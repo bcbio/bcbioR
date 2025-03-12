@@ -37,14 +37,11 @@ load_metrics <- function(multiqc_data_dir){
 }
 
 load_coldata <- function(coldata_fn, column=NULL, numerator=NULL, denominator=NULL, subset_column = NULL, subset_value = NULL){
-  coldata=read.csv(coldata_fn) %>%
-    dplyr::distinct(sample, .keep_all = T) %>%
+  coldata <- read.csv(coldata_fn) %>%
+    dplyr::distinct(sample_name, .keep_all = T) %>%
     dplyr::select(!matches("fastq")) %>%
     distinct()
-  if('description' %in% names(coldata)){
-    coldata$sample <- tolower(coldata$description)
-  }
-  coldata <- coldata %>% distinct(sample, .keep_all = T)
+
   if (!is.null(column))
     stopifnot(column %in% names(coldata))
 
@@ -52,14 +49,7 @@ load_coldata <- function(coldata_fn, column=NULL, numerator=NULL, denominator=NU
   if (!is.null(subset_column)){
     coldata <- coldata[coldata[[paste(subset_column)]] == subset_value, ]
   }
-  #coldata <- coldata[coldata[[paste(column)]] %in% c(numerator, denominator), ]
-  #browser()
-  coldata$sample <- make.names(coldata$sample)
-  rownames(coldata) <- coldata$sample
-  coldata$description <- coldata$sample
-  coldata$antibody <- ifelse(coldata$antibody == '', 'input', coldata$antibody)
-  coldata$type <- ifelse(coldata$antibody == 'input', 'input', 'chip')
-
+ 
   if (!is.null(denominator))
     coldata[[column]] = relevel(as.factor(coldata[[column]]), denominator)
 
@@ -102,15 +92,15 @@ make_diffbind_samplesheet <- function(coldata, bam_dir, peaks_dir, column = NULL
     mutate(SampleID = gsub('_peaks', '', SampleID))
   
   coldata_for_diffbind <- coldata %>% 
-    filter(!is.na(control) & control != '') %>%
-    dplyr::rename(ControlID = control, SampleID = sample, Factor = antibody) %>% 
-    separate(SampleID, into = c('sample', 'Replicate'), remove = F, sep = '_REP') 
+    dplyr::mutate(SampleID = paste0(sample, "_REP", replicate))
+
   coldata_for_diffbind$Condition <- coldata_for_diffbind[[column]]
   
-  samplesheet <- coldata_for_diffbind %>%
+  samplesheet <- coldata_for_diffbind %>% dplyr::select(SampleID, Condition, replicate) %>% 
     left_join(bam_files %>% dplyr::select(SampleID = sample, bamReads = bam), by = 'SampleID') %>%
-    left_join(bam_files %>% dplyr::select(ControlID = sample, bamControl = bam), by = 'ControlID') %>%
     left_join(peak_files, by = 'SampleID')
+  
+  samplesheet$PeakCaller <- "narrow"
   
   return(samplesheet)
 }
