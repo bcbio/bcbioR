@@ -454,7 +454,7 @@ seurat_cca= readRDS("seurat_cca.rds")
 ## SCT can be run with and without regressing out variables. Generally we do not regress out covariates. However, we provide both options below.
 
 ## To properly integrate with harmony we split our object by sample first.
-split_sctnorm <- SplitObject(seurat_lognorm, split.by = "orig.ident")
+split_sctnorm <- SplitObject(seurat_sctnorm, split.by = "orig.ident")
 # NOTE If we have a large dataset, then we might need to adjust the limit for allowable object sizes within R
 # options(future.globals.maxSize = 4000 * 1024^2)
 for (i in 1:length(split_sctnorm)) {
