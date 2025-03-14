@@ -20,7 +20,8 @@ params:
   # species = mouse or human
   params_file: params_diffbind-example.R
   project_file: ../information.R
-  functions_file: ../libs/load_data.R
+  # chose the functions that matches the pipeline: chip or atac
+  functions_file: ../libs/load_data_chip.R
   condition_of_interest: genotype
   numerator: cKO
   denominator: WT
