@@ -19,7 +19,8 @@ params:
   # params_file: params_qc_nf-core-example.R # example data
   params_file: params_qc-example.R
   project_file: ../information.R
-  functions_file: ../libs/load_data.R
+  # chose the functions that matches the pipeline: chip or atac
+  functions_file: ../libs/load_data_chip.R
   factor_of_interest: genotype
 ---
 
