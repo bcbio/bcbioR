@@ -1,0 +1,380 @@
+---
+title: "Visium post-QC clustering and cell type annotation"
+author: "Harvard Chan Bioinformatics Core"
+date: "`r Sys.Date()`"
+output:
+   html_document:
+      code_folding: hide
+      df_print: paged
+      highlights: pygments
+      number_sections: false
+      self_contained: true
+      theme: default
+      toc: true
+      toc_float:
+         collapsed: true
+         smooth_scroll: true
+params:
+  project_file: ./information.R
+  results_dir: ./results
+  visium_postQCF: "01_qc.RDS"
+  scrna_refF: "allen_scRNAseq_ref_subset.qs"
+---
+
+This code is in this ![](https://img.shields.io/badge/status-draft-grey) revision.
+
+```{r versioncheck, cache = FALSE, message = FALSE, warning=FALSE}
+library(rstudioapi)
+setwd(fs::path_dir(getSourceEditorContext()$path))
+stopifnot(R.version$major>= 4) # requires R4
+if (compareVersion(R.version$minor,"3.1")<0) warning("We recommend >= R4.3.1") 
+stopifnot(compareVersion(as.character(BiocManager::version()), "3.18")>=0)
+stopifnot(compareVersion(as.character(packageVersion("Seurat")), "5.1")>=0)
+```
+
+```{r load_libraries, cache = FALSE, message = FALSE, warning=FALSE, echo=FALSE,}
+library(bcbioR)
+library(knitr)
+# analysis-specific package
+library(Seurat)
+library(SeuratWrappers)
+library(Banksy)
+library(quadprog)
+library(spacexr)
+# General data-wrangling 
+library(glue)
+library(qs)
+library(tidyverse)
+# Plotting
+library(patchwork)
+library(ggprism)
+
+
+import::from(magrittr,set_colnames,set_rownames,"%<>%")
+invisible(list2env(params,environment()))
+source(project_file)
+
+ggplot2::theme_set(theme_prism(base_size = 12))
+# https://grafify-vignettes.netlify.app/colour_palettes.html
+# NOTE change colors here if you wish
+scale_colour_discrete <- function(...)
+  scale_colour_manual(..., 
+                      values = as.vector(grafify:::graf_palettes[["kelly"]]))
+scale_fill_discrete <- function(...)
+  scale_fill_manual(..., 
+                      values = as.vector(grafify:::graf_palettes[["kelly"]]))
+
+opts_chunk[["set"]](
+    cache = F,
+    cache.lazy = FALSE,
+    dev = c("png", "pdf"),
+    error = TRUE,
+    highlight = TRUE,
+    message = FALSE,
+    prompt = FALSE,
+    tidy = FALSE,
+    warning = FALSE,
+    echo = T, 
+    fig.height = 4)
+
+# set seed for reproducibility
+set.seed(1234567890L)
+options(future.globals.maxSize= 2000000000)
+
+inputRead <- function(f){
+  if(R.utils::isUrl(f)){f <- url(f)}
+  if(sum(endsWith(f,c("rds","RDS")))>0){
+    return(readRDS(f))
+  }else if(sum(endsWith(f,c("qs","QS")))>0){
+     return(qread(f))
+  }else{
+    print("Check file extension and choose appropriate functions!")
+  }
+}
+```
+
+## Project details 
+
+-   Project: `r project`
+-   PI: `r PI`
+-   Analyst: `r analyst`
+-   Experiment: `r experiment`
+-   Aim: `r aim`
+
+
+In this template, we assume you have already run QC on your visium data:
+
+- Remove genes that are contamination/poor quality-related (e.g. mitochondria or hemoglobin); 
+- Keep only cells that have all QC metrics passing the chosen thresholds
+
+Now, we will move to the analysis of Visium data, we will perform:
+
+- Normalization
+- Unsupervised sketch clustering
+- scRNA-seq data project
+
+# Normalize Data 
+
+Normalization is important in order to make expression counts comparable across genes and/or sample. We note that the best normalization methods for spatial data are still being developed and evaluated. Here we use a standard log-normalization.
+
+```{r normalize}
+visiumHD_postQCobj <- inputRead(visium_postQCF)
+assaytouse <- DefaultAssay(visiumHD_postQCobj)
+message("Default assay: [",assaytouse,
+        "] used, please change it if another assay is of interest.")
+object_filt <- NormalizeData(visiumHD_postQCobj, assay = assaytouse)
+```
+
+# Unsupervised Clustering 
+
+The authors of the `Seurat` package recommend the `Seurat` v5 **[sketch clustering](https://satijalab.org/seurat/articles/seurat5_sketch_analysis)** workflow because it exhibits improved performance, especially for identifying rare and spatially restricted groups. 
+
+Sketch-based analyses aim to "subsample" large datasets in a way that preserves rare populations. Here, we sketch the Visium HD dataset, perform clustering on the subsampled cells, and then project the cluster labels back to the full dataset.
+
+```{r create sketch assay}
+object_filt <- FindVariableFeatures(object_filt)
+# we select 10,000 cells and create a new 'sketch' assay
+object_filt <- SketchData(
+  object = object_filt,
+  assay = assaytouse,
+  ncells = 10000,
+  method = "LeverageScore",
+  sketched.assay = "sketch"
+)
+
+```
+
+```{r perform sketched clustering}
+# switch analysis to sketched cells
+DefaultAssay(object_filt) <- "sketch"
+
+# perform clustering workflow
+object_filt <- FindVariableFeatures(object_filt)
+object_filt <- ScaleData(object_filt)
+object_filt <- RunPCA(object_filt, assay = "sketch", reduction.name = "pca.sketch")
+# default first 50 PCs are used
+object_filt <- FindNeighbors(object_filt, assay = "sketch", 
+                             reduction = "pca.sketch", 
+                             dims = 1:50)
+# you may want to tweak resolution parameter in your own data
+object_filt <- FindClusters(object_filt, cluster.name = "seurat_cluster.sketched", 
+                            resolution = .65)
+# Use the same dimension of PCs for both FindNeighbors and run UMAP
+object_filt <- RunUMAP(object_filt, reduction = "pca.sketch", 
+                       reduction.name = "umap.sketch", return.model = T, 
+                       dims = 1:50)
+```
+
+```{r project clusters}
+object_filt <- ProjectData(
+  object = object_filt,
+  assay = assaytouse,
+  full.reduction = "full.pca.sketch",
+  sketched.assay = "sketch",
+  sketched.reduction = "pca.sketch",
+  umap.model = "umap.sketch",
+  dims = 1:50,
+  refdata = list(seurat_cluster.projected = "seurat_cluster.sketched")
+)
+
+```
+
+```{r visualize clusters,fig.height = 5,fig.width = 10}
+object_filt$seurat_cluster.projected <- object_filt$seurat_cluster.projected %>% 
+  as.numeric %>% as.factor()
+
+DefaultAssay(object_filt) <- "sketch"
+Idents(object_filt) <- "seurat_cluster.sketched"
+p1 <- DimPlot(object_filt, reduction = "umap.sketch", label = F, cols = 'polychrome') + 
+  ggtitle("Sketched clustering") + 
+  theme(legend.position = "bottom")+  
+  guides(color = guide_legend(override.aes = list(size=4), ncol=5) )
+
+# switch to full dataset
+DefaultAssay(object_filt) <- assaytouse
+Idents(object_filt) <- "seurat_cluster.projected"
+p2 <- DimPlot(object_filt, reduction = "full.umap.sketch", label = F, raster = F, 
+              cols = 'polychrome') +
+  ggtitle("Projected clustering") + 
+  theme(legend.position = "bottom")+  
+  guides(color = guide_legend(override.aes = list(size=4), ncol=5) )
+
+p1 | p2
+```
+
+```{r visualize clusters on image}
+
+color_pal = Seurat::DiscretePalette(n = length(unique(object_filt$seurat_cluster.projected)),
+                                    palette = "polychrome")
+names(color_pal) <- sort(unique(object_filt$seurat_cluster.projected))
+image_seurat_clusters <- SpatialDimPlot(object_filt, 
+                                        group.by = 'seurat_cluster.projected', 
+                                        pt.size.factor = 8, cols = color_pal) + 
+  theme(legend.position = "bottom",legend.title=element_blank())+  
+  guides(fill = guide_legend(override.aes = list(size=4,name=""), ncol=5) )
+
+image_seurat_clusters
+```
+
+# Spatially-informed Clustering 
+
+BANKSY is another method for performing clustering. 
+
+Unlike Seurat, BANKSY takes into account not only an individual spot’s expression pattern but also the mean and the gradient of gene expression levels in a spot’s broader neighborhood. This makes it valuable for identifying and segmenting spatial tissue domains.
+
+```{r run banksy}
+# lambda: (numeric between 0-1) Spatial weight parameter
+# k_geom: (integer) kNN parameter - number of neighbors to use, default is 15
+
+# Please consider tweaking those two parameters based on your understanding of your data
+
+object_filt <- RunBanksy(object_filt, lambda = 0.8, verbose = T,
+                         assay = assaytouse, slot = 'data', k_geom = 50)
+object_filt <- RunPCA(object_filt, assay = "BANKSY", 
+                      reduction.name = "pca.banksy", 
+                      features = rownames(object_filt), 
+                      npcs = 30)
+object_filt <- FindNeighbors(object_filt, 
+                             reduction = "pca.banksy", 
+                             dims = 1:30)
+# again, do not forget to try different resolutions
+object_filt <- FindClusters(object_filt, cluster.name = "banksy_cluster",
+                            resolution = 0.5)
+```
+
+```{r}
+color_pal = Seurat::DiscretePalette(n = length(unique(object_filt$banksy_cluster)),
+                                    palette = "polychrome")
+names(color_pal) <- sort(unique(object_filt$banksy_cluster))
+
+image_banksy_clusters <- SpatialDimPlot(object_filt, 
+                                        group.by = "banksy_cluster", 
+                                        pt.size.factor = 7,
+               cols = color_pal)+ 
+  theme(legend.position = "bottom",legend.title=element_blank())+  
+  guides(fill = guide_legend(override.aes = list(size=4,name=""), ncol=5) )
+
+image_seurat_clusters | image_banksy_clusters
+
+```
+
+# Cell Type Annotation 
+
+Perhaps we are particularly interested in understanding the organization of cell types in the cortical region of the brain. 
+
+We first subset our Seurat object to this region of interest.
+
+```{r}
+# change the list of clusters to your interest regions based on previous clustering results
+ROI <- subset(object_filt, seurat_cluster.projected %in% c(18, 19, 7, 2, 4))
+
+color_pal = Seurat::DiscretePalette(n = length(unique(object_filt$seurat_cluster.projected)),
+                                    palette = "polychrome")
+names(color_pal) <- sort(unique(object_filt$seurat_cluster.projected))
+SpatialDimPlot(ROI, group.by = 'seurat_cluster.projected', 
+               pt.size.factor = 8, cols = color_pal)+ 
+  theme(legend.position = "bottom",legend.title=element_blank())+  
+  guides(fill = guide_legend(override.aes = list(size=4,name=""), ncol=5) )
+```
+
+To perform accurate annotation of cell types, we must also take into consideration that our 16 um spots may contain one or more cells each. The method Robust Cell Type Deconvolution (**RCTD**) has been shown to accurately annotate spatial data from a variety of technologies while taking into consideration that a single spot may exhibit multiple cell type profiles.
+
+RCTD takes an scRNA-seq dataset as a reference and a spatial dataset as a query. For a reference, we use a subsampled version of the mouse scRNA-seq dataset from the Allen Brain Atlas. We use our cortex Seurat object as the spatial query. For computational efficiency, we sketch the spatial query dataset, apply RCTD to deconvolute the ‘sketched’ cortical cells and annotate them, and then project these annotations to the full cortical dataset.
+
+```{r sketch cortex}
+DefaultAssay(ROI) <- assaytouse
+ROI <- FindVariableFeatures(ROI)
+ROI <- SketchData(
+  object = ROI,
+  ncells = 3000,
+  method = "LeverageScore",
+  sketched.assay = "sketch"
+)
+
+DefaultAssay(ROI) <- "sketch"
+ROI <- ScaleData(ROI)
+ROI <- RunPCA(ROI, assay = "sketch", reduction.name = "pca.ROI.sketch", verbose = T)
+ROI <- FindNeighbors(ROI, reduction = "pca.ROI.sketch", dims = 1:50)
+ROI <- RunUMAP(ROI, reduction = "pca.ROI.sketch", reduction.name = "umap.ROI.sketch", return.model = T, dims = 1:50, verbose = T)
+
+counts_hd <- ROI[["sketch"]]$counts
+ROI_cells_hd <- colnames(ROI[["sketch"]])
+coords <- GetTissueCoordinates(ROI)[ROI_cells_hd, 1:2]
+
+# create the RCTD query object
+query <- SpatialRNA(coords, counts_hd, colSums(counts_hd))
+```
+
+# Reference projection 
+
+```{r load ref, prep for RCTD}
+ref_subset <- inputRead(scrna_refF)
+# Check the label column you want to use from the scRNA-seq obs data
+Idents(ref_subset) <- "subclass_label"
+counts <- ref_subset[["RNA"]]$counts
+cluster <- as.factor(ref_subset$subclass_label)
+nUMI <- ref_subset$nCount_RNA
+levels(cluster) <- gsub("/", "-", levels(cluster))
+cluster <- droplevels(cluster)
+
+# create the RCTD reference object
+reference <- Reference(counts, cluster, nUMI)
+
+```
+
+```{r run RCTD}
+RCTD <- create.RCTD(query, reference, max_cores = 6)
+RCTD <- run.RCTD(RCTD, doublet_mode = "doublet") # this command takes ~15 mins to run
+
+# add results back to Seurat object
+ROI <- AddMetaData(ROI, metadata = RCTD@results$results_df)
+
+```
+
+```{r project to all cortical cells}
+ROI$first_type <- as.character(ROI$first_type)
+ROI$first_type[is.na(ROI$first_type)] <- "Unknown"
+ROI <- ProjectData(
+  object = ROI,
+  assay = assaytouse,
+  full.reduction = "pca.ROI",
+  sketched.assay = "sketch",
+  sketched.reduction = "pca.ROI.sketch",
+  umap.model = "umap.ROI.sketch",
+  dims = 1:50,
+  refdata = list(full_first_type = "first_type")
+)
+```
+
+We can see that the excitatory neurons are located in layers at varying cortical depths, as expected
+
+```{r visualize labels}
+
+Idents(ROI) <- "full_first_type"
+cells <- CellsByIdentities(ROI)
+# Layered (starts with L), excitatory neurons in the ROI
+excitatory_names <- sort(grep("^L.* CTX", names(cells), value = TRUE))
+SpatialDimPlot(ROI, cells.highlight = cells[excitatory_names], 
+               cols.highlight = c("#FFFF00", "grey50"), facet.highlight = T, 
+               combine = T, ncol = 4, pt.size.factor = 8)
+```
+
+
+## Methods
+
+
+### Citation
+
+```{r citations}
+citation("Seurat")
+citation("Banksy")
+citation("quadprog")
+citation("spacexr")
+```
+
+### Session Information
+
+```{r}
+sessionInfo()
+```
+
