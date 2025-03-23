@@ -3,7 +3,7 @@ pkgdown: 2.1.1
 pkgdown_sha: ~
 articles:
   bcbioR_quick_start: bcbioR_quick_start.html
-last_built: 2025-03-14T18:53Z
+last_built: 2025-03-23T22:55Z
 urls:
   reference: http://bcb.io/bcbioR/reference
   article: http://bcb.io/bcbioR/articles
