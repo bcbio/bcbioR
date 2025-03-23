@@ -212,6 +212,8 @@ copy_templates <- function(path, pipeline, org=NULL){
     names(repos)="rnaseq-reports"
   }else if(pipeline=="singlecell"){
     parts = c("templates/singlecell")
+    # repos = "https://github.com/bcbio/singlecell-reports"
+    # names(repos)="singlecell-reports"
     apps=c(apps, scRNAseq_qc="https://github.com/hbc/scRNAseq_qc_app/archive/refs/heads/main.zip")
   }else if(pipeline=="singlecell_delux"){
     parts = c("templates/singlecell_delux")

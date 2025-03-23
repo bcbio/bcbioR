@@ -29,7 +29,7 @@ jobs:
         patch=0
 
         # Get commit messages from last release tag to HEAD
-        commits=$(git log ${GITHUB_ENV[latest_tag]..HEAD --oneline --pretty=%B)
+        commits=$(git log ${GITHUB_ENV[latest_tag]..HEAD} --oneline --pretty=%B)
 
         for commit in $commits; do
           if [[ "$commit" == *"BREAKING CHANGE"* ]]; then
