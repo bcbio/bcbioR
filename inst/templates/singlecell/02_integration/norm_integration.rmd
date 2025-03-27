@@ -323,6 +323,9 @@ seurat_sctnorm <- SCTransform(seurat_lognorm,
                               vst.flavor = "v2",
                               # vars.to.regress = c("mitoRatio")
                               variable.features.n = 3000)
+seurat_sctnorm <- RunPCA(seurat_sctnorm)
+seurat_sctnorm <- RunUMAP(seurat_sctnorm, 1:40)
+
 saveRDS(seurat_sctnorm, file="seurat_sctnorm.rds")
 ```
 
@@ -334,7 +337,6 @@ We qualitatively reviewed the "structure" in our normalized data projection . We
 
 ```{r, fig.width=10}
 DefaultAssay(seurat_sctnorm) <- "SCT"
-seurat_sctnorm <- RunPCA(seurat_sctnorm)
 UMAPPlot(seurat_sctnorm, group.by = "orig.ident") + ggtitle("UMAP")
 ```
 
