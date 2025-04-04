@@ -1,3 +1,33 @@
+# bcbioR 0.4.4
+
+init QC single cell adding init file for params for single QC #123
+on disk seurat object How to make a Seurat object with BPcells-good for big objects #128
+add gene name to count matrix Add gene name to counts files rnaseq-reports#8
+Add style checks to rnaseq and singlecell repositories
+Restructure singlecell readmes
+
+# bcbioR 0.4.3
+
+migrate rnaseq templates to its own repo #120
+add HD visium QC #101
+add HD visum clustering #102
+include code to generate files for DEGpattern #116
+double code for single cell #130
+adapt to QC to ATACseq #133
+fix error in names #132
+fix GSEA rnaseq error and styling code bcbio/rnaseq-reports#2
+
+# bcbioR 0.4.2
+
+Filter genes according biotype or gene name #117
+Add Visium HD QC #101 #115
+Add degPattern template #97
+Collapse multiple params files #65
+Add rmaseq library links #60
+Fix version comparison #104
+Save log object in sc data #105
+More docs for clusters ids #106
+
 # bcbioR 0.4.1
 
 - in DEG.Rmd, write expression table only once	https://github.com/bcbio/bcbioR/issues/63
