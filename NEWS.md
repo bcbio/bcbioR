@@ -1,5 +1,10 @@
 # bcbioR 0.4.4
 
+init QC single cell adding init file for params for single QC #123
+on disk seurat object How to make a Seurat object with BPcells-good for big objects #128
+add gene name to count matrix Add gene name to counts files rnaseq-reports#8
+Add style checks to rnaseq and singlecell repositories
+Restructure singlecell readmes
 
 # bcbioR 0.4.3
 
